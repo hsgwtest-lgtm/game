@@ -1,85 +1,115 @@
-// ── World: Sandbox Environment ──
-// Manages all entities, environment state, day/night cycle, and natural spawning.
+// ── World: Sandbox Environment with Ant Colony ──
+// Manages all entities, pheromone grid, nest, day/night, and natural spawning.
 
 class GameWorld {
   constructor(w, h) {
-    this.pixelScale = 3; // each pixel is 3x3 screen pixels
-    this.width = Math.floor(w / this.pixelScale);
+    this.pixelScale = 3;
+    this.width  = Math.floor(w / this.pixelScale);
     this.height = Math.floor(h / this.pixelScale);
-    this.screenWidth = w;
+    this.screenWidth  = w;
     this.screenHeight = h;
 
-    this.creatures = [];
-    this.foods = [];
-    this.rocks = [];
-    this.lights = [];
+    this.creatures     = [];
+    this.foods         = [];
+    this.rocks         = [];
+    this.lights        = [];
     this.pendingBirths = [];
-    this.particles = []; // ambient particles
+    this.particles     = [];
 
-    this.maxCreatures = 40;
-    this.maxFood = 120;
-    this.temperature = 50;  // 0-100
-    this.humidity = 50;     // 0-100
-    this.time = 0;
-    this.dayTime = 0;       // 0-1 cycle (0=dawn, 0.25=noon, 0.5=dusk, 0.75=midnight)
-    this.dayLength = 60;    // seconds per full day cycle
-    this.isNight = false;
-    this.manualNight = false;
-    this.paused = false;
+    this.maxCreatures = 50;
+    this.maxFood      = 110;
+    this.temperature  = 50;
+    this.humidity     = 50;
+    this.time         = 0;
+    this.dayTime      = 0;
+    this.dayLength    = 60;
+    this.isNight      = false;
+    this.manualNight  = false;
+    this.paused       = false;
     this.maxGeneration = 0;
-
-    // Ambient light map (simplified: uniform + light sources)
     this.ambientLight = 0.8;
+
+    // Colony
+    this.nest           = null;
+    this.nestFood       = 0;   // total food delivered all time
+    this._nestSpawnTimer = 0;
+
+    // Pheromone grid (world-pixel resolution ÷ pheroSize)
+    this.pheroSize = 3;
+    this._initPheroGrid();
   }
 
+  // ── Pheromone grid ──
+  _initPheroGrid() {
+    this.pheroWidth  = Math.ceil(this.width  / this.pheroSize) + 2;
+    this.pheroHeight = Math.ceil(this.height / this.pheroSize) + 2;
+    this.pheromones  = new Float32Array(this.pheroWidth * this.pheroHeight);
+  }
+
+  getPheromone(wx, wy) {
+    const cx = Math.floor(wx / this.pheroSize);
+    const cy = Math.floor(wy / this.pheroSize);
+    if (cx < 0 || cx >= this.pheroWidth || cy < 0 || cy >= this.pheroHeight) return 0;
+    return this.pheromones[cy * this.pheroWidth + cx];
+  }
+
+  depositPheromone(wx, wy, amount) {
+    const cx = Math.floor(wx / this.pheroSize);
+    const cy = Math.floor(wy / this.pheroSize);
+    if (cx < 0 || cx >= this.pheroWidth || cy < 0 || cy >= this.pheroHeight) return;
+    const idx = cy * this.pheroWidth + cx;
+    this.pheromones[idx] = Math.min(1.0, this.pheromones[idx] + amount * 0.06);
+  }
+
+  _decayPheromones(dt) {
+    // Decay ~4% per second → half-life ≈17 s, full evaporation ≈25 s
+    const factor = 1 - dt * 0.04;
+    for (let i = 0; i < this.pheromones.length; i++) {
+      const v = this.pheromones[i] * factor;
+      this.pheromones[i] = v < 0.005 ? 0 : v;
+    }
+  }
+
+  // ── Resize ──
   resize(w, h) {
-    this.width = Math.floor(w / this.pixelScale);
+    this.width  = Math.floor(w / this.pixelScale);
     this.height = Math.floor(h / this.pixelScale);
-    this.screenWidth = w;
+    this.screenWidth  = w;
     this.screenHeight = h;
+    this._initPheroGrid();
   }
 
-  // Get light level at a world position (0-1)
+  // ── Light ──
   getLightAt(x, y) {
     let light = this.ambientLight;
     for (const ls of this.lights) {
-      const dx = x - ls.x;
-      const dy = y - ls.y;
+      const dx = x - ls.x, dy = y - ls.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < ls.radius) {
-        light += ls.intensity * (1 - dist / ls.radius);
-      }
+      if (dist < ls.radius) light += ls.intensity * (1 - dist / ls.radius);
     }
     return Math.min(1, light);
   }
 
+  // ── Spawn helpers ──
   spawnCreature(x, y, params) {
     if (this.creatures.length >= this.maxCreatures) return null;
-    // Convert screen coords to world coords
-    const wx = x / this.pixelScale;
-    const wy = y / this.pixelScale;
-    const c = new Creature(wx, wy, params);
+    const c = new Creature(x / this.pixelScale, y / this.pixelScale, params);
     this.creatures.push(c);
     return c;
   }
 
   spawnFood(x, y, type) {
-    if (this.foods.length >= this.maxFood) return;
-    const wx = x / this.pixelScale;
-    const wy = y / this.pixelScale;
-    this.foods.push(new Food(wx, wy, type));
+    const alive = this.foods.filter(f => f.alive).length;
+    if (alive >= this.maxFood) return;
+    this.foods.push(new Food(x / this.pixelScale, y / this.pixelScale, type));
   }
 
   spawnRock(x, y) {
-    const wx = x / this.pixelScale;
-    const wy = y / this.pixelScale;
-    this.rocks.push(new Rock(wx, wy));
+    this.rocks.push(new Rock(x / this.pixelScale, y / this.pixelScale));
   }
 
   addLight(x, y) {
-    const wx = x / this.pixelScale;
-    const wy = y / this.pixelScale;
-    this.lights.push(new LightSource(wx, wy, 50, 1));
+    this.lights.push(new LightSource(x / this.pixelScale, y / this.pixelScale, 50, 1));
   }
 
   // Apply gentle push from user touch (なでる)
@@ -88,11 +118,9 @@ class GameWorld {
     const wy = screenY / this.pixelScale;
     for (const c of this.creatures) {
       if (!c.alive) continue;
-      const dx = c.x - wx;
-      const dy = c.y - wy;
+      const dx = c.x - wx, dy = c.y - wy;
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist < 30) {
-        // Gentle push away from touch + slight energy boost
         const pushForce = strength / (dist + 5);
         c.x += dx * pushForce * 0.5;
         c.y += dy * pushForce * 0.5;
@@ -104,18 +132,22 @@ class GameWorld {
     }
   }
 
+  // ── Natural food spawning ──
   _naturalFoodSpawn(dt) {
-    // Spawn food naturally
-    const spawnRate = this.humidity / 100 * 3; // higher humidity = more food
-    if (this.foods.length < this.maxFood * 0.5 && Math.random() < dt * spawnRate) {
-      const x = 5 + Math.random() * (this.width - 10);
-      const y = 5 + Math.random() * (this.height - 10);
-      // Avoid rocks
+    const aliveFood = this.foods.filter(f => f.alive).length;
+    const spawnRate = (this.humidity / 100) * 2.5;
+    if (aliveFood < this.maxFood * 0.45 && Math.random() < dt * spawnRate) {
+      const x = 8 + Math.random() * (this.width - 16);
+      const y = 8 + Math.random() * (this.height - 16);
+      // Avoid nest area
       let blocked = false;
-      for (const r of this.rocks) {
-        if (Math.abs(r.x - x) < r.size && Math.abs(r.y - y) < r.size) {
-          blocked = true;
-          break;
+      if (this.nest) {
+        const dx = x - this.nest.x, dy = y - this.nest.y;
+        if (dx * dx + dy * dy < (this.nest.radius * 2.5) * (this.nest.radius * 2.5)) blocked = true;
+      }
+      if (!blocked) {
+        for (const r of this.rocks) {
+          if (Math.abs(r.x - x) < r.size + 1 && Math.abs(r.y - y) < r.size + 1) { blocked = true; break; }
         }
       }
       if (!blocked) {
@@ -124,19 +156,50 @@ class GameWorld {
     }
   }
 
+  // ── Nest-based spawning ──
+  _updateNestSpawning(dt) {
+    if (!this.nest) return;
+    this._nestSpawnTimer += dt;
+    // Once foodStored threshold (5) is reached, consume it and spawn a creature (max 1 per 10 s)
+    if (this.nest.foodStored >= 5 && this._nestSpawnTimer >= 10 &&
+        this.creatures.length < this.maxCreatures) {
+      this.nest.foodStored -= 5;
+      this._nestSpawnTimer = 0;
+      const angle = Math.random() * Math.PI * 2;
+      const r = this.nest.radius + 4;
+      const nc = new Creature(
+        this.nest.x + Math.cos(angle) * r,
+        this.nest.y + Math.sin(angle) * r,
+        { energy: 65, generation: this.maxGeneration }
+      );
+      this.creatures.push(nc);
+      // Celebration burst
+      for (let i = 0; i < 10; i++) {
+        this.particles.push({
+          x: this.nest.x, y: this.nest.y,
+          vx: (Math.random() - 0.5) * 18,
+          vy: (Math.random() - 0.5) * 18 - 4,
+          life: 1, type: 'sparkle',
+        });
+      }
+    }
+  }
+
+  // ── Ambient particles ──
   _spawnAmbientParticles(dt) {
     if (Math.random() < dt * 2 && this.particles.length < 30) {
       this.particles.push({
-        x: Math.random() * this.width,
-        y: Math.random() * this.height,
-        vx: (Math.random() - 0.5) * 2,
-        vy: -Math.random() * 3 - 1,
+        x:    Math.random() * this.width,
+        y:    Math.random() * this.height,
+        vx:   (Math.random() - 0.5) * 2,
+        vy:   -Math.random() * 3 - 1,
         life: 1,
         type: this.isNight ? 'firefly' : 'pollen',
       });
     }
   }
 
+  // ── Main update ──
   update(dt) {
     if (this.paused) return;
     dt = Math.min(dt, 0.05);
@@ -148,19 +211,19 @@ class GameWorld {
       this.ambientLight = 0.15;
       this.isNight = true;
     } else {
-      // Smooth day/night: peaks at noon (0.25), darkest at midnight (0.75)
       const sunAngle = this.dayTime * Math.PI * 2;
       this.ambientLight = 0.3 + 0.6 * Math.max(0, Math.cos(sunAngle - Math.PI * 0.5));
       this.isNight = this.ambientLight < 0.35;
     }
 
-    // Natural food spawning
     this._naturalFoodSpawn(dt);
-
-    // Ambient particles
     this._spawnAmbientParticles(dt);
+    this._decayPheromones(dt);
 
-    // Update particles
+    if (this.nest) this.nest.update(dt);
+    this._updateNestSpawning(dt);
+
+    // Particles
     for (const p of this.particles) {
       p.x += p.vx * dt;
       p.y += p.vy * dt;
@@ -170,23 +233,19 @@ class GameWorld {
         p.vy += (Math.random() - 0.5) * dt * 10;
       }
     }
-    this.particles = this.particles.filter(p => p.life > 0 && p.x > 0 && p.x < this.width && p.y > 0 && p.y < this.height);
+    this.particles = this.particles.filter(
+      p => p.life > 0 && p.x > 0 && p.x < this.width && p.y > 0 && p.y < this.height
+    );
 
-    // Update lights
-    for (const l of this.lights) {
-      l.update(dt);
-    }
+    // Lights
+    for (const l of this.lights) l.update(dt);
     this.lights = this.lights.filter(l => l.life > 0);
 
-    // Update food
-    for (const f of this.foods) {
-      f.update(dt, this.getLightAt(f.x, f.y));
-    }
+    // Food
+    for (const f of this.foods) f.update(dt, this.getLightAt(f.x, f.y));
 
-    // Update creatures
-    for (const c of this.creatures) {
-      c.update(dt, this);
-    }
+    // Creatures
+    for (const c of this.creatures) c.update(dt, this);
 
     // Process births
     const births = [];
@@ -195,101 +254,122 @@ class GameWorld {
         const child = parent.reproduce();
         if (child) {
           births.push(child);
-          if (child.generation > this.maxGeneration) {
-            this.maxGeneration = child.generation;
-          }
+          if (child.generation > this.maxGeneration) this.maxGeneration = child.generation;
         }
       }
     }
     this.pendingBirths = [];
-    for (const b of births) {
-      this.creatures.push(b);
-    }
+    for (const b of births) this.creatures.push(b);
 
-    // Remove dead
-    const deadCreatures = this.creatures.filter(c => !c.alive);
-    for (const dead of deadCreatures) {
-      // Spawn food from dead creature
-      const numDrops = 2 + Math.floor(Math.random() * 3);
-      for (let i = 0; i < numDrops; i++) {
-        const fx = dead.x + (Math.random() - 0.5) * 8;
-        const fy = dead.y + (Math.random() - 0.5) * 8;
-        if (this.foods.length < this.maxFood) {
-          this.foods.push(new Food(fx, fy, 'fruit'));
+    // Remove dead creatures (leave food scraps)
+    const dead = this.creatures.filter(c => !c.alive);
+    for (const d of dead) {
+      const aliveFood = this.foods.filter(f => f.alive).length;
+      if (aliveFood < this.maxFood) {
+        for (let i = 0; i < 2; i++) {
+          this.foods.push(new Food(
+            d.x + (Math.random() - 0.5) * 6,
+            d.y + (Math.random() - 0.5) * 6,
+            'fruit'
+          ));
         }
       }
-      // Death particles
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 4; i++) {
         this.particles.push({
-          x: dead.x,
-          y: dead.y,
+          x: d.x, y: d.y,
           vx: (Math.random() - 0.5) * 10,
-          vy: (Math.random() - 0.5) * 10 - 5,
-          life: 1,
-          type: 'sparkle',
+          vy: (Math.random() - 0.5) * 10 - 3,
+          life: 1, type: 'sparkle',
         });
       }
     }
     this.creatures = this.creatures.filter(c => c.alive);
-    this.foods = this.foods.filter(f => f.alive);
+    this.foods     = this.foods.filter(f => f.alive);
 
-    // Auto-spawn if population dies out (fixed-rate timer)
+    // Auto-respawn if colony dies out
     if (this.creatures.length === 0) {
       this._respawnTimer = (this._respawnTimer || 0) + dt;
-      if (this._respawnTimer >= 2) {
+      if (this._respawnTimer >= 3) {
         this._respawnTimer = 0;
-        const x = this.width * 0.3 + Math.random() * this.width * 0.4;
-        const y = this.height * 0.3 + Math.random() * this.height * 0.4;
-        this.creatures.push(new Creature(x, y));
+        const bx = this.nest ? this.nest.x : this.width * 0.5;
+        const by = this.nest ? this.nest.y : this.height * 0.5;
+        for (let i = 0; i < 5; i++) {
+          const a = (i / 5) * Math.PI * 2;
+          this.creatures.push(new Creature(bx + Math.cos(a) * 12, by + Math.sin(a) * 12, { energy: 70 }));
+        }
       }
     } else {
       this._respawnTimer = 0;
     }
   }
 
+  // ── Reset / init ──
   reset() {
-    this.creatures = [];
-    this.foods = [];
-    this.rocks = [];
-    this.lights = [];
-    this.particles = [];
+    this.creatures     = [];
+    this.foods         = [];
+    this.rocks         = [];
+    this.lights        = [];
+    this.particles     = [];
     this.pendingBirths = [];
-    this.time = 0;
+    this.time          = 0;
     this.maxGeneration = 0;
+    this.nestFood      = 0;
+    this._nestSpawnTimer = 0;
+    this._respawnTimer   = 0;
+    this._initPheroGrid();
 
-    // Spawn initial creatures
-    for (let i = 0; i < 8; i++) {
-      const x = this.width * 0.15 + Math.random() * this.width * 0.7;
-      const y = this.height * 0.15 + Math.random() * this.height * 0.7;
-      this.creatures.push(new Creature(x, y));
+    // Place nest roughly in the center
+    this.nest = new Nest(
+      Math.floor(this.width  * 0.5),
+      Math.floor(this.height * 0.55)
+    );
+
+    // Initial creatures fanning out from nest
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      const r = this.nest.radius + 5 + Math.random() * 8;
+      this.creatures.push(new Creature(
+        this.nest.x + Math.cos(angle) * r,
+        this.nest.y + Math.sin(angle) * r,
+        { energy: 85 }
+      ));
     }
 
-    // Spawn initial food
-    for (let i = 0; i < 40; i++) {
-      const x = 5 + Math.random() * (this.width - 10);
-      const y = 5 + Math.random() * (this.height - 10);
-      this.foods.push(new Food(x, y, Math.random() < 0.2 ? 'fruit' : 'plant'));
+    // Scatter food (avoid nest proximity)
+    for (let i = 0; i < 55; i++) {
+      let x, y, ok = false, tries = 0;
+      while (!ok && tries < 30) {
+        x = 8 + Math.random() * (this.width - 16);
+        y = 8 + Math.random() * (this.height - 16);
+        const dx = x - this.nest.x, dy = y - this.nest.y;
+        ok = dx * dx + dy * dy > (this.nest.radius * 2.5) * (this.nest.radius * 2.5);
+        tries++;
+      }
+      if (ok) this.foods.push(new Food(x, y, Math.random() < 0.2 ? 'fruit' : 'plant'));
     }
 
-    // Spawn some rocks
-    for (let i = 0; i < 6; i++) {
-      const x = 10 + Math.random() * (this.width - 20);
-      const y = 10 + Math.random() * (this.height - 20);
-      this.rocks.push(new Rock(x, y));
+    // Rocks (avoid nest)
+    for (let i = 0; i < 5; i++) {
+      let x, y, ok = false, tries = 0;
+      while (!ok && tries < 20) {
+        x = 10 + Math.random() * (this.width - 20);
+        y = 10 + Math.random() * (this.height - 20);
+        const dx = x - this.nest.x, dy = y - this.nest.y;
+        ok = dx * dx + dy * dy > (this.nest.radius * 3) * (this.nest.radius * 3);
+        tries++;
+      }
+      if (ok) this.rocks.push(new Rock(x, y));
     }
   }
 
-  // Get the creature at a screen position (for info panel)
+  // ── Creature tap detection ──
   getCreatureAt(screenX, screenY) {
     const wx = screenX / this.pixelScale;
     const wy = screenY / this.pixelScale;
     for (const c of this.creatures) {
       if (!c.alive) continue;
-      const dx = c.x - wx;
-      const dy = c.y - wy;
-      if (dx * dx + dy * dy < (c.dna.size + 3) * (c.dna.size + 3)) {
-        return c;
-      }
+      const dx = c.x - wx, dy = c.y - wy;
+      if (dx * dx + dy * dy < (c.dna.size + 4) * (c.dna.size + 4)) return c;
     }
     return null;
   }
