@@ -1,0 +1,24 @@
+{
+  "name": "PixLife 2 - ピクセル生命観察",
+  "short_name": "PixLife 2",
+  "description": "ピクセル生命のサンドボックスシミュレーション。小さな生命が学び、成長し、コロニーを築く様子を観察しよう。",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1a1a2e",
+  "theme_color": "#e8a87c",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["games", "entertainment"],
+  "lang": "ja"
+}

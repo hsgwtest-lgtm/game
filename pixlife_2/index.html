@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PixLife 2">
+  <meta name="theme-color" content="#e8a87c">
+  <meta name="description" content="ピクセル生命のサンドボックスシミュレーション">
+  <title>PixLife 2 - ピクセル生命観察</title>
+
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Start Screen -->
+  <div id="start-screen">
+    <h1>PIXLIFE 2</h1>
+    <p>
+      ピクセル生命の観察シミュレーション<br>
+      小さな生命が学び、成長し、<br>
+      コロニーを築く様子を見守ろう
+    </p>
+    <button id="start-btn">はじめる</button>
+  </div>
+
+  <!-- Game Canvas -->
+  <canvas id="game-canvas"></canvas>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="hud-stat" id="hud-pop">個体: <span>0</span></div>
+    <div class="hud-stat" id="hud-gen">世代: <span>0</span></div>
+    <div class="hud-stat" id="hud-food">巣: <span>0</span></div>
+  </div>
+
+  <!-- Speed Controls -->
+  <div id="speed-controls">
+    <button class="speed-btn active" data-speed="1">1x</button>
+    <button class="speed-btn" data-speed="2">2x</button>
+    <button class="speed-btn" data-speed="4">4x</button>
+  </div>
+
+  <!-- Toolbar -->
+  <div id="toolbar">
+    <button class="tool-btn active" data-tool="food">
+      🍎
+      <span class="tool-label">餌</span>
+    </button>
+    <button class="tool-btn" data-tool="wall">
+      🧱
+      <span class="tool-label">壁</span>
+    </button>
+    <button class="tool-btn" data-tool="water">
+      💧
+      <span class="tool-label">水</span>
+    </button>
+    <button class="tool-btn" data-tool="nudge">
+      👆
+      <span class="tool-label">誘導</span>
+    </button>
+    <button class="tool-btn" data-tool="inspect">
+      🔬
+      <span class="tool-label">観察</span>
+    </button>
+  </div>
+
+  <!-- Info Panel (for inspect tool) -->
+  <div id="info-panel"></div>
+
+  <!-- Toast notification -->
+  <div id="toast"></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
