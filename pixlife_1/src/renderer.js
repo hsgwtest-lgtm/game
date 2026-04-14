@@ -352,7 +352,7 @@ class Renderer {
 
     // Draw radial glow as pixel rings
     for (let ring = r; ring > 0; ring -= 2) {
-      const alpha = (ls.intensity * 0.05 * (1 - ring / r)).toFixed(3);
+      const alpha = ls.intensity * 0.05 * (1 - ring / r);
       ctx.fillStyle = `rgba(255,240,180,${alpha})`;
       this._drawPixelCircle(ctx, x, y, ring, null, true);
     }

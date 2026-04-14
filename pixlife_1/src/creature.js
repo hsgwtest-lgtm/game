@@ -247,8 +247,10 @@ class Creature {
       world.pendingBirths.push(this);
     }
 
-    // Lifetime learning
-    if (this.age > 0 && Math.floor(this.age) % 5 === 0) {
+    // Lifetime learning (every 5 seconds)
+    if (!this._lastLearnAge) this._lastLearnAge = 0;
+    if (this.age - this._lastLearnAge >= 5) {
+      this._lastLearnAge = this.age;
       this.brain.learn(0.005);
     }
 

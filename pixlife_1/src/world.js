@@ -233,11 +233,17 @@ class GameWorld {
     this.creatures = this.creatures.filter(c => c.alive);
     this.foods = this.foods.filter(f => f.alive);
 
-    // Auto-spawn if population dies out
-    if (this.creatures.length === 0 && Math.random() < dt * 0.5) {
-      const x = this.width * 0.3 + Math.random() * this.width * 0.4;
-      const y = this.height * 0.3 + Math.random() * this.height * 0.4;
-      this.creatures.push(new Creature(x, y));
+    // Auto-spawn if population dies out (fixed-rate timer)
+    if (this.creatures.length === 0) {
+      this._respawnTimer = (this._respawnTimer || 0) + dt;
+      if (this._respawnTimer >= 2) {
+        this._respawnTimer = 0;
+        const x = this.width * 0.3 + Math.random() * this.width * 0.4;
+        const y = this.height * 0.3 + Math.random() * this.height * 0.4;
+        this.creatures.push(new Creature(x, y));
+      }
+    } else {
+      this._respawnTimer = 0;
     }
   }
 
