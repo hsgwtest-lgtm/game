@@ -19,14 +19,16 @@ const FOOD_TYPE = {
   LEAF: 3      // green
 };
 
-const FOOD_COLORS = {
+const FOOD_TYPE_COUNT = Object.keys(FOOD_TYPE).length;
+
+export const FOOD_COLORS = {
   [FOOD_TYPE.BERRY]: [0xe0, 0x5a, 0x5a],
   [FOOD_TYPE.SEED]: [0xf0, 0xc2, 0x7f],
   [FOOD_TYPE.MUSHROOM]: [0xb0, 0x70, 0xd0],
   [FOOD_TYPE.LEAF]: [0x70, 0xb0, 0x60]
 };
 
-const FOOD_ENERGY = {
+export const FOOD_ENERGY = {
   [FOOD_TYPE.BERRY]: 25,
   [FOOD_TYPE.SEED]: 15,
   [FOOD_TYPE.MUSHROOM]: 35,
@@ -110,7 +112,7 @@ export class World {
   spawnFoodCluster(count = 5) {
     const cx = 10 + Math.random() * (this.width - 20);
     const cy = 10 + Math.random() * (this.height - 20);
-    const type = Math.floor(Math.random() * 4);
+    const type = Math.floor(Math.random() * FOOD_TYPE_COUNT);
 
     for (let i = 0; i < count; i++) {
       if (this.foods.length >= this.maxFood) break;
@@ -133,7 +135,7 @@ export class World {
    */
   placeFood(x, y, type = -1) {
     if (this.foods.length >= this.maxFood) return;
-    if (type < 0) type = Math.floor(Math.random() * 4);
+    if (type < 0) type = Math.floor(Math.random() * FOOD_TYPE_COUNT);
     this.foods.push({
       x, y, type,
       energy: FOOD_ENERGY[type],

@@ -15,6 +15,11 @@ export const STATE = {
   EXPLORING: 4   // Wandering with curiosity
 };
 
+// Reproduction thresholds
+const REPRODUCE_ENERGY_MIN = 70;
+const REPRODUCE_FOOD_MIN = 2;
+const REPRODUCE_AGE_MIN = 200;
+
 // Color palettes for different generations (warm pixel tones)
 const GEN_COLORS = [
   [0xe0, 0x7a, 0x5f],  // warm red
@@ -221,7 +226,7 @@ export class Creature {
    * Can this creature reproduce?
    */
   canReproduce() {
-    return this.energy > 70 && this.foodCollected >= 2 && this.age > 200;
+    return this.energy > REPRODUCE_ENERGY_MIN && this.foodCollected >= REPRODUCE_FOOD_MIN && this.age > REPRODUCE_AGE_MIN;
   }
 
   /**

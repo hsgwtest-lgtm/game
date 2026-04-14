@@ -3,7 +3,7 @@
  * Handles game loop, user input, UI, and PWA setup.
  */
 
-import { World } from './world.js';
+import { World, FOOD_COLORS, FOOD_ENERGY } from './world.js';
 import { Renderer } from './renderer.js';
 import { Creature } from './creature.js';
 import { NeuralNet } from './neural.js';
@@ -388,13 +388,6 @@ class Game {
       // Restore food
       if (state.foods) {
         this.world.foods = [];
-        const FOOD_COLORS = {
-          0: [0xe0, 0x5a, 0x5a],
-          1: [0xf0, 0xc2, 0x7f],
-          2: [0xb0, 0x70, 0xd0],
-          3: [0x70, 0xb0, 0x60]
-        };
-        const FOOD_ENERGY = { 0: 25, 1: 15, 2: 35, 3: 10 };
         for (const fs of state.foods) {
           this.world.foods.push({
             x: fs.x, y: fs.y, type: fs.type,
