@@ -62,7 +62,7 @@ class GameWorld {
   }
 
   _decayPheromones(dt) {
-    // ~4% decay per second; full evaporation in ~25 s
+    // Decay ~4% per second → half-life ≈17 s, full evaporation ≈25 s
     const factor = 1 - dt * 0.04;
     for (let i = 0; i < this.pheromones.length; i++) {
       const v = this.pheromones[i] * factor;
@@ -160,7 +160,7 @@ class GameWorld {
   _updateNestSpawning(dt) {
     if (!this.nest) return;
     this._nestSpawnTimer += dt;
-    // Every 5 food delivered → spawn a new creature (max 1 per 10 s)
+    // Once foodStored threshold (5) is reached, consume it and spawn a creature (max 1 per 10 s)
     if (this.nest.foodStored >= 5 && this._nestSpawnTimer >= 10 &&
         this.creatures.length < this.maxCreatures) {
       this.nest.foodStored -= 5;

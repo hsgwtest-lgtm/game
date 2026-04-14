@@ -125,7 +125,7 @@ class Creature {
     let nearestFoodDist = Infinity;
     let nearestFood = null;
     for (const f of world.foods) {
-      if (!f.alive || f.pickedUp) continue;
+      if (!f.alive) continue;
       const dx = f.x - this.x, dy = f.y - this.y;
       const d = Math.sqrt(dx * dx + dy * dy);
       if (d < nearestFoodDist) { nearestFoodDist = d; nearestFood = f; }
@@ -253,7 +253,7 @@ class Creature {
     // Find nearest food
     let nearestFood = null, nearestFoodDist = this.dna.senseRange;
     for (const f of world.foods) {
-      if (!f.alive || f.pickedUp) continue;
+      if (!f.alive) continue;
       const dx = f.x - this.x, dy = f.y - this.y;
       const d = Math.sqrt(dx * dx + dy * dy);
       if (d < nearestFoodDist) { nearestFoodDist = d; nearestFood = f; }
@@ -294,7 +294,8 @@ class Creature {
   _updateCarrying(dt, world, neuralSpeed, neuralTurn) {
     if (!world.nest) { this.state = 'searching'; this.carryingFood = null; return; }
 
-    // Deposit pheromone trail on path back to nest
+    // Deposit pheromone trail on path back to nest.
+    // 0.65 chosen so trails saturate (~1.0) after ~10 overlapping ants and evaporate cleanly.
     world.depositPheromone(this.x, this.y, 0.65);
 
     // Hard steer toward nest, neural net adds tiny variation
@@ -313,8 +314,7 @@ class Creature {
   }
 
   _pickupFood(food, world) {
-    food.pickedUp = true;
-    food.alive = false;
+    food.alive = false; // removes food from world; other creatures see !f.alive in same frame
     this.state = 'carrying';
     this.carryingFood = food;
     this.emotion = 'happy';
@@ -393,7 +393,7 @@ class Food {
     this.energy = type === 'fruit' ? 22 + Math.random() * 12 : 8 + Math.random() * 8;
     this.size = type === 'fruit' ? 3 : 2;
     this.alive = true;
-    this.pickedUp = false; // true while a creature is carrying this
+    this.pickedUp = false;
     this.age = 0;
     this.growthPhase = 0;
   }
