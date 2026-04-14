@@ -18,6 +18,28 @@
   const SPATIAL_W = (WORLD_W / SPATIAL_CELL) | 0;
   const SPATIAL_H = (WORLD_H / SPATIAL_CELL) | 0;
 
+  // Pheromone tuning
+  const PHERO_DECAY_RATE = 0.997;
+  const PHERO_DIFFUSE_RATE = 0.08;
+
+  // Zoom limits
+  const MIN_ZOOM = 0.3;
+  const MAX_ZOOM = 8;
+
+  // Movement tuning
+  const MAX_TURN_RATE = 0.12;
+  const FOOD_PICKUP_RADIUS = 8;
+  const FOOD_DETECT_RADIUS = 40;
+
+  // Congestion tuning
+  const CONGESTION_THRESHOLD = 5;
+  const CONGESTION_SLOWDOWN = 0.08;
+  const MIN_CONGESTION_SPEED = 0.3;
+
+  // Combat tuning
+  const MAX_ALLY_BONUS = 2.0;
+  const ALLY_BONUS_PER_ANT = 0.15;
+
   // Pheromone channels per species (3 species × 3 types = 9 channels)
   const PHERO_FOOD = 0;
   const PHERO_HOME = 1;
@@ -236,8 +258,8 @@
 
   // ─── Pheromone decay & diffusion ────────────────────
   function updatePheromones() {
-    const decayRate = 0.997;
-    const diffuseRate = 0.08;
+    const decayRate = PHERO_DECAY_RATE;
+    const diffuseRate = PHERO_DIFFUSE_RATE;
 
     for (let ch = 0; ch < TOTAL_PHERO_CHANNELS; ch++) {
       const grid = pheroGrids[ch];
@@ -333,7 +355,7 @@
 
     const sp = SPECIES[ant.species];
     const nest = getNestForSpecies(ant.species);
-    const maxTurn = 0.12;
+    const maxTurn = MAX_TURN_RATE;
     let moveSpeed = ant.speed * 38;
 
     // Realistic wandering: Perlin-like noise via summed sine waves
@@ -404,7 +426,7 @@
             }
           }
           if (closestFood) {
-            if (closestD2 < 64) { // within 8px - pickup
+            if (closestD2 < FOOD_PICKUP_RADIUS * FOOD_PICKUP_RADIUS) { // within pickup range
               const f = closestFood;
               if (f.big && f.amount > f.maxAmount * 0.5) {
                 // Big food: need multiple ants. Each takes a small piece
@@ -423,7 +445,7 @@
               ant.targetFood = closestFood;
               // Emit strong food pheromone
               depositPheromone(ant.x, ant.y, ant.species, PHERO_FOOD, 0.9 * sp.pheroStr);
-            } else if (closestD2 < 1600) { // within 40px, steer towards
+            } else if (closestD2 < FOOD_DETECT_RADIUS * FOOD_DETECT_RADIUS) { // within detection range
               const toFood = Math.atan2(closestFood.y - ant.y, closestFood.x - ant.x);
               ant.angle = steerTowards(ant.angle, toFood, maxTurn * 1.8);
             }
@@ -505,7 +527,7 @@
           for (let k = 0; k < queryResult.length; k++) {
             if (queryResult[k].species === ant.species && queryResult[k].alive) allyCount++;
           }
-          const numBonus = Math.min(2.0, 1.0 + allyCount * 0.15);
+          const numBonus = Math.min(MAX_ALLY_BONUS, 1.0 + allyCount * ALLY_BONUS_PER_ANT);
           target.hp -= sp.attack * (ant.role === ROLE_SOLDIER ? 1.5 : 0.8) * dt * 3 * numBonus;
           ant.fightCooldown = 0.3;
           depositPheromone(ant.x, ant.y, ant.species, PHERO_DANGER, 0.8 * sp.pheroStr);
@@ -547,10 +569,10 @@
     if (cx0 >= 0 && cx0 < SPATIAL_W && cy0 >= 0 && cy0 < SPATIAL_H) {
       nearbyCount = spatialBuckets[cy0 * SPATIAL_W + cx0].length;
     }
-    if (nearbyCount > 5) {
-      moveSpeed *= Math.max(0.3, 1.0 - (nearbyCount - 5) * 0.08);
+    if (nearbyCount > CONGESTION_THRESHOLD) {
+      moveSpeed *= Math.max(MIN_CONGESTION_SPEED, 1.0 - (nearbyCount - CONGESTION_THRESHOLD) * CONGESTION_SLOWDOWN);
       // Add extra wander to simulate pushing/shoving
-      ant.angle += (Math.random() - 0.5) * 0.15 * (nearbyCount - 5);
+      ant.angle += (Math.random() - 0.5) * 0.15 * (nearbyCount - CONGESTION_THRESHOLD);
     }
 
     // ─── Move ─────────────────────────────────
@@ -1074,7 +1096,7 @@
         const scale = dist / lastPinchDist;
         const cx = (pts[0].x + pts[1].x) / 2;
         const cy = (pts[0].y + pts[1].y) / 2;
-        const newZoom = Math.max(0.3, Math.min(8, targetCamZoom * scale));
+        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, targetCamZoom * scale));
         targetCamX = cx - (cx - targetCamX) * (newZoom / targetCamZoom);
         targetCamY = cy - (cy - targetCamY) * (newZoom / targetCamZoom);
         targetCamZoom = newZoom;
@@ -1111,7 +1133,7 @@
   canvas.addEventListener('wheel', e => {
     e.preventDefault();
     const scale = e.deltaY > 0 ? 0.9 : 1.1;
-    const newZoom = Math.max(0.3, Math.min(8, targetCamZoom * scale));
+    const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, targetCamZoom * scale));
     targetCamX = e.clientX - (e.clientX - targetCamX) * (newZoom / targetCamZoom);
     targetCamY = e.clientY - (e.clientY - targetCamY) * (newZoom / targetCamZoom);
     targetCamZoom = newZoom;
