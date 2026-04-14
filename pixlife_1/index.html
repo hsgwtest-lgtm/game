@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PixLife">
+  <meta name="theme-color" content="#2a1a0e">
+  <title>PixLife</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+  <canvas id="world"></canvas>
+  <div id="ui-overlay">
+    <div id="stats-panel">
+      <span id="pop-count">0</span> 生命
+      <span id="gen-count">世代 0</span>
+      <span id="time-display">0:00</span>
+    </div>
+    <div id="toolbar">
+      <button id="btn-touch" class="tool-btn active" title="なでる">🫳</button>
+      <button id="btn-food" class="tool-btn" title="食べ物を置く">🌿</button>
+      <button id="btn-light" class="tool-btn" title="光を当てる">☀️</button>
+      <button id="btn-rock" class="tool-btn" title="岩を置く">🪨</button>
+      <button id="btn-spawn" class="tool-btn" title="生命を追加">🥚</button>
+    </div>
+    <div id="env-controls">
+      <label>気温 <input type="range" id="temperature" min="0" max="100" value="50"></label>
+      <label>湿度 <input type="range" id="humidity" min="0" max="100" value="50"></label>
+      <button id="btn-day-night" class="env-btn">🌙</button>
+      <button id="btn-pause" class="env-btn">⏸️</button>
+      <button id="btn-reset" class="env-btn">🔄</button>
+    </div>
+    <div id="info-panel" class="hidden">
+      <div id="info-content"></div>
+      <button id="btn-close-info" class="env-btn">✕</button>
+    </div>
+  </div>
+  <div id="splash-screen">
+    <div class="splash-content">
+      <div class="pixel-logo">
+        <span class="logo-pix">Pix</span><span class="logo-life">Life</span>
+      </div>
+      <p>ピクセル生命サンドボックス</p>
+      <p class="sub-desc">小さな生命たちを見守り、少しだけ手を差し伸べよう</p>
+      <button id="btn-start">▶ はじめる</button>
+    </div>
+  </div>
+  <script src="src/brain.js"></script>
+  <script src="src/creature.js"></script>
+  <script src="src/world.js"></script>
+  <script src="src/renderer.js"></script>
+  <script src="src/input.js"></script>
+  <script src="src/main.js"></script>
+</body>
+</html>
