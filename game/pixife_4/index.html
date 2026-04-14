@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no,viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PixiLife4">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>PixiLife 4 — Evolutionary Sandbox</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- ── Stats Bar ── -->
+  <div id="stats-bar">
+    <span id="stat-pop">🧬 0</span>
+    <span id="stat-food">🍂 0</span>
+    <span id="stat-gen">⏳ G0</span>
+    <span id="stat-fps">60fps</span>
+  </div>
+
+  <!-- ── Main Canvas ── -->
+  <canvas id="world-canvas"></canvas>
+
+  <!-- ── Minimap ── -->
+  <canvas id="minimap" width="80" height="60"></canvas>
+
+  <!-- ── Info Panel (creature details) ── -->
+  <div id="info-panel" class="hidden">
+    <button id="info-close">✕</button>
+    <div id="info-content"></div>
+  </div>
+
+  <!-- ── Data Panel (graphs, phylogeny) ── -->
+  <div id="data-panel" class="hidden">
+    <button id="data-close">✕</button>
+    <div id="data-header">📊 統計データ</div>
+    <canvas id="pop-graph" width="300" height="120"></canvas>
+    <canvas id="species-graph" width="300" height="120"></canvas>
+  </div>
+
+  <!-- ── God Mode Toolbar ── -->
+  <div id="toolbar">
+    <button class="tool-btn active" data-tool="observe" title="観察">🔍</button>
+    <button class="tool-btn" data-tool="meteor" title="隕石">☄️</button>
+    <button class="tool-btn" data-tool="food-burst" title="資源バースト">🌿</button>
+    <button class="tool-btn" data-tool="mutate" title="突然変異">🧪</button>
+    <button class="tool-btn" data-tool="wall" title="壁">🧱</button>
+    <button class="tool-btn" data-tool="water" title="水源">💧</button>
+    <button class="tool-btn" data-tool="climate" title="気候変更">🌡️</button>
+    <button class="tool-btn" data-tool="stats" title="統計">📊</button>
+  </div>
+
+  <!-- ── Time Controls ── -->
+  <div id="time-controls">
+    <button id="btn-pause" title="一時停止">⏸</button>
+    <button id="btn-speed" title="速度">1×</button>
+  </div>
+
+  <!-- ── Season Indicator ── -->
+  <div id="season-indicator">🌸 春</div>
+
+  <!-- ── Toast ── -->
+  <div id="toast" class="hidden"></div>
+
+  <script type="module" src="engine.js"></script>
+</body>
+</html>
