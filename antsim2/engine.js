@@ -1,3 +1,4 @@
+   /* =====================================================
    AntSim2 - リアルなアリ生態シミュレータ v2
    改善点:
    - 巣/餌の削除機能
@@ -39,8 +40,8 @@
   const ALLY_BONUS_PER_ANT = 0.15;
 
   // Lifespan: ants die of old age after this many seconds (with some variance)
-  const ANT_LIFESPAN_BASE = 120;   // ~2 minutes base lifespan
-  const ANT_LIFESPAN_VARIANCE = 40;
+  const ANT_LIFESPAN_BASE_SECONDS = 120;   // ~2 minutes base lifespan
+  const ANT_LIFESPAN_VARIANCE_SECONDS = 40;
 
   // Nest upkeep: food consumed per ant per second to maintain the colony
   const NEST_UPKEEP_RATE = 0.002;
@@ -69,9 +70,9 @@
 
   // birthCost: food needed to birth one ant
   const SPECIES = [
-    { name: '赤アリ', color: [200, 60, 60], bodyR: 2.2, speed: 1.2, attack: 1.0, pheroStr: 1.0, spawnRate: 0.008, birthCost: 10 },
-    { name: '緑アリ', color: [60, 180, 60], bodyR: 2.6, speed: 0.9, attack: 1.3, pheroStr: 0.8, spawnRate: 0.006, birthCost: 12 },
-    { name: '青アリ', color: [60, 60, 200], bodyR: 1.8, speed: 1.5, attack: 0.7, pheroStr: 1.3, spawnRate: 0.010, birthCost: 8 },
+    { name: '赤アリ', color: [200, 60, 60], bodyR: 2.2, speed: 1.2, attack: 1.0, pheroStr: 1.0, birthCost: 10 },
+    { name: '緑アリ', color: [60, 180, 60], bodyR: 2.6, speed: 0.9, attack: 1.3, pheroStr: 0.8, birthCost: 12 },
+    { name: '青アリ', color: [60, 60, 200], bodyR: 1.8, speed: 1.5, attack: 0.7, pheroStr: 1.3, birthCost: 8 },
   ];
 
   // ─── DELETE radius for nest/food deletion ──────────
@@ -166,7 +167,6 @@
       birthProgress: 0,  // accumulated food toward next birth (0 → birthCost)
       population: 0,
       maxPop: 200,
-      spawnTimer: 0,
       tunnels: generateTunnels(x, y),
       birthEffects: [],   // visual birth effect queue
     };
@@ -253,7 +253,7 @@
   function spawnAnt(x, y, species, role) {
     if (ants.length >= MAX_ANTS) return null;
     const sp = SPECIES[species];
-    const lifespan = ANT_LIFESPAN_BASE + (Math.random() - 0.5) * 2 * ANT_LIFESPAN_VARIANCE;
+    const lifespan = ANT_LIFESPAN_BASE_SECONDS + (Math.random() - 0.5) * 2 * ANT_LIFESPAN_VARIANCE_SECONDS;
     const ant = {
       x, y,
       angle: Math.random() * Math.PI * 2,
@@ -993,6 +993,7 @@
       }
 
       // ─── Reproduction progress bar above nest ───
+      const sp = SPECIES[nest.species];
       const barW = 30;
       const barH = 5;
       const barX = nest.x - barW / 2;
