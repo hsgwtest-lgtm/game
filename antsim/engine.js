@@ -333,14 +333,19 @@
 
     const sp = SPECIES[ant.species];
     const nest = getNestForSpecies(ant.species);
-    const maxTurn = 0.15;
-    let moveSpeed = ant.speed * 40;
+    const maxTurn = 0.12;
+    let moveSpeed = ant.speed * 38;
 
-    // Random wander component (creates zigzag/meandering)
+    // Realistic wandering: Perlin-like noise via summed sine waves
     ant.wanderTimer -= dt;
     if (ant.wanderTimer <= 0) {
-      ant.wanderAngle += (Math.random() - 0.5) * 1.6;
-      ant.wanderTimer = 0.05 + Math.random() * 0.15;
+      // Multi-frequency wander: creates naturalistic zigzag paths
+      const t = ant.age * 2.3 + ant.legPhase * 0.1;
+      ant.wanderAngle = Math.sin(t * 1.1) * 0.6
+                       + Math.sin(t * 2.7 + 1.3) * 0.3
+                       + Math.sin(t * 5.3 + 2.7) * 0.15
+                       + (Math.random() - 0.5) * 0.8;
+      ant.wanderTimer = 0.03 + Math.random() * 0.08;
     }
 
     // Phase-based behavior
@@ -388,22 +393,39 @@
 
         // Check for nearby food
         if (ant.role !== ROLE_SOLDIER || foods.length > 10) {
+          let closestFood = null;
+          let closestD2 = Infinity;
           for (const f of foods) {
             if (f.amount <= 0) continue;
             const d2 = distSq(ant.x, ant.y, f.x, f.y);
-            if (d2 < 100) { // within 10px
-              // Pickup food
-              const take = Math.min(ant.carryCapacity, f.amount);
-              ant.carryFood = take;
-              f.amount -= take;
+            if (d2 < closestD2) {
+              closestD2 = d2;
+              closestFood = f;
+            }
+          }
+          if (closestFood) {
+            if (closestD2 < 64) { // within 8px - pickup
+              const f = closestFood;
+              if (f.big && f.amount > f.maxAmount * 0.5) {
+                // Big food: need multiple ants. Each takes a small piece
+                // More ants nearby = faster collection
+                const take = Math.min(ant.carryCapacity * 0.4, f.amount);
+                ant.carryFood = take;
+                f.amount -= take;
+                // Record carrier for cooperative animation
+                if (f.carriers.length < 6) f.carriers.push(ant);
+              } else {
+                const take = Math.min(ant.carryCapacity, f.amount);
+                ant.carryFood = take;
+                f.amount -= take;
+              }
               ant.state = STATE_CARRY_FOOD;
-              ant.targetFood = f;
+              ant.targetFood = closestFood;
               // Emit strong food pheromone
               depositPheromone(ant.x, ant.y, ant.species, PHERO_FOOD, 0.9 * sp.pheroStr);
-              break;
-            } else if (d2 < 900) { // within 30px, steer towards
-              const toFood = Math.atan2(f.y - ant.y, f.x - ant.x);
-              ant.angle = steerTowards(ant.angle, toFood, maxTurn * 2);
+            } else if (closestD2 < 1600) { // within 40px, steer towards
+              const toFood = Math.atan2(closestFood.y - ant.y, closestFood.x - ant.x);
+              ant.angle = steerTowards(ant.angle, toFood, maxTurn * 1.8);
             }
           }
         }
@@ -411,26 +433,38 @@
       }
 
       case STATE_CARRY_FOOD: {
-        moveSpeed *= 0.65; // Slow while carrying
+        moveSpeed *= 0.55; // Slower while carrying
+        // Add slight stumble/wobble when carrying
+        ant.wanderAngle *= 0.7;
+
         // Navigate home using home pheromone
-        let desiredAngle = ant.angle + ant.wanderAngle * 0.15;
+        let desiredAngle = ant.angle + ant.wanderAngle * 0.12;
 
         if (nest) {
           const toNest = Math.atan2(nest.y - ant.y, nest.x - ant.x);
+          const distToNest = Math.sqrt(distSq(ant.x, ant.y, nest.x, nest.y));
           // Mix direct heading with pheromone sensing
-          const senseDist = 12;
-          const senseAngle = 0.5;
+          const senseDist = 14;
+          const senseAngle = 0.55;
           const fwd = samplePheromoneDir(ant.x, ant.y, ant.angle, ant.species, PHERO_HOME, senseDist);
           const left = samplePheromoneDir(ant.x, ant.y, ant.angle - senseAngle, ant.species, PHERO_HOME, senseDist);
           const right = samplePheromoneDir(ant.x, ant.y, ant.angle + senseAngle, ant.species, PHERO_HOME, senseDist);
 
-          if (left > fwd && left > right) {
-            desiredAngle = ant.angle - senseAngle * 0.5;
-          } else if (right > fwd && right > left) {
-            desiredAngle = ant.angle + senseAngle * 0.5;
+          const maxPhero = Math.max(fwd, left, right);
+          if (maxPhero > 0.05) {
+            if (left > fwd && left > right) {
+              desiredAngle = ant.angle - senseAngle * 0.6;
+            } else if (right > fwd && right > left) {
+              desiredAngle = ant.angle + senseAngle * 0.6;
+            }
           } else {
-            // Bias towards nest direction
-            desiredAngle = steerTowards(ant.angle, toNest, maxTurn * 0.5);
+            // No pheromone detected: head more directly to nest with some wander
+            desiredAngle = toNest + ant.wanderAngle * 0.2;
+          }
+
+          // Strong nest attraction when close
+          if (distToNest < 80) {
+            desiredAngle = steerTowards(desiredAngle, toNest, maxTurn * 2);
           }
 
           // Close to nest? Drop food
@@ -439,7 +473,7 @@
             ant.carryFood = 0;
             ant.state = STATE_EXPLORE;
             // Turn around
-            ant.angle = normalizeAngle(ant.angle + Math.PI);
+            ant.angle = normalizeAngle(ant.angle + Math.PI + (Math.random() - 0.5) * 0.6);
           }
         }
 
@@ -465,7 +499,14 @@
         ant.angle = steerTowards(ant.angle, toTarget, maxTurn * 3);
 
         if (distSq(ant.x, ant.y, target.x, target.y) < 25 && ant.fightCooldown <= 0) {
-          target.hp -= sp.attack * (ant.role === ROLE_SOLDIER ? 1.5 : 0.8) * dt * 3;
+          // Number advantage: count allies nearby
+          spatialQuery(ant.x, ant.y, 15, queryResult);
+          let allyCount = 0;
+          for (let k = 0; k < queryResult.length; k++) {
+            if (queryResult[k].species === ant.species && queryResult[k].alive) allyCount++;
+          }
+          const numBonus = Math.min(2.0, 1.0 + allyCount * 0.15);
+          target.hp -= sp.attack * (ant.role === ROLE_SOLDIER ? 1.5 : 0.8) * dt * 3 * numBonus;
           ant.fightCooldown = 0.3;
           depositPheromone(ant.x, ant.y, ant.species, PHERO_DANGER, 0.8 * sp.pheroStr);
           if (target.hp <= 0) {
@@ -495,6 +536,21 @@
         }
         break;
       }
+    }
+
+    // ─── Congestion detection ──────────────────
+    // Check nearby ant density to simulate crowding slowdown
+    const congestionRadius = 6;
+    const cx0 = (ant.x / SPATIAL_CELL) | 0;
+    const cy0 = (ant.y / SPATIAL_CELL) | 0;
+    let nearbyCount = 0;
+    if (cx0 >= 0 && cx0 < SPATIAL_W && cy0 >= 0 && cy0 < SPATIAL_H) {
+      nearbyCount = spatialBuckets[cy0 * SPATIAL_W + cx0].length;
+    }
+    if (nearbyCount > 5) {
+      moveSpeed *= Math.max(0.3, 1.0 - (nearbyCount - 5) * 0.08);
+      // Add extra wander to simulate pushing/shoving
+      ant.angle += (Math.random() - 0.5) * 0.15 * (nearbyCount - 5);
     }
 
     // ─── Move ─────────────────────────────────
