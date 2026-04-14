@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VITA-PHYS">
+  <meta name="theme-color" content="#0a0a1a">
+  <title>VITA-PHYS</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+  <canvas id="world"></canvas>
+  <div id="ui-overlay">
+    <div id="stats-panel">
+      <span id="pop-count">0</span> 生命体
+      <span id="gen-count">Gen 0</span>
+    </div>
+    <div id="toolbar">
+      <button id="btn-gravity" class="tool-btn active" title="重力ポインター">🌀</button>
+      <button id="btn-wall" class="tool-btn" title="壁を描く">🧱</button>
+      <button id="btn-feed" class="tool-btn" title="栄養を撒く">🟢</button>
+      <button id="btn-spawn" class="tool-btn" title="生命体を追加">🧬</button>
+    </div>
+    <div id="env-controls">
+      <label>粘性 <input type="range" id="viscosity" min="0" max="100" value="20"></label>
+      <label>重力 <input type="range" id="gravity-str" min="0" max="100" value="30"></label>
+      <button id="btn-reset" class="env-btn">🔄 リセット</button>
+      <button id="btn-pause" class="env-btn">⏸️</button>
+    </div>
+  </div>
+  <div id="splash-screen">
+    <div class="splash-content">
+      <h1>VITA-PHYS</h1>
+      <p>物理生命サンドボックス</p>
+      <button id="btn-start">▶ はじめる</button>
+    </div>
+  </div>
+  <script src="src/vector.js"></script>
+  <script src="src/physics.js"></script>
+  <script src="src/entity.js"></script>
+  <script src="src/world.js"></script>
+  <script src="src/renderer.js"></script>
+  <script src="src/input.js"></script>
+  <script src="src/main.js"></script>
+</body>
+</html>
