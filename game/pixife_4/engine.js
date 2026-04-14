@@ -44,9 +44,9 @@ const TILE_WATER = 2;
 const TILE_DANGER = 3;
 
 // Pheromone channels
-const PHER_FOOD = 0;
-const PHER_DANGER = 1;
-const PHER_CHANNELS = 2;
+const PHEROMONE_FOOD = 0;
+const PHEROMONE_DANGER = 1;
+const PHEROMONE_CHANNELS = 2;
 
 // Species colors (warm pixel art palette)
 const SPECIES_COLORS = [
@@ -87,6 +87,7 @@ function seededRandom(seed) {
 function generateNoise(w, h, scale, seed) {
   const rng = seededRandom(seed);
   // Generate grid of random values
+  // +2 padding for bilinear interpolation at boundaries
   const gw = Math.ceil(w / scale) + 2;
   const gh = Math.ceil(h / scale) + 2;
   const grid = new Float32Array(gw * gh);
@@ -426,8 +427,8 @@ class Creature {
     // Pheromones at current position
     const pi = cy * W + cx;
     if (cx >= 0 && cx < W && cy >= 0 && cy < H) {
-      inp[10] = clamp(world.pheromones[PHER_FOOD * W * H + pi], 0, 1);
-      inp[11] = clamp(world.pheromones[PHER_DANGER * W * H + pi], 0, 1);
+      inp[10] = clamp(world.pheromones[PHEROMONE_FOOD * W * H + pi], 0, 1);
+      inp[11] = clamp(world.pheromones[PHEROMONE_DANGER * W * H + pi], 0, 1);
     }
 
     // Wall proximity (check 4 directions)
@@ -458,10 +459,10 @@ class Creature {
     // Pheromone gradient (food trail direction)
     let pgx = 0, pgy = 0;
     if (cx > 0 && cx < W - 1 && cy > 0 && cy < H - 1) {
-      pgx = (world.pheromones[PHER_FOOD * W * H + cy * W + cx + 1] -
-             world.pheromones[PHER_FOOD * W * H + cy * W + cx - 1]);
-      pgy = (world.pheromones[PHER_FOOD * W * H + (cy + 1) * W + cx] -
-             world.pheromones[PHER_FOOD * W * H + (cy - 1) * W + cx]);
+      pgx = (world.pheromones[PHEROMONE_FOOD * W * H + cy * W + cx + 1] -
+             world.pheromones[PHEROMONE_FOOD * W * H + cy * W + cx - 1]);
+      pgy = (world.pheromones[PHEROMONE_FOOD * W * H + (cy + 1) * W + cx] -
+             world.pheromones[PHEROMONE_FOOD * W * H + (cy - 1) * W + cx]);
     }
     inp[18] = clamp(pgx * 5, -1, 1);
     inp[19] = clamp(pgy * 5, -1, 1);
@@ -542,7 +543,7 @@ class Creature {
         this.foodCarried++;
         this.fitness += 5;
         // Deposit food pheromone
-        world.depositPheromone(ix, iy, PHER_FOOD, 0.8);
+        world.depositPheromone(ix, iy, PHEROMONE_FOOD, 0.8);
       }
     }
 
@@ -574,7 +575,7 @@ class Creature {
               this.energy += 20; // Predation bonus
               this.fitness += 10;
               // Deposit danger pheromone
-              world.depositPheromone(Math.round(enemy.x), Math.round(enemy.y), PHER_DANGER, 1.0);
+              world.depositPheromone(Math.round(enemy.x), Math.round(enemy.y), PHEROMONE_DANGER, 1.0);
             }
             break;
           }
@@ -604,7 +605,7 @@ class Creature {
 
     // Pheromone deposit while moving
     if (out[7] > 0.4 && ix >= 0 && ix < W && iy >= 0 && iy < H) {
-      const channel = this.carrying ? PHER_FOOD : PHER_DANGER;
+      const channel = this.carrying ? PHEROMONE_FOOD : PHEROMONE_DANGER;
       world.depositPheromone(ix, iy, channel, 0.3);
     }
 
@@ -656,6 +657,8 @@ class Creature {
       childGenome
     );
     child.generation = this.generation + 1;
+    // Track max generation at creation time
+    if (child.generation > world.maxGeneration) world.maxGeneration = child.generation;
     child.energy = INITIAL_ENERGY * 0.8;
     child.nestX = this.nestX;
     child.nestY = this.nestY;
@@ -682,7 +685,7 @@ class World {
   constructor() {
     this.terrain = new Uint8Array(W * H);        // Tile types
     this.food = new Uint8Array(W * H);           // Food amount per cell
-    this.pheromones = new Float32Array(PHER_CHANNELS * W * H); // Pheromone channels
+    this.pheromones = new Float32Array(PHEROMONE_CHANNELS * W * H); // Pheromone channels
     this.creatures = [];
     this.nests = {};                              // { speciesId: { x, y, food } }
     this.tick = 0;
@@ -879,11 +882,6 @@ class World {
     // Remove dead creatures
     this.creatures = this.creatures.filter(c => c.alive);
 
-    // Track max generation
-    for (const c of this.creatures) {
-      if (c.generation > this.maxGeneration) this.maxGeneration = c.generation;
-    }
-
     // Auto-repopulate if population too low
     if (this.creatures.length < 10) {
       for (let i = 0; i < 20; i++) {
@@ -999,6 +997,7 @@ class Renderer {
           r = 120 + pulse; g = 30; b = 20;
         }
 
+        // Pack RGBA as ABGR into Uint32Array (little-endian byte order)
         buf[idx] = (255 << 24) | (b << 16) | (g << 8) | r;
       }
     }
@@ -1007,8 +1006,8 @@ class Renderer {
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         const idx = y * W + x;
-        const pf = world.pheromones[PHER_FOOD * W * H + idx];
-        const pd = world.pheromones[PHER_DANGER * W * H + idx];
+        const pf = world.pheromones[PHEROMONE_FOOD * W * H + idx];
+        const pd = world.pheromones[PHEROMONE_DANGER * W * H + idx];
 
         if (pf > 0.01 || pd > 0.01) {
           const existing = buf[idx];
@@ -1553,7 +1552,7 @@ class UI {
     toast.classList.remove('hidden');
     // Reset animation
     toast.style.animation = 'none';
-    // Force reflow
+    // Force reflow to restart CSS animation
     void toast.offsetHeight;
     toast.style.animation = '';
     setTimeout(() => toast.classList.add('hidden'), 2500);

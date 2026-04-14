@@ -1,5 +1,5 @@
-/* PixiLife 4 Service Worker — Cache-first offline strategy */
-const CACHE = 'pixife4-v1';
+/* PixiLife4 Service Worker — Cache-first offline strategy */
+const CACHE = 'pixilife4-v1';
 const ASSETS = [
   './',
   './index.html',
