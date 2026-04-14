@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PixLife">
+  <meta name="theme-color" content="#2a1a0e">
+  <title>PixLife - 生命のサンドボックス</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <canvas id="world"></canvas>
+    <div id="ui-overlay">
+      <div id="top-bar">
+        <div id="stats">
+          <span id="pop-count" title="総個体数">🌱 0</span>
+          <span id="food-count" title="食料数">🍂 0</span>
+          <span id="gen-count" title="世代">⏳ 1</span>
+        </div>
+        <div id="speed-controls">
+          <button id="btn-pause" class="icon-btn" title="一時停止">⏸</button>
+          <button id="btn-speed" class="icon-btn" title="速度変更">1×</button>
+        </div>
+      </div>
+      <div id="bottom-bar">
+        <button id="tool-food" class="tool-btn active" title="食料を置く">🍂<span>食料</span></button>
+        <button id="tool-water" class="tool-btn" title="水を置く">💧<span>水源</span></button>
+        <button id="tool-wall" class="tool-btn" title="壁を置く">🧱<span>壁</span></button>
+        <button id="tool-pheromone" class="tool-btn" title="フェロモン">✨<span>誘導</span></button>
+        <button id="tool-observe" class="tool-btn" title="観察モード">🔍<span>観察</span></button>
+      </div>
+      <div id="info-panel" class="hidden">
+        <button id="info-close" class="icon-btn">✕</button>
+        <div id="info-content"></div>
+      </div>
+    </div>
+    <div id="toast" class="hidden"></div>
+  </div>
+  <script src="engine.js" type="module"></script>
+</body>
+</html>
