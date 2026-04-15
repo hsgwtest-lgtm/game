@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a1206">
+<title>AntSim4 - アリ生態シミュレータ v4</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="mainCanvas"></canvas>
+  <div id="ui-overlay">
+    <div id="top-bar">
+      <div id="stats">
+        <span id="ant-count">🐜 0</span>
+        <span id="food-count">🍎 0</span>
+        <span id="fps-counter">FPS: 0</span>
+      </div>
+      <div id="species-stats"></div>
+      <div id="speed-control">
+        <button id="btn-pause" title="一時停止">⏸</button>
+        <button id="btn-play" title="再生" class="active">▶</button>
+        <button id="btn-fast" title="倍速">⏩</button>
+        <button id="btn-config" title="設定 (COF)">⚙️</button>
+      </div>
+    </div>
+    <div id="toolbar">
+      <button class="tool-btn active" data-tool="observe" title="観察">👁</button>
+      <button class="tool-btn" data-tool="food" title="餌配置">🍖</button>
+      <button class="tool-btn" data-tool="bigfood" title="大きい餌">🍗</button>
+      <button class="tool-btn" data-tool="wall" title="壁設置">🧱</button>
+      <button class="tool-btn" data-tool="water" title="水">💧</button>
+      <button class="tool-btn" data-tool="nest" title="巣追加">🕳</button>
+      <button class="tool-btn" data-tool="erase" title="消しゴム（地形）">🧹</button>
+      <button class="tool-btn" data-tool="delete-nest" title="巣を削除">❌🕳</button>
+      <button class="tool-btn" data-tool="delete-food" title="餌を削除">❌🍖</button>
+      <div id="erase-radius-control" class="hidden">
+        <label>範囲</label>
+        <input type="range" id="erase-radius-slider" min="1" max="15" value="3" step="1">
+        <span id="erase-radius-value">3</span>
+      </div>
+      <div class="tool-separator"></div>
+      <button class="tool-btn tool-war" data-tool="provoke" title="挑発フェロモン">💢</button>
+      <button class="tool-btn tool-war" data-tool="war" title="宣戦布告">⚔️</button>
+    </div>
+    <div id="bottom-bar">
+      <div id="species-selector">
+        <button class="species-btn active" data-species="0" style="color:#c44">種族A</button>
+        <button class="species-btn" data-species="1" style="color:#4c4">種族B</button>
+        <button class="species-btn" data-species="2" style="color:#44c">種族C</button>
+      </div>
+      <div id="toggles">
+        <label><input type="checkbox" id="toggle-pheromone"> フェロモン</label>
+        <label><input type="checkbox" id="toggle-grid"> グリッド</label>
+        <label><input type="checkbox" id="toggle-graph"> グラフ</label>
+      </div>
+    </div>
+  </div>
+  <div id="graph-panel" class="hidden">
+    <div id="graph-header">
+      <span>種族別 個体数推移</span>
+      <button id="close-graph">✕</button>
+    </div>
+    <canvas id="graphCanvas" width="360" height="180"></canvas>
+  </div>
+  <div id="config-panel" class="hidden">
+    <div id="config-header">
+      <span>⚙️ COF - パラメータ設定</span>
+      <button id="close-config">✕</button>
+    </div>
+    <div id="config-content"></div>
+  </div>
+  <div id="info-panel" class="hidden">
+    <button id="close-info">✕</button>
+    <div id="info-content"></div>
+  </div>
+  <div id="birth-log"></div>
+</div>
+<script src="engine.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js');
+}
+</script>
+</body>
+</html>
