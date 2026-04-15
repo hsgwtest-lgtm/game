@@ -52,8 +52,8 @@
 
     // Food
     naturalFoodSpawnRate: 0.003,
-    naturalFoodMin: 15,
-    naturalFoodMax: 8,
+    naturalFoodMin: 8,
+    naturalFoodMax: 15,
 
     // Plunder (Raid) system
     raidEnabled: true,
@@ -504,6 +504,7 @@
 
   const ENV_EVENTS = [
     {
+      id: 'rain',
       name: '☔ 雨 (Rain)',
       nameJa: '☔ 雨が降った！',
       duration: 5,
@@ -518,6 +519,7 @@
       },
     },
     {
+      id: 'drought',
       name: '🏜 干ばつ (Drought)',
       nameJa: '🏜 干ばつ発生！',
       duration: 8,
@@ -531,6 +533,7 @@
       },
     },
     {
+      id: 'bloom',
       name: '🌸 豊穣 (Bloom)',
       nameJa: '🌸 豊穣の季節！',
       duration: 5,
@@ -546,6 +549,7 @@
       },
     },
     {
+      id: 'storm',
       name: '🌪 嵐 (Storm)',
       nameJa: '🌪 嵐が来た！',
       duration: 4,
@@ -590,7 +594,7 @@
       envEventTimer = 0;
       const evt = ENV_EVENTS[(Math.random() * ENV_EVENTS.length) | 0];
       evt.apply();
-      activeEvent = { name: evt.nameJa, timer: evt.duration };
+      activeEvent = { id: evt.id, name: evt.nameJa, timer: evt.duration };
       showEventNotification(evt.nameJa);
     }
   }
@@ -1135,7 +1139,7 @@
     }
 
     // Drought suppresses spawning
-    const isDrought = activeEvent && activeEvent.name && activeEvent.name.includes('干ばつ');
+    const isDrought = activeEvent && activeEvent.id === 'drought';
     const spawnRate = isDrought ? COF.naturalFoodSpawnRate * 0.2 : COF.naturalFoodSpawnRate;
 
     if (foods.length < 15 && Math.random() < spawnRate) {
@@ -1577,11 +1581,11 @@
     // Environment event overlay
     if (activeEvent) {
       ctx.fillStyle = 'rgba(255,255,200,0.03)';
-      if (activeEvent.name.includes('雨')) {
+      if (activeEvent.id === 'rain') {
         ctx.fillStyle = 'rgba(80,100,200,0.06)';
-      } else if (activeEvent.name.includes('干ばつ')) {
+      } else if (activeEvent.id === 'drought') {
         ctx.fillStyle = 'rgba(200,150,50,0.05)';
-      } else if (activeEvent.name.includes('嵐')) {
+      } else if (activeEvent.id === 'storm') {
         ctx.fillStyle = 'rgba(100,100,120,0.08)';
       }
       ctx.fillRect(0, 0, COF.worldW, COF.worldH);
