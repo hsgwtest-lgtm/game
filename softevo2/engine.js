@@ -91,9 +91,9 @@
 
   // ─── Gaussian Random ──────────────────────────────
   function gaussianRandom() {
-    let u = 0, v = 0;
-    while (u === 0) u = Math.random();
-    while (v === 0) v = Math.random();
+    let u, v;
+    do { u = Math.random(); } while (u <= Number.EPSILON);
+    v = Math.random();
     return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
   }
 
@@ -216,6 +216,10 @@
     updateBuildInfo();
   }
 
+  function isValidBlueprint() {
+    return blueprint.nodes.length >= 2 && blueprint.muscles.length >= 1;
+  }
+
   function updateBuildInfo() {
     const nd = document.getElementById('build-node-count');
     const bn = document.getElementById('build-bone-count');
@@ -226,8 +230,7 @@
 
     const btn = document.getElementById('btn-start-sim');
     if (btn) {
-      const valid = blueprint.nodes.length >= 2 && blueprint.muscles.length >= 1;
-      btn.disabled = !valid;
+      btn.disabled = !isValidBlueprint();
     }
 
     updateBuildHint();
@@ -1405,7 +1408,7 @@
           // Cycle through sizes
           const sizes = [4, 6, 8, 10, 12];
           const curIdx = sizes.indexOf(n.radius);
-          n.radius = sizes[(curIdx + 1) % sizes.length] || 7;
+          n.radius = curIdx >= 0 ? sizes[(curIdx + 1) % sizes.length] : sizes[0];
         }
         break;
       }
@@ -1688,7 +1691,7 @@
 
   // Start Sim
   document.getElementById('btn-start-sim').addEventListener('click', () => {
-    if (blueprint.nodes.length < 2 || blueprint.muscles.length < 1) return;
+    if (!isValidBlueprint()) return;
     switchToSim();
   });
 
