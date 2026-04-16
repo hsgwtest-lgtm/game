@@ -1,12 +1,12 @@
 {
-  "name": "SoftEvo - 軟体生物AI進化シミュレータ",
+  "name": "SoftEvo - 軟体生物進化シミュレータ",
   "short_name": "SoftEvo",
-  "description": "物理演算×AIで軟体生物が歩き方を自力で学習する進化シミュレータ",
+  "description": "自作物理演算×ニューラルネットで軟体生物が歩き方を自力で学習する進化シミュレータ",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#1a1a2e",
-  "theme_color": "#1a1a2e",
+  "background_color": "#0a0e1a",
+  "theme_color": "#0a0e1a",
   "icons": [
     {
       "src": "icons/icon-192.png",
