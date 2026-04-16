@@ -452,7 +452,7 @@ function draw(time) {
     currentFps = Math.round(frameCount * 1000 / (now - lastFpsTime));
     frameCount = 0;
     lastFpsTime = now;
-    document.getElementById('fps-counter').textContent = `FPS:${currentFps}`;
+    document.getElementById('fps-counter').textContent = `FPS: ${currentFps}`;
   }
 }
 
