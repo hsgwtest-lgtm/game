@@ -1000,7 +1000,7 @@
     gCtx.lineWidth = lw;
     gCtx.beginPath();
     for (let i = 0; i < data.length; i++) {
-      const x = (i / (HISTORY_MAX - 1)) * gW;
+      const x = (i / Math.max(1, HISTORY_MAX - 1)) * gW;
       const y = gH - ((data[i] - minVal) / rng) * gH;
       if (i === 0) gCtx.moveTo(x, y); else gCtx.lineTo(x, y);
     }
@@ -1155,7 +1155,7 @@
     } else if (isPanning) {
       targetCamX = camStartX + (e.clientX - panStartX);
       targetCamY = camStartY + (e.clientY - panStartY);
-    } else if (isDrawing && currentTool !== 'goal' && currentTool !== 'delete-goal' && currentTool !== 'poke' && currentTool !== 'restart') {
+    } else if (isDrawing && (currentTool === 'block' || currentTool === 'erase')) {
       handleToolAction(e.clientX, e.clientY);
     }
   });
