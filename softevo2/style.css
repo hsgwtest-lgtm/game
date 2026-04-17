@@ -532,7 +532,7 @@ html, body {
 .tog-label {
   font-size: 11px;
   color: rgba(99, 210, 255, 0.7);
-  margin-right: 2px;
+  margin-right: 4px;
   white-space: nowrap;
 }
 
@@ -819,7 +819,7 @@ html, body {
   #stats { font-size: 11px; gap: 8px; }
   #ranking { font-size: 9px; gap: 4px; }
   #toggles { font-size: 11px; gap: 3px; }
-  .tog-btn { padding: 6px 8px; font-size: 10px; min-height: 36px; }
+  .tog-btn { padding: 4px 6px; font-size: 10px; }
   #graph-panel { width: 260px; }
   #graphCanvas { height: 140px; }
   #config-panel { width: 280px; }
