@@ -381,22 +381,68 @@ html, body {
   border-color: rgba(99, 210, 255, 0.6);
 }
 
-/* ─── Objective Bar ──────────────────────────── */
-#objective-bar {
+/* ─── Stage Bar ──────────────────────────────── */
+#stage-bar {
   pointer-events: auto;
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 58px;
+  left: 8px;
+  top: calc(50% + 70px);
   display: flex;
+  flex-direction: column;
   gap: 4px;
-  align-items: center;
   background: rgba(6, 10, 20, 0.90);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  padding: 6px 10px;
+  padding: 6px;
   border-radius: 8px;
-  border: 1px solid rgba(167, 139, 250, 0.2);
+  border: 1px solid rgba(52, 211, 153, 0.2);
+}
+
+.stage-label {
+  font-size: 10px;
+  color: rgba(52, 211, 153, 0.7);
+  white-space: nowrap;
+  text-align: center;
+  padding-bottom: 2px;
+}
+
+.stage-btn {
+  background: rgba(52, 211, 153, 0.08);
+  border: 1px solid rgba(52, 211, 153, 0.2);
+  color: #e2e8f0;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.stage-btn:hover {
+  background: rgba(52, 211, 153, 0.2);
+}
+
+.stage-btn.active {
+  background: rgba(52, 211, 153, 0.3);
+  border-color: rgba(52, 211, 153, 0.6);
+  box-shadow: 0 0 6px rgba(52, 211, 153, 0.2);
+}
+
+.stage-reset {
+  border-color: rgba(251, 191, 36, 0.3) !important;
+  font-size: 13px;
+}
+
+/* ─── Objective Bar (inside bottom-bar) ─────── */
+#objective-bar {
+  pointer-events: auto;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(167, 139, 250, 0.1);
+  flex-wrap: wrap;
 }
 
 .obj-label {
@@ -476,6 +522,27 @@ html, body {
   align-items: center;
   gap: 4px;
   cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+#toggles label:active {
+  background: rgba(129, 140, 248, 0.15);
+}
+
+/* ─── Stage Flash Effect ────────────────────── */
+#stage-flash {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  background: rgba(52, 211, 153, 0.15);
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 99;
+}
+
+#stage-flash.show {
+  opacity: 1;
 }
 
 /* ═══════════════════════════════════════════════
@@ -724,6 +791,7 @@ html, body {
   #stats { font-size: 11px; gap: 8px; }
   #ranking { font-size: 9px; gap: 4px; }
   #toggles { font-size: 11px; }
+  #toggles label { padding: 6px 8px; min-height: 36px; }
   #graph-panel { width: 260px; }
   #graphCanvas { height: 140px; }
   #config-panel { width: 280px; }
@@ -733,5 +801,13 @@ html, body {
   #gen-flash .gen-sub { font-size: 13px; }
   .obj-btn { padding: 4px 6px; font-size: 10px; }
   .cam-btn { padding: 4px 6px; font-size: 10px; }
-  #objective-bar { bottom: 52px; }
+  .stage-btn { padding: 3px 6px; font-size: 10px; }
+  #bottom-content {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+  #objective-bar {
+    justify-content: center;
+  }
 }
