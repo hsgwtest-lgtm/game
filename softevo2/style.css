@@ -386,7 +386,7 @@ html, body {
   pointer-events: auto;
   position: absolute;
   left: 8px;
-  top: calc(50% + 70px);
+  top: calc(50% + 60px);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -396,6 +396,8 @@ html, body {
   padding: 6px;
   border-radius: 8px;
   border: 1px solid rgba(52, 211, 153, 0.2);
+  max-height: calc(50vh - 80px);
+  overflow-y: auto;
 }
 
 .stage-label {

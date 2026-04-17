@@ -76,6 +76,9 @@
   const TERRAIN_SOLID = 1;
   const MIN_ZOOM = 0.15;
   const MAX_ZOOM = 6;
+  const BASE_WORLD_WIDTH = 4000;
+  const EXPAND_THRESHOLD = 500;
+  const WORLD_EXPAND_INCREMENT = 2000;
 
   let TERRAIN_W, TERRAIN_H, TERRAIN_CELLS;
   let terrain;
@@ -240,10 +243,10 @@
     const hint = document.getElementById('build-hint');
     if (!hint) return;
     const msgs = {
-      'add-node': 'タップでノード配置 ┃ 2本指でパン/ズーム',
+      'add-node': 'タップでノード配置 | 2本指でパン/ズーム',
       'add-bone': buildSelectedNode >= 0 ? '2つ目のノードをタップして接続' : 'ノードをタップして骨格を開始',
       'add-muscle': buildSelectedNode >= 0 ? '2つ目のノードをタップして筋肉接続' : 'ノードをタップして筋肉を開始',
-      'move-node': 'ノードをドラッグして移動 ┃ 2本指でパン/ズーム',
+      'move-node': 'ノードをドラッグして移動 | 2本指でパン/ズーム',
       'resize-node': 'ノードをタップしてサイズ変更（タップで切替）',
       'delete': 'ノード/接続をタップして削除',
     };
@@ -728,7 +731,7 @@
     let needExpand = false;
     for (const body of population) {
       for (const n of body.nodes) {
-        if (n.x > COF.worldW - 500) { needExpand = true; break; }
+        if (n.x > COF.worldW - EXPAND_THRESHOLD) { needExpand = true; break; }
       }
       if (needExpand) break;
     }
@@ -1724,7 +1727,7 @@
     historyBest.length = 0;
     historyAvg.length = 0;
     evalTimer = 0;
-    COF.worldW = 4000; // Reset to base world width
+    COF.worldW = BASE_WORLD_WIDTH; // Reset to base world width
 
     initWorld();
     createPopulation(null);
@@ -1818,7 +1821,7 @@
       if (newStage !== currentStage) {
         currentStage = newStage;
         // Reset world with new stage
-        COF.worldW = 4000;
+        COF.worldW = BASE_WORLD_WIDTH;
         initWorld();
         createPopulation(null);
         evalTimer = 0;
@@ -1830,7 +1833,7 @@
   });
 
   document.getElementById('btn-stage-reset').addEventListener('click', () => {
-    COF.worldW = 4000;
+    COF.worldW = BASE_WORLD_WIDTH;
     initWorld();
     createPopulation(null);
     evalTimer = 0;
@@ -2157,7 +2160,7 @@
 
   function expandWorld() {
     const oldW = TERRAIN_W;
-    COF.worldW += 2000;
+    COF.worldW += WORLD_EXPAND_INCREMENT;
     const newTW = (COF.worldW / COF.cellSize) | 0;
     const newCells = newTW * TERRAIN_H;
     const newTerrain = new Uint8Array(newCells);
