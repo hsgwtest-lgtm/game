@@ -447,6 +447,18 @@ html, body {
   flex-wrap: wrap;
 }
 
+/* ─── Display Bar (inside bottom-bar) ──────── */
+#display-bar {
+  pointer-events: auto;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(99, 210, 255, 0.1);
+  flex-wrap: wrap;
+}
+
 .obj-label {
   font-size: 11px;
   color: rgba(167, 139, 250, 0.7);
@@ -500,9 +512,9 @@ html, body {
 
 #bottom-content {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
-  padding: 8px 12px;
+  padding: 6px 12px;
   flex-wrap: wrap;
   gap: 6px;
 }
@@ -514,10 +526,7 @@ html, body {
 }
 
 #toggles {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-  font-size: 12px;
+  display: none;
 }
 
 .tog-label {
@@ -821,12 +830,16 @@ html, body {
   .obj-btn { padding: 4px 6px; font-size: 10px; }
   .cam-btn { padding: 4px 6px; font-size: 10px; }
   .stage-btn { padding: 3px 6px; font-size: 10px; }
+  .tog-btn { padding: 4px 6px; font-size: 10px; }
   #bottom-content {
     flex-direction: column;
     align-items: stretch;
     gap: 4px;
   }
   #objective-bar {
+    justify-content: center;
+  }
+  #display-bar {
     justify-content: center;
   }
 }
