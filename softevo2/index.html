@@ -25,6 +25,7 @@
         <button class="build-btn" data-btool="add-muscle" title="筋肉接続">💪</button>
         <button class="build-btn" data-btool="move-node" title="ノード移動">✥</button>
         <button class="build-btn" data-btool="resize-node" title="サイズ変更">⊚</button>
+        <button class="build-btn" data-btool="pan" title="視点移動">🖐</button>
         <button class="build-btn build-del" data-btool="delete" title="削除">🗑</button>
         <div class="build-sep"></div>
         <button class="build-btn build-action" id="btn-preset-biped" title="プリセット: 二足">🚶</button>
@@ -101,10 +102,11 @@
       <div id="bottom-content">
         <div id="eval-timer">⏱ 0.0 / 10.0s</div>
         <div id="toggles">
-          <label><input type="checkbox" id="toggle-muscles" checked> 筋肉</label>
-          <label><input type="checkbox" id="toggle-trails"> 軌跡</label>
-          <label><input type="checkbox" id="toggle-grid"> グリッド</label>
-          <label><input type="checkbox" id="toggle-graph"> グラフ</label>
+          <span class="tog-label">表示：</span>
+          <button class="tog-btn active" id="toggle-muscles">筋肉</button>
+          <button class="tog-btn" id="toggle-trails">軌跡</button>
+          <button class="tog-btn" id="toggle-grid">グリッド</button>
+          <button class="tog-btn" id="toggle-graph">グラフ</button>
         </div>
       </div>
     </div>

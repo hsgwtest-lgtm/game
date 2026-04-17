@@ -515,21 +515,38 @@ html, body {
 
 #toggles {
   display: flex;
-  gap: 10px;
+  gap: 4px;
+  align-items: center;
   font-size: 12px;
 }
 
-#toggles label {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 4px;
+.tog-label {
+  font-size: 11px;
+  color: rgba(99, 210, 255, 0.7);
+  margin-right: 2px;
+  white-space: nowrap;
 }
 
-#toggles label:active {
-  background: rgba(129, 140, 248, 0.15);
+.tog-btn {
+  background: rgba(99, 210, 255, 0.08);
+  border: 1px solid rgba(99, 210, 255, 0.2);
+  color: #e2e8f0;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.tog-btn:hover {
+  background: rgba(99, 210, 255, 0.15);
+}
+
+.tog-btn.active {
+  background: rgba(99, 210, 255, 0.3);
+  border-color: rgba(99, 210, 255, 0.6);
+  box-shadow: 0 0 6px rgba(99, 210, 255, 0.2);
 }
 
 /* ─── Stage Flash Effect ────────────────────── */
@@ -792,8 +809,8 @@ html, body {
   .tool-del { font-size: 10px; }
   #stats { font-size: 11px; gap: 8px; }
   #ranking { font-size: 9px; gap: 4px; }
-  #toggles { font-size: 11px; }
-  #toggles label { padding: 6px 8px; min-height: 36px; }
+  #toggles { font-size: 11px; gap: 3px; }
+  .tog-btn { padding: 6px 8px; font-size: 10px; min-height: 36px; }
   #graph-panel { width: 260px; }
   #graphCanvas { height: 140px; }
   #config-panel { width: 280px; }

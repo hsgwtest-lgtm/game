@@ -248,6 +248,7 @@
       'add-muscle': buildSelectedNode >= 0 ? '2つ目のノードをタップして筋肉接続' : 'ノードをタップして筋肉を開始',
       'move-node': 'ノードをドラッグして移動 | 2本指でパン/ズーム',
       'resize-node': 'ノードをタップしてサイズ変更（タップで切替）',
+      'pan': '1本指でドラッグして視点移動 | 2本指でピンチズーム',
       'delete': 'ノード/接続をタップして削除',
     };
     hint.textContent = msgs[buildTool] || '';
@@ -1560,6 +1561,10 @@
             panStartX = e.clientX; panStartY = e.clientY;
             camStartX = targetCamX; camStartY = targetCamY;
           }
+        } else if (buildTool === 'pan') {
+          isPanning = true;
+          panStartX = e.clientX; panStartY = e.clientY;
+          camStartX = targetCamX; camStartY = targetCamY;
         } else {
           // Check if we should pan (right click or outside area)
           const { x: wx } = screenToWorld(e.clientX, e.clientY);
@@ -1842,17 +1847,27 @@
   });
 
   // ─── Toggles ──────────────────────────────────────
-  document.getElementById('toggle-muscles').addEventListener('change', e => { showMuscles = e.target.checked; });
-  document.getElementById('toggle-trails').addEventListener('change', e => { showTrails = e.target.checked; });
-  document.getElementById('toggle-grid').addEventListener('change', e => { showGrid = e.target.checked; });
-  document.getElementById('toggle-graph').addEventListener('change', e => {
-    showGraph = e.target.checked;
+  document.getElementById('toggle-muscles').addEventListener('click', e => {
+    showMuscles = !showMuscles;
+    e.target.classList.toggle('active', showMuscles);
+  });
+  document.getElementById('toggle-trails').addEventListener('click', e => {
+    showTrails = !showTrails;
+    e.target.classList.toggle('active', showTrails);
+  });
+  document.getElementById('toggle-grid').addEventListener('click', e => {
+    showGrid = !showGrid;
+    e.target.classList.toggle('active', showGrid);
+  });
+  document.getElementById('toggle-graph').addEventListener('click', e => {
+    showGraph = !showGraph;
+    e.target.classList.toggle('active', showGraph);
     document.getElementById('graph-panel').classList.toggle('hidden', !showGraph);
   });
 
   document.getElementById('close-graph').addEventListener('click', () => {
     showGraph = false;
-    document.getElementById('toggle-graph').checked = false;
+    document.getElementById('toggle-graph').classList.remove('active');
     document.getElementById('graph-panel').classList.add('hidden');
   });
 
