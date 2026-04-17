@@ -1263,7 +1263,7 @@
       return positions;
     }
 
-    // ── Input → H1: aggregate signal bars to first hidden layer ──
+    // ── Input → H1: per-input-bar signal lines to H1 nodes ──
     if (hiddenLayers > 0) {
       const h1Positions = getHiddenNodePositions(0);
       const h1Count = h1Positions.length;
@@ -1271,45 +1271,91 @@
       const inputCount = brain.layers[0];
       const h1Size = brain.layers[1];
 
-      // Compute aggregate input signal per H1 node
+      // Build map of input index → { y position, color, category }
+      const inputBarMap = [];
+      const nc2 = nodeCount;
+      const mc2 = muscleCount;
+      // Velocity: each node uses 2 inputs (vx, vy), displayed as 1 bar
+      let ii = 0;
+      const velStartY = 24 + catFontSz + 3; // after first category header
+      for (let i = 0; i < nc2 && i < 8; i++) {
+        const barY = velStartY + i * (barH + barGap) + barH / 2;
+        // Both vx and vy map to same bar
+        inputBarMap[ii] = { y: barY, color: 'rgba(251,191,36,', indices: [ii, ii + 1] };
+        inputBarMap[ii + 1] = inputBarMap[ii];
+        ii += 2;
+      }
+      // Muscle state
+      const musStartY = velStartY + Math.min(nc2, 8) * (barH + barGap) + sectionGap + catFontSz + 3;
+      for (let i = 0; i < mc2 && i < 8; i++) {
+        const barY = musStartY + i * (barH + barGap) + barH / 2;
+        inputBarMap[ii] = { y: barY, color: 'rgba(52,211,153,', indices: [ii] };
+        ii++;
+      }
+      // Grounded
+      const gndStartY = musStartY + Math.min(mc2, 8) * (barH + barGap) + sectionGap + catFontSz + 3 + 4;
+      for (let i = 0; i < nc2 && i < 8; i++) {
+        inputBarMap[ii] = { y: gndStartY, color: 'rgba(99,210,255,', indices: [ii] };
+        ii++;
+      }
+      // Rhythm
+      const rhtStartY = gndStartY + 18 + sectionGap + catFontSz + 3 + barH / 2;
+      inputBarMap[ii] = { y: rhtStartY, color: 'rgba(167,139,250,', indices: [ii] };
+
+      // For each H1 node, find the top contributing input categories
+      const fromX = colInput + colInputW + 2;
+
       for (let j = 0; j < h1Count; j++) {
-        let sumPos = 0, sumNeg = 0;
+        // Gather per-bar contributions (merge vx/vy into one bar)
+        const barContribs = new Map();
         for (let i = 0; i < inputCount; i++) {
+          const info = inputBarMap[i];
+          if (!info) continue;
           const w = wt0[i * h1Size + j];
           const a = acts[0][i] || 0;
           const s = w * a;
-          if (s > 0) sumPos += s; else sumNeg -= s;
+          const key = info.y; // unique per bar row
+          if (!barContribs.has(key)) {
+            barContribs.set(key, { y: info.y, color: info.color, pos: 0, neg: 0 });
+          }
+          const entry = barContribs.get(key);
+          if (s > 0) entry.pos += s; else entry.neg -= s;
         }
-        const totalSignal = sumPos + sumNeg;
-        if (totalSignal < 0.1) continue;
 
-        const dominant = sumPos >= sumNeg;
-        const alpha = Math.min(0.4, totalSignal * 0.08);
-        const lineWidth = Math.min(2, totalSignal * 0.15);
+        // Draw lines for significant contributors
+        for (const [, entry] of barContribs) {
+          const totalSignal = entry.pos + entry.neg;
+          if (totalSignal < 0.15) continue;
 
-        // Draw from right edge of input column to H1 node
-        const fromX = colInput + colInputW + 2;
-        const fromY = h1Positions[j].y;
-        const toX = h1Positions[j].x - 4;
-        const toY = h1Positions[j].y;
+          const dominant = entry.pos >= entry.neg;
+          const alpha = Math.min(0.5, totalSignal * 0.12);
+          const lineWidth = Math.min(2.5, totalSignal * 0.2);
 
-        nCtx.strokeStyle = dominant
-          ? `rgba(251,191,36,${alpha})`
-          : `rgba(248,113,113,${alpha})`;
-        nCtx.lineWidth = lineWidth;
-        nCtx.beginPath();
-        nCtx.moveTo(fromX, fromY);
-        nCtx.lineTo(toX, toY);
-        nCtx.stroke();
+          nCtx.strokeStyle = dominant
+            ? `${entry.color}${alpha})`
+            : `rgba(248,113,113,${alpha})`;
+          nCtx.lineWidth = lineWidth;
+          nCtx.beginPath();
+          nCtx.moveTo(fromX, entry.y);
+          // Curve toward the H1 node
+          const toX = h1Positions[j].x - 4;
+          const toY = h1Positions[j].y;
+          const cpX = fromX + (toX - fromX) * 0.5;
+          nCtx.quadraticCurveTo(cpX, entry.y, toX, toY);
+          nCtx.stroke();
 
-        // Traveling pulse
-        if (totalSignal > 0.5) {
-          const t = (simTime * 2 + j * 0.15) % 1;
-          const px = fromX + (toX - fromX) * t;
-          nCtx.fillStyle = dominant
-            ? `rgba(251,191,36,${alpha * 2.5})`
-            : `rgba(248,113,113,${alpha * 2.5})`;
-          nCtx.beginPath(); nCtx.arc(px, fromY, 1.5, 0, Math.PI * 2); nCtx.fill();
+          // Traveling pulse along curve
+          if (totalSignal > 0.4) {
+            const t = (simTime * 2.0 + j * 0.12 + entry.y * 0.003) % 1;
+            // Approximate point on quadratic bezier
+            const mt = 1 - t;
+            const px = mt * mt * fromX + 2 * mt * t * cpX + t * t * toX;
+            const py = mt * mt * entry.y + 2 * mt * t * entry.y + t * t * toY;
+            nCtx.fillStyle = dominant
+              ? `${entry.color}${Math.min(0.8, alpha * 2.5)})`
+              : `rgba(248,113,113,${Math.min(0.8, alpha * 2.5)})`;
+            nCtx.beginPath(); nCtx.arc(px, py, 1.5, 0, Math.PI * 2); nCtx.fill();
+          }
         }
       }
     }
