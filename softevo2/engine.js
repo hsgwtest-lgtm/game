@@ -76,6 +76,9 @@
   const TERRAIN_SOLID = 1;
   const MIN_ZOOM = 0.15;
   const MAX_ZOOM = 6;
+  const BASE_WORLD_WIDTH = 4000;
+  const EXPAND_THRESHOLD = 500;
+  const WORLD_EXPAND_INCREMENT = 2000;
 
   let TERRAIN_W, TERRAIN_H, TERRAIN_CELLS;
   let terrain;
@@ -240,10 +243,10 @@
     const hint = document.getElementById('build-hint');
     if (!hint) return;
     const msgs = {
-      'add-node': 'キャンバスをタップしてノードを配置',
+      'add-node': 'タップでノード配置 | 2本指でパン/ズーム',
       'add-bone': buildSelectedNode >= 0 ? '2つ目のノードをタップして接続' : 'ノードをタップして骨格を開始',
       'add-muscle': buildSelectedNode >= 0 ? '2つ目のノードをタップして筋肉接続' : 'ノードをタップして筋肉を開始',
-      'move-node': 'ノードをドラッグして移動',
+      'move-node': 'ノードをドラッグして移動 | 2本指でパン/ズーム',
       'resize-node': 'ノードをタップしてサイズ変更（タップで切替）',
       'delete': 'ノード/接続をタップして削除',
     };
@@ -401,6 +404,7 @@
   //  FITNESS OBJECTIVES
   // ═══════════════════════════════════════════════════
   let fitnessObjective = 'distance'; // 'distance', 'height', 'goal-speed', 'stability'
+  let currentStage = 'flat'; // 'flat', 'hills', 'obstacles', 'random'
 
   function calcFitnessForBody(body) {
     const cx = body.getCenterX();
@@ -723,6 +727,16 @@
 
   // ─── Physics (Verlet Integration) ─────────────────
   function physicStep() {
+    // Check if any creature is near the right edge and expand world
+    let needExpand = false;
+    for (const body of population) {
+      for (const n of body.nodes) {
+        if (n.x > COF.worldW - EXPAND_THRESHOLD) { needExpand = true; break; }
+      }
+      if (needExpand) break;
+    }
+    if (needExpand) expandWorld();
+
     for (const body of population) {
       for (const n of body.nodes) {
         const vx = (n.x - n.ox) * COF.airDrag;
@@ -835,7 +849,7 @@
   function constrainToWorld(node) {
     const r = node.radius;
     if (node.x - r < 0) { node.x = r; node.ox = node.x; }
-    if (node.x + r > COF.worldW) { node.x = COF.worldW - r; node.ox = node.x; }
+    // No right wall — infinite running
     if (node.y - r < 0) { node.y = r; node.oy = node.y; }
     if (node.y + r > COF.worldH) { node.y = COF.worldH - r; node.oy = node.y; node.grounded = true; }
   }
@@ -1530,7 +1544,13 @@
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
     if (currentPhase === PHASE_BUILD) {
-      if (pointers.size === 1) {
+      if (pointers.size >= 2) {
+        // 2-finger always pans in build phase
+        isPanning = true;
+        panStartX = e.clientX; panStartY = e.clientY;
+        camStartX = targetCamX; camStartY = targetCamY;
+        buildDragNode = -1;
+      } else if (pointers.size === 1) {
         if (buildTool === 'move-node') {
           const { x: wx, y: wy } = screenToWorld(e.clientX, e.clientY);
           buildDragNode = findBuildNodeAt(wx, wy);
@@ -1707,6 +1727,7 @@
     historyBest.length = 0;
     historyAvg.length = 0;
     evalTimer = 0;
+    COF.worldW = BASE_WORLD_WIDTH; // Reset to base world width
 
     initWorld();
     createPopulation(null);
@@ -1780,6 +1801,44 @@
     if (!isPaused && population.length > 0) {
       evalTimer = COF.evalSeconds;
     }
+  });
+
+  // ─── Reset Generation ─────────────────────────────
+  document.getElementById('btn-reset-gen').addEventListener('click', () => {
+    if (population.length > 0) {
+      evalTimer = 0;
+      createPopulation(null);
+      addEventMsg('🔄 世代リセット — 全個体を再配置', '#63d2ff', false);
+    }
+  });
+
+  // ─── Stage Selection ──────────────────────────────
+  document.querySelectorAll('.stage-btn[data-stage]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.stage-btn[data-stage]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const newStage = btn.dataset.stage;
+      if (newStage !== currentStage) {
+        currentStage = newStage;
+        // Reset world with new stage
+        COF.worldW = BASE_WORLD_WIDTH;
+        initWorld();
+        createPopulation(null);
+        evalTimer = 0;
+        triggerStageFlash();
+        const stageNames = { flat: '平地', hills: '丘陵', obstacles: '障害物', random: 'ランダム' };
+        addEventMsg(`🗺 ステージ変更: ${stageNames[currentStage]}`, '#34d399', false);
+      }
+    });
+  });
+
+  document.getElementById('btn-stage-reset').addEventListener('click', () => {
+    COF.worldW = BASE_WORLD_WIDTH;
+    initWorld();
+    createPopulation(null);
+    evalTimer = 0;
+    triggerStageFlash();
+    addEventMsg('🔄 地形リセット', '#34d399', false);
   });
 
   // ─── Toggles ──────────────────────────────────────
@@ -2003,51 +2062,150 @@
   }
 
   // ─── World Initialization ─────────────────────────
+  function generateFlatTerrain(startCol, endCol) {
+    const groundRow = Math.floor(TERRAIN_H * COF.groundLevel);
+    for (let y = groundRow; y < TERRAIN_H; y++) {
+      for (let x = startCol; x < endCol; x++) {
+        terrain[y * TERRAIN_W + x] = TERRAIN_SOLID;
+      }
+    }
+  }
+
+  function generateHillsTerrain(startCol, endCol) {
+    const groundRow = Math.floor(TERRAIN_H * COF.groundLevel);
+    for (let y = groundRow; y < TERRAIN_H; y++) {
+      for (let x = startCol; x < endCol; x++) {
+        terrain[y * TERRAIN_W + x] = TERRAIN_SOLID;
+      }
+    }
+    // Rolling hills
+    for (let i = 0; i < Math.ceil((endCol - startCol) / 40); i++) {
+      const hillCx = startCol + 30 + i * 40 + Math.floor(Math.random() * 20);
+      const hillW = 8 + Math.floor(Math.random() * 10);
+      const hillH = 2 + Math.floor(Math.random() * 5);
+      for (let dx = -hillW; dx <= hillW; dx++) {
+        const gx = hillCx + dx;
+        if (gx < startCol || gx >= endCol) continue;
+        const h = Math.floor(hillH * Math.max(0, 1 - (dx / hillW) * (dx / hillW)));
+        for (let dy = 0; dy < h; dy++) {
+          const gy = groundRow - 1 - dy;
+          if (gy >= 0) terrain[gy * TERRAIN_W + gx] = TERRAIN_SOLID;
+        }
+      }
+    }
+  }
+
+  function generateObstaclesTerrain(startCol, endCol) {
+    const groundRow = Math.floor(TERRAIN_H * COF.groundLevel);
+    for (let y = groundRow; y < TERRAIN_H; y++) {
+      for (let x = startCol; x < endCol; x++) {
+        terrain[y * TERRAIN_W + x] = TERRAIN_SOLID;
+      }
+    }
+    const span = endCol - startCol;
+    // Steps
+    for (let i = 0; i < Math.ceil(span / 60); i++) {
+      const sx = startCol + 20 + i * 60;
+      const sw = 4 + Math.floor(Math.random() * 4);
+      const sh = 2 + Math.floor(Math.random() * 3);
+      for (let dx = 0; dx < sw; dx++) {
+        for (let dy = 0; dy < sh; dy++) {
+          const gx = sx + dx;
+          const gy = groundRow - 1 - dy;
+          if (gx >= startCol && gx < endCol && gy >= 0) terrain[gy * TERRAIN_W + gx] = TERRAIN_SOLID;
+        }
+      }
+    }
+    // Walls
+    for (let i = 0; i < Math.ceil(span / 120); i++) {
+      const wx = startCol + 80 + i * 120;
+      const wh = 4 + Math.floor(Math.random() * 4);
+      for (let dy = 0; dy < wh; dy++) {
+        const gy = groundRow - 1 - dy;
+        if (wx >= startCol && wx < endCol && gy >= 0) terrain[gy * TERRAIN_W + wx] = TERRAIN_SOLID;
+      }
+    }
+    // Gaps
+    for (let i = 0; i < Math.ceil(span / 100); i++) {
+      const gapX = startCol + 50 + i * 100;
+      const gapW = 2 + Math.floor(Math.random() * 3);
+      for (let dx = 0; dx < gapW; dx++) {
+        const gx = gapX + dx;
+        if (gx >= startCol && gx < endCol) {
+          terrain[groundRow * TERRAIN_W + gx] = TERRAIN_EMPTY;
+          if (groundRow + 1 < TERRAIN_H) terrain[(groundRow + 1) * TERRAIN_W + gx] = TERRAIN_EMPTY;
+        }
+      }
+    }
+  }
+
+  function generateRandomTerrain(startCol, endCol) {
+    const fns = [generateFlatTerrain, generateHillsTerrain, generateObstaclesTerrain];
+    const chunkSize = 30;
+    for (let x = startCol; x < endCol; x += chunkSize) {
+      const fn = fns[Math.floor(Math.random() * fns.length)];
+      fn(x, Math.min(x + chunkSize, endCol));
+    }
+  }
+
+  function generateTerrainForStage(stage, startCol, endCol) {
+    switch (stage) {
+      case 'flat': generateFlatTerrain(startCol, endCol); break;
+      case 'hills': generateHillsTerrain(startCol, endCol); break;
+      case 'obstacles': generateObstaclesTerrain(startCol, endCol); break;
+      case 'random': generateRandomTerrain(startCol, endCol); break;
+      default: generateFlatTerrain(startCol, endCol);
+    }
+  }
+
+  function expandWorld() {
+    const oldW = TERRAIN_W;
+    COF.worldW += WORLD_EXPAND_INCREMENT;
+    const newTW = (COF.worldW / COF.cellSize) | 0;
+    const newCells = newTW * TERRAIN_H;
+    const newTerrain = new Uint8Array(newCells);
+    // Copy old data row by row
+    for (let y = 0; y < TERRAIN_H; y++) {
+      for (let x = 0; x < oldW; x++) {
+        newTerrain[y * newTW + x] = terrain[y * oldW + x];
+      }
+    }
+    terrain = newTerrain;
+    TERRAIN_W = newTW;
+    TERRAIN_CELLS = newCells;
+    // Generate terrain for the extended area
+    generateTerrainForStage(currentStage, oldW, newTW);
+    // Add borders for new area
+    for (let x = oldW; x < newTW; x++) {
+      newTerrain[x] = TERRAIN_SOLID; // top border
+      newTerrain[(TERRAIN_H - 1) * newTW + x] = TERRAIN_SOLID; // bottom border
+    }
+    // Rebuild terrain canvas
+    initTerrainCanvas();
+    terrainDirty = true;
+  }
+
+  function triggerStageFlash() {
+    const el = document.getElementById('stage-flash');
+    if (!el) return;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 200);
+  }
+
   function initWorld() {
     initTerrainGrid();
     initTerrainCanvas();
 
-    const groundRow = Math.floor(TERRAIN_H * COF.groundLevel);
-    for (let y = groundRow; y < TERRAIN_H; y++) {
-      for (let x = 0; x < TERRAIN_W; x++) {
-        terrain[y * TERRAIN_W + x] = TERRAIN_SOLID;
-      }
-    }
+    // Generate base terrain using stage
+    generateTerrainForStage(currentStage, 0, TERRAIN_W);
 
+    // Borders (top, bottom, left only — no right wall for infinite running)
     for (let x = 0; x < TERRAIN_W; x++) {
       terrain[x] = TERRAIN_SOLID;
       terrain[(TERRAIN_H - 1) * TERRAIN_W + x] = TERRAIN_SOLID;
     }
     for (let y = 0; y < TERRAIN_H; y++) {
       terrain[y * TERRAIN_W] = TERRAIN_SOLID;
-    }
-
-    // Small hill
-    const hillCx = 100;
-    const hillW = 12;
-    const hillH = 3;
-    for (let dx = -hillW; dx <= hillW; dx++) {
-      const gx = hillCx + dx;
-      if (gx < 0 || gx >= TERRAIN_W) continue;
-      const h = Math.floor(hillH * Math.max(0, 1 - (dx / hillW) * (dx / hillW)));
-      for (let dy = 0; dy < h; dy++) {
-        const gy = groundRow - 1 - dy;
-        if (gy >= 0) terrain[gy * TERRAIN_W + gx] = TERRAIN_SOLID;
-      }
-    }
-
-    // Small step
-    const stepX = 200;
-    const stepW = 6;
-    const stepH = 2;
-    for (let dx = 0; dx < stepW; dx++) {
-      for (let dy = 0; dy < stepH; dy++) {
-        const gx = stepX + dx;
-        const gy = groundRow - 1 - dy;
-        if (gx >= 0 && gx < TERRAIN_W && gy >= 0 && gy < TERRAIN_H) {
-          terrain[gy * TERRAIN_W + gx] = TERRAIN_SOLID;
-        }
-      }
     }
 
     terrainDirty = true;
