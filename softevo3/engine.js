@@ -1248,13 +1248,124 @@
     }
 
     // ════════════ SIGNAL FLOW LINES ════════════
-    // Draw signal flow from hidden layer to outputs
+
+    // Helper: get hidden layer node positions
+    function getHiddenNodePositions(hlIndex) {
+      const layerIdx = hlIndex + 1;
+      const count = Math.min(brain.layers[layerIdx], 14);
+      const hlX = colHiddenX + (colHiddenW / (hiddenLayers + 1)) * (hlIndex + 1);
+      const nodeSpacing = Math.min(14, hiddenAreaH / (count + 1));
+      const startNodeY = hiddenBaseY + (hiddenAreaH - count * nodeSpacing) / 2;
+      const positions = [];
+      for (let n = 0; n < count; n++) {
+        positions.push({ x: hlX, y: startNodeY + n * nodeSpacing });
+      }
+      return positions;
+    }
+
+    // ── Input → H1: aggregate signal bars to first hidden layer ──
     if (hiddenLayers > 0) {
-      const lastHlIdx = hiddenLayers; // last hidden layer index in brain.layers
-      const lastHlCount = Math.min(brain.layers[lastHlIdx], 14);
-      const hlX = colHiddenX + (colHiddenW / (hiddenLayers + 1)) * hiddenLayers;
-      const nodeSpacing = Math.min(14, hiddenAreaH / (lastHlCount + 1));
-      const startNodeY = hiddenBaseY + (hiddenAreaH - lastHlCount * nodeSpacing) / 2;
+      const h1Positions = getHiddenNodePositions(0);
+      const h1Count = h1Positions.length;
+      const wt0 = brain.weights[0];
+      const inputCount = brain.layers[0];
+      const h1Size = brain.layers[1];
+
+      // Compute aggregate input signal per H1 node
+      for (let j = 0; j < h1Count; j++) {
+        let sumPos = 0, sumNeg = 0;
+        for (let i = 0; i < inputCount; i++) {
+          const w = wt0[i * h1Size + j];
+          const a = acts[0][i] || 0;
+          const s = w * a;
+          if (s > 0) sumPos += s; else sumNeg -= s;
+        }
+        const totalSignal = sumPos + sumNeg;
+        if (totalSignal < 0.1) continue;
+
+        const dominant = sumPos >= sumNeg;
+        const alpha = Math.min(0.4, totalSignal * 0.08);
+        const lineWidth = Math.min(2, totalSignal * 0.15);
+
+        // Draw from right edge of input column to H1 node
+        const fromX = colInput + colInputW + 2;
+        const fromY = h1Positions[j].y;
+        const toX = h1Positions[j].x - 4;
+        const toY = h1Positions[j].y;
+
+        nCtx.strokeStyle = dominant
+          ? `rgba(251,191,36,${alpha})`
+          : `rgba(248,113,113,${alpha})`;
+        nCtx.lineWidth = lineWidth;
+        nCtx.beginPath();
+        nCtx.moveTo(fromX, fromY);
+        nCtx.lineTo(toX, toY);
+        nCtx.stroke();
+
+        // Traveling pulse
+        if (totalSignal > 0.5) {
+          const t = (simTime * 2 + j * 0.15) % 1;
+          const px = fromX + (toX - fromX) * t;
+          nCtx.fillStyle = dominant
+            ? `rgba(251,191,36,${alpha * 2.5})`
+            : `rgba(248,113,113,${alpha * 2.5})`;
+          nCtx.beginPath(); nCtx.arc(px, fromY, 1.5, 0, Math.PI * 2); nCtx.fill();
+        }
+      }
+    }
+
+    // ── H1 → H2 (and any hidden→hidden) ──
+    for (let hl = 0; hl < hiddenLayers - 1; hl++) {
+      const fromPositions = getHiddenNodePositions(hl);
+      const toPositions = getHiddenNodePositions(hl + 1);
+      const fromLayerIdx = hl + 1;
+      const toLayerIdx = hl + 2;
+      const wt = brain.weights[hl + 1];
+      const fromSize = brain.layers[fromLayerIdx];
+      const toSize = brain.layers[toLayerIdx];
+      const fromCount = fromPositions.length;
+      const toCount = toPositions.length;
+
+      for (let j = 0; j < toCount; j++) {
+        for (let i = 0; i < fromCount; i++) {
+          const w = wt[i * toSize + j];
+          const hAct = acts[fromLayerIdx][i] || 0;
+          const signal = Math.abs(w * hAct);
+          if (signal < 0.06) continue;
+
+          const alpha = Math.min(0.4, signal * 0.35);
+          const isPos = w > 0;
+
+          nCtx.strokeStyle = isPos
+            ? `rgba(129,140,248,${alpha})`
+            : `rgba(248,113,113,${alpha})`;
+          nCtx.lineWidth = Math.min(1.8, signal * 0.8);
+          nCtx.beginPath();
+          nCtx.moveTo(fromPositions[i].x + 4, fromPositions[i].y);
+          nCtx.lineTo(toPositions[j].x - 4, toPositions[j].y);
+          nCtx.stroke();
+
+          // Traveling pulse
+          if (signal > 0.2) {
+            const t = (simTime * 2.2 + i * 0.11 + j * 0.08) % 1;
+            const fx = fromPositions[i].x + 4;
+            const tx = toPositions[j].x - 4;
+            const px = fx + (tx - fx) * t;
+            const py = fromPositions[i].y + (toPositions[j].y - fromPositions[i].y) * t;
+            nCtx.fillStyle = isPos
+              ? `rgba(129,140,248,${alpha * 2})`
+              : `rgba(248,113,113,${alpha * 2})`;
+            nCtx.beginPath(); nCtx.arc(px, py, 1.2, 0, Math.PI * 2); nCtx.fill();
+          }
+        }
+      }
+    }
+
+    // ── Last hidden → Output ──
+    if (hiddenLayers > 0) {
+      const lastHlIdx = hiddenLayers;
+      const lastPositions = getHiddenNodePositions(hiddenLayers - 1);
+      const lastHlCount = lastPositions.length;
 
       const wt = brain.weights[brain.weights.length - 1];
       const outCount = Math.min(muscleCount, 12);
@@ -1268,21 +1379,22 @@
           if (signal < 0.08) continue;
 
           const alpha = Math.min(0.35, signal * 0.3);
-          const hy = startNodeY + i * nodeSpacing;
+          const hy = lastPositions[i].y;
 
           nCtx.strokeStyle = w > 0
             ? `rgba(52,211,153,${alpha})`
             : `rgba(248,113,113,${alpha})`;
           nCtx.lineWidth = Math.min(1.5, signal);
           nCtx.beginPath();
-          nCtx.moveTo(hlX + 5, hy);
+          nCtx.moveTo(lastPositions[i].x + 5, hy);
           nCtx.lineTo(outBarStartX - 2, outY);
           nCtx.stroke();
 
           // Traveling pulse
           if (signal > 0.25) {
             const t = (simTime * 2.5 + i * 0.13 + j * 0.09) % 1;
-            const px = hlX + 5 + (outBarStartX - 2 - hlX - 5) * t;
+            const fx = lastPositions[i].x + 5;
+            const px = fx + (outBarStartX - 2 - fx) * t;
             const py = hy + (outY - hy) * t;
             nCtx.fillStyle = w > 0
               ? `rgba(52,211,153,${alpha * 2})`
@@ -1293,16 +1405,13 @@
       }
     }
 
-    // ════════════ FLOW ARROWS ════════════
-    // Input → Hidden arrows
-    if (hiddenLayers > 0) {
-      const firstHlX = colHiddenX + (colHiddenW / (hiddenLayers + 1));
-      const arrowX = (colInput + colInputW + firstHlX) / 2;
-      nCtx.fillStyle = 'rgba(255,255,255,0.12)';
-      nCtx.font = '12px -apple-system,sans-serif';
-      nCtx.textAlign = 'center';
-      nCtx.fillText('→', arrowX, ch / 2);
-    }
+    // ════════════ COLUMN HEADERS ════════════
+    nCtx.font = `bold 8px -apple-system,sans-serif`;
+    nCtx.textAlign = 'center';
+    nCtx.fillStyle = 'rgba(251,191,36,0.5)';
+    nCtx.fillText('入力', colInput + colInputW / 2, 18);
+    nCtx.fillStyle = 'rgba(52,211,153,0.5)';
+    nCtx.fillText('出力', colOutputX + colOutputW / 2, 18);
 
     // ════════════ LEGEND (bottom) ════════════
     const legendY = ch - 6;
