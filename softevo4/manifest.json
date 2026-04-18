@@ -1,7 +1,7 @@
 {
-  "name": "SoftEvo4 — 思考が見える進化",
+  "name": "SoftEvo4 — 脳解析付き進化シミュレータ",
   "short_name": "SoftEvo4",
-  "description": "脳の思考を可視化する軟体生物進化シミュレータ",
+  "description": "ニューラル解析モード付き軟体生物進化シミュレータ",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "any",

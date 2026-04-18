@@ -1,189 +1,162 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#060a14">
-  <title>SoftEvo4 — 思考が見える進化</title>
-  <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#060a14">
+<title>SoftEvo4 — 脳解析付き進化シミュレータ</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="app">
   <canvas id="mainCanvas"></canvas>
 
-  <!-- ── Build Phase Overlay ── -->
+  <!-- ═══ BUILD PHASE UI ═══ -->
   <div id="build-overlay">
-    <div class="build-header">
-      <h1 class="build-title">🧬 SoftEvo4</h1>
-      <p class="build-sub">思考が見える進化シミュレータ</p>
+    <div id="build-top-bar">
+      <div id="build-title">🧬 SoftEvo4 — 生物設計</div>
+      <div id="build-tools">
+        <button class="build-btn active" data-btool="add-node" title="ノード追加">⊕</button>
+        <button class="build-btn" data-btool="add-bone" title="ボーン接続">🦴</button>
+        <button class="build-btn" data-btool="add-muscle" title="筋肉接続">💪</button>
+        <button class="build-btn" data-btool="move-node" title="ノード移動">✥</button>
+        <button class="build-btn" data-btool="resize-node" title="サイズ変更">⊚</button>
+        <button class="build-btn" data-btool="pan" title="視点移動">🖐</button>
+        <button class="build-btn build-del" data-btool="delete" title="削除">🗑</button>
+        <div class="build-sep"></div>
+        <button class="build-btn build-action" id="btn-preset-biped" title="プリセット: 二足">🚶</button>
+        <button class="build-btn build-action" id="btn-preset-snake" title="プリセット: 蛇">🐍</button>
+        <button class="build-btn build-action" id="btn-preset-spider" title="プリセット: クモ">🕷</button>
+        <button class="build-btn build-action" id="btn-preset-blob" title="プリセット: ブロブ">🫧</button>
+        <button class="build-btn build-action" id="btn-clear-build" title="クリア">🔄</button>
+      </div>
     </div>
-    <div class="build-toolbar">
-      <button class="build-btn active" data-btool="add-node" title="ノード追加">⊕</button>
-      <button class="build-btn" data-btool="add-bone" title="骨格接続">🦴</button>
-      <button class="build-btn" data-btool="add-muscle" title="筋肉接続">💪</button>
-      <button class="build-btn" data-btool="move-node" title="ノード移動">✋</button>
-      <button class="build-btn" data-btool="resize-node" title="サイズ変更">⊙</button>
-      <button class="build-btn" data-btool="pan" title="パン">🔍</button>
-      <button class="build-btn" data-btool="delete" title="削除">✕</button>
-    </div>
-    <div id="build-hint" class="build-hint">タップでノード配置</div>
-    <div class="build-info">
+    <div id="build-info">
       <span id="build-node-count">ノード: 0</span>
       <span id="build-bone-count">ボーン: 0</span>
       <span id="build-muscle-count">筋肉: 0</span>
     </div>
-    <div class="preset-bar">
-      <button class="preset-btn" id="btn-preset-biped">🚶 二足</button>
-      <button class="preset-btn" id="btn-preset-snake">🐍 蛇</button>
-      <button class="preset-btn" id="btn-preset-spider">🕷 蜘蛛</button>
-      <button class="preset-btn" id="btn-preset-blob">🫧 塊</button>
-      <button class="preset-btn danger" id="btn-clear-build">✕ クリア</button>
-    </div>
-    <button id="btn-start-sim" class="start-btn" disabled>▶ 進化開始</button>
+    <div id="build-hint">キャンバスをタップしてノードを配置</div>
+    <button id="btn-start-sim" class="big-action-btn" disabled>▶ 進化スタート</button>
   </div>
 
-  <!-- ── Sim Phase Overlay ── -->
+  <!-- ═══ SIM PHASE UI ═══ -->
   <div id="sim-overlay" class="hidden">
-    <!-- Top HUD -->
-    <div class="top-hud">
-      <button id="btn-back-build" class="hud-btn">◀</button>
-      <div class="hud-stats">
+    <div id="top-bar">
+      <div id="stats">
         <span id="gen-info">🧬 世代 0</span>
         <span id="best-info">🏆 0</span>
         <span id="avg-info">📊 0</span>
+        <span id="fps-counter">FPS: 0</span>
       </div>
-      <span id="fps-counter" class="fps">FPS: 60</span>
+      <div id="ranking"></div>
+      <div id="speed-control">
+        <button id="btn-pause" title="一時停止">⏸</button>
+        <button id="btn-play" title="再生" class="active">▶</button>
+        <button id="btn-fast" title="倍速">⏩</button>
+        <button id="btn-skip" title="世代スキップ">⏭</button>
+        <button id="btn-reset-gen" title="世代リセット">🔄</button>
+        <button id="btn-config" title="ライブ・チューニング">⚙️</button>
+        <button id="btn-back-build" title="設計に戻る">🔧</button>
+      </div>
     </div>
-
-    <!-- Eval Progress -->
-    <div class="eval-bar">
-      <div id="eval-fill" class="eval-fill"></div>
-    </div>
-    <div id="eval-timer" class="eval-timer">⏱ 0.0 / 10.0s</div>
-
-    <!-- Ranking -->
-    <div id="ranking" class="ranking"></div>
-
-    <!-- Tool Bar -->
-    <div class="tool-bar">
+    <div id="toolbar">
       <button class="tool-btn active" data-tool="observe" title="観察">👁</button>
-      <button class="tool-btn" data-tool="block" title="地形追加">🧱</button>
-      <button class="tool-btn" data-tool="erase" title="地形削除">🧹</button>
+      <button class="tool-btn" data-tool="block" title="ブロック配置">🧱</button>
+      <button class="tool-btn" data-tool="erase" title="消しゴム">🧹</button>
       <button class="tool-btn" data-tool="goal" title="ゴール配置">🎯</button>
-      <button class="tool-btn" data-tool="poke" title="突く">👆</button>
+      <button class="tool-btn tool-del" data-tool="delete-goal" title="ゴール削除">❌</button>
+      <div id="brush-radius-control" class="hidden">
+        <label>範囲</label>
+        <input type="range" id="brush-radius-slider" min="1" max="10" value="2" step="1">
+        <span id="brush-radius-value">2</span>
+      </div>
+      <div class="tool-separator"></div>
+      <button class="tool-btn tool-action" data-tool="poke" title="つつく">👆</button>
     </div>
-
-    <!-- Brush Radius -->
-    <div id="brush-radius-control" class="brush-control hidden">
-      <span>ブラシ:</span>
-      <input type="range" id="brush-radius-slider" min="1" max="8" value="2">
-      <span id="brush-radius-value">2</span>
+    <div id="camera-mode-bar">
+      <button class="cam-btn active" data-cam="follow">📹 追従</button>
+      <button class="cam-btn" data-cam="free">🎥 フリー</button>
     </div>
-
-    <!-- Speed -->
-    <div id="speed-control" class="speed-control">
-      <button id="btn-pause" class="spd-btn" title="一時停止">⏸</button>
-      <button id="btn-play" class="spd-btn active" title="再生">▶</button>
-      <button id="btn-fast" class="spd-btn" title="高速">⏩</button>
-      <button id="btn-skip" class="spd-btn" title="世代スキップ">⏭</button>
-      <button id="btn-reset-gen" class="spd-btn" title="世代リセット">🔄</button>
-    </div>
-
-    <!-- Stage Select -->
-    <div class="stage-bar">
+    <div id="stage-bar">
+      <span class="stage-label">🗺 ステージ:</span>
       <button class="stage-btn active" data-stage="flat">平地</button>
       <button class="stage-btn" data-stage="hills">丘陵</button>
-      <button class="stage-btn" data-stage="obstacles">障害</button>
+      <button class="stage-btn" data-stage="obstacles">障害物</button>
       <button class="stage-btn" data-stage="random">ランダム</button>
-      <button class="stage-btn" id="btn-stage-reset">🔄</button>
+      <button class="stage-btn stage-reset" id="btn-stage-reset" title="地形リセット">🔄</button>
     </div>
-
-    <!-- Toggle Row -->
-    <div class="toggle-row">
-      <button id="toggle-muscles" class="tog-btn active" title="筋肉表示">筋</button>
-      <button id="toggle-trails" class="tog-btn" title="軌跡表示">軌</button>
-      <button id="toggle-grid" class="tog-btn" title="グリッド">格</button>
-      <button id="toggle-graph" class="tog-btn" title="グラフ">📈</button>
-      <button id="toggle-labels" class="tog-btn active" title="ラベル">名</button>
-      <button id="toggle-neural" class="tog-btn" title="ニューラル">🧠</button>
-      <button id="toggle-insight" class="tog-btn" title="思考解釈">💡</button>
-    </div>
-
-    <!-- Camera -->
-    <div class="cam-bar">
-      <button class="cam-btn active" data-cam="follow">追尾</button>
-      <button class="cam-btn" data-cam="free">自由</button>
-    </div>
-
-    <!-- Fitness Objective -->
-    <div class="obj-bar">
-      <button class="obj-btn active" data-obj="distance">距離</button>
-      <button class="obj-btn" data-obj="height">跳躍</button>
-      <button class="obj-btn" data-obj="goal-speed">ゴール</button>
-      <button class="obj-btn" data-obj="stability">安定</button>
-    </div>
-
-    <!-- Config Button -->
-    <button id="btn-config" class="config-toggle-btn">⚙</button>
-
-    <!-- Graph Panel -->
-    <div id="graph-panel" class="panel graph-panel hidden">
-      <div class="panel-header">
-        <span>📊 適応度グラフ</span>
-        <button id="close-graph" class="panel-close">✕</button>
+    <div id="bottom-bar">
+      <div id="eval-progress-bar"><div id="eval-fill"></div></div>
+      <div id="objective-bar">
+        <span class="obj-label">学習目標:</span>
+        <button class="obj-btn active" data-obj="distance">📏 移動距離</button>
+        <button class="obj-btn" data-obj="height">⬆ 跳躍高</button>
+        <button class="obj-btn" data-obj="goal-speed">🎯 ゴール到達</button>
+        <button class="obj-btn" data-obj="stability">⚖ 安定性</button>
       </div>
-      <canvas id="graphCanvas" width="300" height="150"></canvas>
-    </div>
-
-    <!-- Neural Monitor Panel -->
-    <div id="neural-panel" class="panel neural-panel hidden">
-      <div class="panel-header">
-        <span>🧠 ニューラルモニター</span>
-        <button id="close-neural" class="panel-close">✕</button>
+      <div id="display-bar">
+        <span class="tog-label">表示：</span>
+        <button class="tog-btn active" id="toggle-muscles">筋肉</button>
+        <button class="tog-btn" id="toggle-trails">軌跡</button>
+        <button class="tog-btn" id="toggle-grid">グリッド</button>
+        <button class="tog-btn" id="toggle-graph">グラフ</button>
+        <button class="tog-btn active" id="toggle-labels">ラベル</button>
+        <button class="tog-btn" id="toggle-neural">脳波</button>
+        <button class="tog-btn" id="toggle-analysis">🔬解析</button>
       </div>
-      <canvas id="neuralCanvas"></canvas>
-    </div>
-
-    <!-- BRAIN INSIGHT PANEL (NEW in v4) -->
-    <div id="insight-panel" class="panel insight-panel hidden">
-      <div class="panel-header insight-header">
-        <span>💡 思考解釈</span>
-        <button id="close-insight" class="panel-close">✕</button>
-      </div>
-      <div id="insight-content" class="insight-content">
-        <div class="insight-empty">進化開始を待っています…</div>
+      <div id="bottom-content">
+        <div id="eval-timer">⏱ 0.0 / 10.0s</div>
       </div>
     </div>
-
-    <!-- Config Panel -->
-    <div id="config-panel" class="panel config-panel hidden">
-      <div class="panel-header">
-        <span>⚙ ライブ設定</span>
-        <button id="close-config" class="panel-close">✕</button>
-      </div>
-      <div id="config-content" class="config-content"></div>
-    </div>
-
-    <!-- Info Panel -->
-    <div id="info-panel" class="panel info-panel hidden">
-      <div class="panel-header">
-        <span>🔍 個体情報</span>
-        <button id="close-info" class="panel-close">✕</button>
-      </div>
-      <div id="info-content" class="info-content"></div>
-    </div>
-
-    <!-- Gen Flash -->
-    <div id="gen-flash" class="gen-flash"></div>
-    <div id="stage-flash" class="stage-flash"></div>
-
-    <!-- Event Log -->
-    <div id="event-log" class="event-log"></div>
   </div>
 
-  <script src="engine.js"></script>
+  <!-- ═══ Panels ═══ -->
+  <div id="graph-panel" class="hidden">
+    <div id="graph-header">
+      <span>📈 適応度推移</span>
+      <button id="close-graph">✕</button>
+    </div>
+    <canvas id="graphCanvas" width="360" height="180"></canvas>
+  </div>
+  <div id="neural-panel" class="hidden">
+    <div id="neural-header">
+      <span>🧠 ニューラルモニター</span>
+      <button id="close-neural">✕</button>
+    </div>
+    <canvas id="neuralCanvas" width="380" height="260"></canvas>
+  </div>
+  <div id="analysis-panel" class="hidden">
+    <div id="analysis-header">
+      <span>🔬 脳解析 — なぜこの戦略？</span>
+      <button id="close-analysis">✕</button>
+    </div>
+    <canvas id="analysisCanvas" width="380" height="420"></canvas>
+  </div>
+  <div id="config-panel" class="hidden">
+    <div id="config-header">
+      <span>⚙️ ライブ・チューニング</span>
+      <button id="close-config">✕</button>
+    </div>
+    <div id="config-content"></div>
+  </div>
+  <div id="info-panel" class="hidden">
+    <button id="close-info">✕</button>
+    <div id="info-content"></div>
+  </div>
+  <div id="event-log"></div>
+  <div id="gen-flash"></div>
+  <div id="stage-flash"></div>
+</div>
+<script src="engine.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js');
+}
+</script>
 </body>
 </html>

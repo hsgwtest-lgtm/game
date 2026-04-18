@@ -1,17 +1,14 @@
 /* =====================================================
-   SoftEvo4 — 思考が見える進化シミュレータ
+   SoftEvo3 — ライブ進化シミュレータ
    ─────────────────────────────────────────────────────
    ゼロ依存: 自作 Verlet 物理 + 自作ニューラルネット
-   SoftEvo3 からの進化:
-     1. 🧠 脳解釈モード — なぜその重みを採用したか可視化
-        - 帰属分析: 各出力の入力別寄与率
-        - 戦略指紋: 歩行パターン自動検出
-        - 思考ナレーション: 自然言語で脳の判断を説明
-        - 世代比較: なぜ勝者が勝ったか
-     2. ニューラルモニター (リアルタイム発火可視化)
+   SoftEvo2 からの進化:
+     1. ニューラルモニター (リアルタイム発火可視化)
+     2. ライブ・ステータスラベル (全個体頭上表示)
      3. ライブ・チューニング (走行中パラメータ即時反映)
      4. 環境リアルタイム干渉
      5. ライブ・イベントティッカー (AI実況ログ)
+     6. 演算/描画分離 60fps 最適化
    ===================================================== */
 
 (function () {
@@ -111,6 +108,7 @@
       this.layers = layerSizes;
       this.weights = [];
       this.biases = [];
+      // Telemetry: store activations for visualization
       this.activations = [];
       for (let i = 0; i < layerSizes.length; i++) {
         this.activations.push(new Float32Array(layerSizes[i]));
@@ -128,6 +126,7 @@
 
     predict(input) {
       let cur = input;
+      // Store input activations
       for (let i = 0; i < Math.min(cur.length, this.activations[0].length); i++) {
         this.activations[0][i] = cur[i];
       }
@@ -146,6 +145,7 @@
             ? Math.max(0, sum)
             : 1.0 / (1.0 + Math.exp(-Math.max(-10, Math.min(10, sum))));
         }
+        // Store activations
         for (let j = 0; j < outSz; j++) {
           this.activations[l + 1][j] = out[j];
         }
@@ -166,59 +166,6 @@
         this.weights[i].set(g.weights[i]);
         this.biases[i].set(g.biases[i]);
       }
-    }
-
-    // ── Attribution: compute input contribution to each output ──
-    computeAttribution() {
-      const nLayers = this.layers.length;
-      const outSize = this.layers[nLayers - 1];
-      const inSize = this.layers[0];
-
-      // For each output j, compute contribution from each input i
-      // Using gradient-based attribution (chain rule through ReLU)
-      const attribution = [];
-      for (let j = 0; j < outSize; j++) {
-        const contrib = new Float32Array(inSize);
-
-        // Forward pass already done, use stored activations
-        // Compute Jacobian column j via backprop
-        // Start with output layer gradient = 1 for unit j
-        let grad = new Float32Array(this.layers[nLayers - 1]);
-        grad[j] = 1.0;
-
-        // Backprop through layers
-        for (let l = this.weights.length - 1; l >= 0; l--) {
-          const w = this.weights[l];
-          const inSz = this.layers[l];
-          const outSz = this.layers[l + 1];
-
-          // Multiply by activation derivative
-          if (l < this.weights.length - 1) {
-            // ReLU derivative
-            for (let k = 0; k < outSz; k++) {
-              if (this.activations[l + 1][k] <= 0) grad[k] = 0;
-            }
-          }
-          // else: sigmoid derivative (already accounted in gradient magnitude)
-
-          const prevGrad = new Float32Array(inSz);
-          for (let i = 0; i < inSz; i++) {
-            let sum = 0;
-            for (let k = 0; k < outSz; k++) {
-              sum += w[i * outSz + k] * grad[k];
-            }
-            prevGrad[i] = sum;
-          }
-          grad = prevGrad;
-        }
-
-        // Contribution = gradient * input_value
-        for (let i = 0; i < inSize; i++) {
-          contrib[i] = grad[i] * this.activations[0][i];
-        }
-        attribution.push(contrib);
-      }
-      return attribution;
     }
   }
 
@@ -260,177 +207,6 @@
         return m;
       }),
     };
-  }
-
-  // ═══════════════════════════════════════════════════
-  //  BRAIN INSIGHT — Strategy & Attribution Analysis
-  // ═══════════════════════════════════════════════════
-
-  // Input category definitions
-  function getInputCategories(nodeCount, muscleCount) {
-    const cats = [];
-    let idx = 0;
-    // Velocity: 2 per node (vx, vy)
-    for (let i = 0; i < nodeCount; i++) {
-      cats.push({ idx: idx, name: `N${i}速度X`, cat: 'velocity', icon: '⚡', nodeIdx: i });
-      cats.push({ idx: idx + 1, name: `N${i}速度Y`, cat: 'velocity', icon: '⚡', nodeIdx: i });
-      idx += 2;
-    }
-    // Muscle state: 1 per muscle
-    for (let i = 0; i < muscleCount; i++) {
-      cats.push({ idx: idx, name: `M${i}伸縮`, cat: 'muscle', icon: '🔗', muscleIdx: i });
-      idx++;
-    }
-    // Grounded: 1 per node
-    for (let i = 0; i < nodeCount; i++) {
-      cats.push({ idx: idx, name: `N${i}接地`, cat: 'ground', icon: '⬇', nodeIdx: i });
-      idx++;
-    }
-    // Rhythm
-    cats.push({ idx: idx, name: 'リズム', cat: 'rhythm', icon: '♪' });
-    return cats;
-  }
-
-  // Category aggregation colors
-  const CAT_COLORS = {
-    velocity: { color: '#fbbf24', bg: 'rgba(251,191,36,', label: '速度' },
-    muscle:   { color: '#34d399', bg: 'rgba(52,211,153,', label: '筋肉状態' },
-    ground:   { color: '#63d2ff', bg: 'rgba(99,210,255,', label: '接地' },
-    rhythm:   { color: '#a78bfa', bg: 'rgba(167,139,250,', label: 'リズム' },
-  };
-
-  // Detect locomotion strategy
-  function detectStrategy(body) {
-    if (!body || !body.brain) return { name: '解析中…', icon: '🔄', desc: '' };
-
-    const acts = body.brain.activations;
-    const outLayer = acts[acts.length - 1];
-    const muscleCount = body.muscles.length;
-    const nodeCount = body.nodes.length;
-
-    // Analyze output patterns
-    let highCount = 0, lowCount = 0, altCount = 0;
-    let prevHigh = false;
-    for (let i = 0; i < muscleCount; i++) {
-      const a = outLayer[i] || 0;
-      if (a > 0.65) { highCount++; if (!prevHigh) altCount++; prevHigh = true; }
-      else if (a < 0.35) { lowCount++; prevHigh = false; }
-      else { prevHigh = false; }
-    }
-
-    // Analyze grounded pattern
-    let groundedCount = 0, frontGrounded = false, backGrounded = false;
-    for (let i = 0; i < nodeCount; i++) {
-      if (body.nodes[i].grounded) {
-        groundedCount++;
-        if (i < nodeCount / 2) backGrounded = true;
-        else frontGrounded = true;
-      }
-    }
-
-    // Analyze velocity
-    const vx = body.nodes.reduce((s, n) => s + (n.x - n.ox), 0) / nodeCount;
-    const vy = body.nodes.reduce((s, n) => s + (n.y - n.oy), 0) / nodeCount;
-
-    // Determine strategy
-    if (groundedCount === 0 && Math.abs(vy) > 1) {
-      return { name: 'ジャンパー', icon: '🦘', desc: '跳躍で移動。接地→跳躍のサイクルを繰り返す' };
-    }
-    if (altCount >= muscleCount * 0.4) {
-      return { name: 'ギャロッパー', icon: '🐎', desc: '筋肉を交互に収縮させ、走るように前進' };
-    }
-    if (highCount >= muscleCount * 0.7) {
-      return { name: 'テンサー', icon: '🦀', desc: 'ほぼ全筋肉を同時収縮。体を硬くして転がる' };
-    }
-    if (lowCount >= muscleCount * 0.7) {
-      return { name: 'リラクサー', icon: '🪼', desc: '筋肉を弛緩させ、重力と慣性で移動' };
-    }
-    if (body.totalMuscleOutput > 0.6) {
-      return { name: 'アクティブウォーカー', icon: '🚶', desc: '高い筋活性で力強く歩行' };
-    }
-    if (Math.abs(vx) > 2) {
-      return { name: 'ダッシャー', icon: '💨', desc: '高速水平移動。効率的な推進力' };
-    }
-    if (groundedCount >= nodeCount * 0.8) {
-      return { name: 'クローラー', icon: '🐛', desc: '地面に密着し、這うように移動' };
-    }
-    return { name: 'エクスプローラー', icon: '🔍', desc: '多様な動きを試行中。戦略が未収束' };
-  }
-
-  // Generate natural language thought narrative
-  function generateThoughtNarrative(body, attribution, inputCats) {
-    if (!body || !attribution || attribution.length === 0) return [];
-    const narratives = [];
-    const muscleCount = body.muscles.length;
-    const outActs = body.brain.activations[body.brain.activations.length - 1];
-
-    for (let mi = 0; mi < Math.min(muscleCount, 8); mi++) {
-      const act = outActs[mi] || 0;
-      if (act < 0.1) continue; // skip inactive muscles
-
-      const contrib = attribution[mi];
-      if (!contrib) continue;
-
-      // Aggregate by category
-      const catContrib = {};
-      for (const ic of inputCats) {
-        if (ic.idx >= contrib.length) continue;
-        const c = contrib[ic.idx];
-        if (!catContrib[ic.cat]) catContrib[ic.cat] = { pos: 0, neg: 0, dominant: null, dominantVal: 0 };
-        if (c > 0) catContrib[ic.cat].pos += c;
-        else catContrib[ic.cat].neg -= c;
-        if (Math.abs(c) > catContrib[ic.cat].dominantVal) {
-          catContrib[ic.cat].dominantVal = Math.abs(c);
-          catContrib[ic.cat].dominant = ic;
-        }
-      }
-
-      // Find top contributing category
-      let topCat = null, topVal = 0;
-      for (const [cat, v] of Object.entries(catContrib)) {
-        const total = v.pos + v.neg;
-        if (total > topVal) { topVal = total; topCat = cat; }
-      }
-
-      if (!topCat || topVal < 0.05) continue;
-
-      // Generate narrative
-      const pct = Math.round(act * 100);
-      const catInfo = CAT_COLORS[topCat];
-      const dominant = catContrib[topCat].dominant;
-      let reason = '';
-
-      switch (topCat) {
-        case 'velocity':
-          if (dominant) {
-            const isY = dominant.name.includes('Y');
-            reason = isY ? '上下の動きに反応して' : '水平速度に反応して';
-          } else {
-            reason = '速度変化を感知して';
-          }
-          break;
-        case 'muscle':
-          reason = dominant ? `M${dominant.muscleIdx}の伸縮状態をフィードバックして` : '他の筋肉状態に連動して';
-          break;
-        case 'ground':
-          reason = dominant ? `N${dominant.nodeIdx}の接地を検知して` : '接地状態に応じて';
-          break;
-        case 'rhythm':
-          reason = '内部リズム信号に同期して';
-          break;
-      }
-
-      narratives.push({
-        muscle: mi,
-        act: pct,
-        reason,
-        topCat,
-        catLabel: catInfo.label,
-        color: catInfo.color,
-      });
-    }
-
-    return narratives;
   }
 
   // ═══════════════════════════════════════════════════
@@ -640,16 +416,12 @@
       this.startX = x; this.startY = y;
       this.fitness = 0; this.alive = true;
       this.minY = y;
+      // Telemetry
       this.totalMuscleOutput = 0;
       this.prevFitness = 0;
       this.fitnessVelocity = 0;
-      this.movementPattern = 0;
+      this.movementPattern = 0; // track movement pattern changes
       this.prevMuscleHash = 0;
-
-      // Insight telemetry
-      this.strategyHistory = [];
-      this.attributionCache = null;
-      this.attributionAge = 0;
 
       const nc = bp.nodes.length;
       let bpCx = 0, bpCy = 0;
@@ -709,26 +481,24 @@
         const act = outputs[i] !== undefined ? outputs[i] : 0.5;
         this.muscleAct[i] = act;
         this.muscles[i].currentTarget = this.muscles[i].restLength * (0.4 + 0.6 * act);
+        // LIVE stiffness from COF
         this.muscles[i].stiffness = COF.muscleStiffness;
         totalOut += Math.abs(act - 0.5);
         muscleHash += (act > 0.6 ? 1 : 0) << (i % 16);
       }
+      // LIVE bone stiffness
       for (const b of this.bones) b.stiffness = COF.boneStiffness;
 
       this.totalMuscleOutput = totalOut / this.muscles.length;
+
+      // Detect movement pattern changes
       if (muscleHash !== this.prevMuscleHash) this.movementPattern++;
       this.prevMuscleHash = muscleHash;
 
+      // Track fitness velocity
       const currentFit = this.getCenterX() - this.startX;
       this.fitnessVelocity = currentFit - this.prevFitness;
       this.prevFitness = currentFit;
-
-      // Update attribution cache periodically
-      this.attributionAge++;
-      if (this.attributionAge >= 30) {
-        this.attributionCache = this.brain.computeAttribution();
-        this.attributionAge = 0;
-      }
     }
 
     getCenterX() { let s = 0; for (const n of this.nodes) s += n.x; return s / this.nodes.length; }
@@ -751,9 +521,6 @@
   let bestEverGen = 0;
   let focusedIndex = 0;
 
-  // Evolution history for insight
-  let evoHistory = []; // { gen, bestFit, avgFit, bestGenome, strategy }
-
   function getSpawnY() { return Math.floor(TERRAIN_H * COF.groundLevel) * COF.cellSize - 50; }
 
   function createPopulation(genomes) {
@@ -769,9 +536,10 @@
 
   const HISTORY_MAX = 200;
   const historyBest = [], historyAvg = [];
+  const strategyHistory = []; // { gen, catScores:[vel,mus,gnd,rht], fitness, strategyType }
 
   // ═══════════════════════════════════════════════════
-  //  LIVE EVENT TICKER
+  //  LIVE EVENT TICKER — AI commentary
   // ═══════════════════════════════════════════════════
   let prevAvgFitness = 0;
   let prevBestFitness = 0;
@@ -782,6 +550,20 @@
     if (tickerCooldown > 0) { tickerCooldown--; return; }
     if (population.length === 0) return;
 
+    // Check for new movement patterns
+    for (let i = 0; i < population.length; i++) {
+      const body = population[i];
+      const key = `pattern_${body.id}`;
+      if (!patternDetectionCounters[key]) patternDetectionCounters[key] = 0;
+      if (body.movementPattern > patternDetectionCounters[key] + 10) {
+        patternDetectionCounters[key] = body.movementPattern;
+        addEventMsg(`⚡ #${body.id}: 新しい動きパターンを検知！`, '#34d399', false, true);
+        tickerCooldown = 60;
+        return;
+      }
+    }
+
+    // Check for sudden fitness jumps
     for (const body of population) {
       if (body.fitnessVelocity > 3) {
         addEventMsg(`🚀 #${body.id}: 急加速中！ (+${body.fitnessVelocity.toFixed(1)}/f)`, '#63d2ff', false, true);
@@ -790,12 +572,14 @@
       }
     }
 
+    // Check for grounded status
     const fullyGrounded = population.filter(b => b.nodes.every(n => n.grounded)).length;
     if (fullyGrounded > population.length * 0.7 && Math.random() < 0.01) {
       addEventMsg(`⚠ ${fullyGrounded}/${population.length}体が完全接地 — 動き不足`, '#f59e0b', false, true);
       tickerCooldown = 120;
     }
 
+    // Random muscle activity observation
     if (Math.random() < 0.005) {
       const best = population.reduce((a, b) => (a.totalMuscleOutput > b.totalMuscleOutput ? a : b));
       const pct = (best.totalMuscleOutput * 100).toFixed(0);
@@ -819,11 +603,14 @@
     const isRecord = bestFit > bestEverFitness;
     if (isRecord) { bestEverFitness = bestFit; bestEverGen = generation; }
 
+    // Live commentary on generation change
     const avgDelta = avgFit - prevAvgFitness;
     if (generation > 0) {
       if (avgDelta > 0) {
         const pct = prevAvgFitness > 0 ? ((avgDelta / prevAvgFitness) * 100).toFixed(0) : '∞';
         addEventMsg(`📈 世代 ${generation + 1}: 平均スコア ${pct}% 向上！`, '#34d399', false, true);
+      } else if (avgDelta < -5) {
+        addEventMsg(`📉 世代 ${generation + 1}: 平均スコア低下… 探索中`, '#f87171', false, true);
       }
     }
     prevAvgFitness = avgFit;
@@ -833,17 +620,17 @@
     historyAvg.push(avgFit);
     if (historyBest.length > HISTORY_MAX) { historyBest.shift(); historyAvg.shift(); }
 
-    // Save evolution history for insight
-    const bestBody = population[indices[0]];
-    const strategy = detectStrategy(bestBody);
-    evoHistory.push({
-      gen: generation,
-      bestFit: bestFit,
-      avgFit: avgFit,
-      strategy: strategy.name,
-      bestGenome: bestBody.brain.getGenome(),
-    });
-    if (evoHistory.length > 50) evoHistory.shift();
+    // ── Record strategy profile for analysis mode ──
+    try {
+      const bestBody = population[indices[0]];
+      if (bestBody && bestBody.brain) {
+        const profile = computeStrategyProfile(bestBody.brain);
+        profile.gen = generation;
+        profile.fitness = bestFit;
+        strategyHistory.push(profile);
+        if (strategyHistory.length > HISTORY_MAX) strategyHistory.shift();
+      }
+    } catch(e) { /* ignore analysis errors */ }
 
     const eliteGenomes = eliteIdx.map(i => population[i].brain.getGenome());
     const newGenomes = [];
@@ -1011,6 +798,7 @@
     terrainCtx.putImageData(terrainImageData, 0, 0);
   }
 
+  // ─── Build Phase Rendering ────────────────────────
   function renderBuildPhase() {
     const w = window.innerWidth, h = window.innerHeight;
     ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
@@ -1059,6 +847,7 @@
     ctx.restore();
   }
 
+  // ─── Sim Phase Rendering ──────────────────────────
   function renderSimPhase(simTime) {
     const w = window.innerWidth, h = window.innerHeight;
     ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
@@ -1109,6 +898,7 @@
 
     ctx.restore();
 
+    // Cursor overlay for brush tools
     if (cursorVisible && (currentTool === 'block' || currentTool === 'erase')) {
       const radiusScreen = BRUSH_SIZE * COF.cellSize * camZoom;
       const pulse = 0.7 + 0.3 * Math.sin(Date.now() * 0.005);
@@ -1138,6 +928,7 @@
       ctx.setLineDash([5,5]); ctx.beginPath(); ctx.arc(cx, cy, 50, 0, Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
     }
 
+    // Membrane
     ctx.globalAlpha = 0.3; ctx.fillStyle = colStr; ctx.beginPath();
     if (sorted.length >= 3) {
       for (let i = 0; i < sorted.length; i++) {
@@ -1150,9 +941,11 @@
     }
     ctx.globalAlpha = 1.0;
 
+    // Bones
     ctx.strokeStyle = 'rgba(200,210,230,0.25)'; ctx.lineWidth = 1;
     for (const b of body.bones) { const na = nodes[b.a], nb = nodes[b.b]; ctx.beginPath(); ctx.moveTo(na.x,na.y); ctx.lineTo(nb.x,nb.y); ctx.stroke(); }
 
+    // Muscles with pulse animation
     if (showMuscles) {
       for (let i = 0; i < body.muscles.length; i++) {
         const m = body.muscles[i], na = nodes[m.a], nb = nodes[m.b];
@@ -1165,11 +958,13 @@
         else if (ratio > 1.05) { mr=80; mg=140; mb=255; }
         else { const t=(ratio-0.85)/0.2; mr=Math.floor(255*(1-t)+80*t); mg=Math.floor(100*(1-t)+140*t); mb=Math.floor(60*(1-t)+255*t); }
 
+        // Pulse effect on high activation
         const lw = act > 0.5 ? 1 + act * 2.5 : 1;
         const pulseAlpha = 0.4 + act * 0.4;
         ctx.strokeStyle = `rgba(${mr},${mg},${mb},${pulseAlpha})`;
         ctx.lineWidth = lw;
 
+        // Draw signal pulse traveling along muscle
         if (act > 0.6 && showNeural) {
           const pulsePos = (simTime * 3 + i) % 1;
           const px = na.x + dx * pulsePos, py = na.y + dy * pulsePos;
@@ -1181,6 +976,7 @@
       }
     }
 
+    // Nodes with firing glow
     for (const n of nodes) {
       ctx.fillStyle = colStr;
       ctx.beginPath(); ctx.arc(n.x,n.y,n.radius,0,Math.PI*2); ctx.fill();
@@ -1188,6 +984,7 @@
       if (n.grounded) { ctx.fillStyle='rgba(129,255,140,0.4)'; ctx.beginPath(); ctx.arc(n.x,n.y,n.radius*0.4,0,Math.PI*2); ctx.fill(); }
     }
 
+    // Neural signal glow on nodes (when neural view is on)
     if (showNeural && body.brain.activations.length > 0) {
       const outActs = body.brain.activations[body.brain.activations.length - 1];
       for (let i = 0; i < Math.min(outActs.length, body.muscles.length); i++) {
@@ -1203,6 +1000,7 @@
       }
     }
 
+    // Eyes
     let frontNode = nodes[0];
     for (const n of nodes) if (n.x > frontNode.x) frontNode = n;
     const eyeAngle = Math.atan2(frontNode.y-cy, frontNode.x-cx);
@@ -1216,8 +1014,12 @@
     ctx.beginPath(); ctx.arc(frontNode.x+perpX*eyeSpread*0.5+Math.cos(eyeAngle)*pOff,frontNode.y+perpY*eyeSpread*0.5+Math.sin(eyeAngle)*pOff,eyeR*0.5,0,Math.PI*2); ctx.fill();
     ctx.beginPath(); ctx.arc(frontNode.x-perpX*eyeSpread*0.5+Math.cos(eyeAngle)*pOff,frontNode.y-perpY*eyeSpread*0.5+Math.sin(eyeAngle)*pOff,eyeR*0.5,0,Math.PI*2); ctx.fill();
 
+    // ═══ LIVE STATUS LABELS ═══
     if (showLabels) {
       const fit = Math.round(body.fitness || (body.getCenterX() - body.startX));
+      const outPct = (body.totalMuscleOutput * 100).toFixed(0);
+
+      // Background pill
       ctx.fillStyle = isFocused ? 'rgba(251,191,36,0.15)' : 'rgba(6,10,20,0.6)';
       const labelW = 70, labelH = 22;
       const lx = cx - labelW/2, ly = cy - 55;
@@ -1227,10 +1029,12 @@
       ctx.lineTo(lx+4, ly+labelH); ctx.quadraticCurveTo(lx, ly+labelH, lx, ly+labelH-4);
       ctx.lineTo(lx, ly+4); ctx.quadraticCurveTo(lx, ly, lx+4, ly); ctx.fill();
 
+      // Fitness score
       ctx.fillStyle = isFocused ? 'rgba(251,191,36,0.95)' : `rgba(${col[0]},${col[1]},${col[2]},0.9)`;
       ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center';
       ctx.fillText(`${fit}`, cx, cy - 43);
 
+      // Output strength bar
       const barW = 30, barH = 2;
       const barX = cx - barW/2, barY = cy - 38;
       ctx.fillStyle = 'rgba(255,255,255,0.1)';
@@ -1242,7 +1046,7 @@
   }
 
   // ═══════════════════════════════════════════════════
-  //  NEURAL MONITOR — compact NN visualization
+  //  NEURAL MONITOR — real-time NN visualization
   // ═══════════════════════════════════════════════════
   function renderNeuralMonitor() {
     if (!showNeural) return;
@@ -1257,23 +1061,28 @@
     const muscleCount = blueprint.muscles.length;
     const dpr = window.devicePixelRatio || 1;
 
+    // ── Displayed counts ──
     const dispNodes   = Math.min(nodeCount, 8);
     const dispMuscles = Math.min(muscleCount, 10);
     const hiddenLayers = brain.layers.length - 2;
 
+    // ── Layout constants ──
     const pad = 8;
     const barH = 6, barGap = 1;
-    const catH = 11;
-    const secGap = 4;
-    const labelW = 20;
+    const catH = 11;   // category header height (px)
+    const secGap = 4;  // section gap
+    const labelW = 20; // px reserved left of each input bar for label
     const inputBarW = 54;
     const colInputX = pad;
-    const colInputTotalW = labelW + inputBarW;
+    const colInputTotalW = labelW + inputBarW;  // 74px
     const inputBarX = colInputX + labelW;
 
+    // ── Dynamic canvas height based on actual input count ──
     const titleH   = 18;
-    const velH     = catH + dispNodes * (barH + barGap) + secGap;
-    const musH     = catH + dispMuscles * (barH + barGap) + secGap;
+    const velRows  = dispNodes;
+    const musRows  = dispMuscles;
+    const velH     = catH + velRows * (barH + barGap) + secGap;
+    const musH     = catH + musRows * (barH + barGap) + secGap;
     const gndH     = catH + 20 + secGap;
     const rhtH     = catH + barH + pad;
     const neededH  = titleH + velH + musH + gndH + rhtH;
@@ -1289,17 +1098,20 @@
     nCtx.clearRect(0, 0, cw, ch);
     nCtx.fillStyle = 'rgba(4,6,10,0.92)'; nCtx.fillRect(0, 0, cw, ch);
 
+    // ── Output column dimensions ──
     const outLabelW = 20, outBarW = 56;
     const colOutTotalW = outLabelW + outBarW;
     const colOutX  = cw - pad - colOutTotalW;
     const outBarX  = colOutX + outLabelW;
 
+    // ── Hidden area bounds ──
     const hidX0 = colInputX + colInputTotalW + pad;
     const hidX1 = colOutX - pad;
     const hidW  = Math.max(1, hidX1 - hidX0);
     const hidAreaTopY = 20;
     const hidAreaH    = ch - 28;
 
+    // ── Helper: get hidden layer node positions ──
     function getHiddenPos(hl) {
       const layerIdx = hl + 1;
       const count = Math.min(brain.layers[layerIdx], 20);
@@ -1310,11 +1122,15 @@
       return Array.from({ length: count }, (_, n) => ({ x: hlX, y: startY + n * spacing }));
     }
 
-    // PASS 1: Compute input entry positions
+    // ══════════════════════════════════════════════════════
+    // PASS 1: Pre-compute input entry positions
+    // Each entry: { y, colorBase, inputIndices }
+    // ══════════════════════════════════════════════════════
     const inputEntries = [];
     let inputIdx = 0;
     let iy = titleH;
 
+    // Velocity (vx,vy per node → 1 bar per node)
     iy += catH;
     for (let i = 0; i < dispNodes; i++) {
       inputEntries.push({ y: iy + barH / 2, colorBase: 'rgba(251,191,36,', inputIndices: [inputIdx, inputIdx + 1] });
@@ -1322,6 +1138,7 @@
     }
     iy += secGap;
 
+    // Muscle state (1 bar per muscle)
     iy += catH;
     for (let i = 0; i < dispMuscles; i++) {
       inputEntries.push({ y: iy + barH / 2, colorBase: 'rgba(52,211,153,', inputIndices: [inputIdx] });
@@ -1329,6 +1146,7 @@
     }
     iy += secGap;
 
+    // Grounded (dots, all share same row Y)
     iy += catH;
     const gndDotY = iy + 4;
     for (let i = 0; i < dispNodes; i++) {
@@ -1337,9 +1155,11 @@
     }
     iy += 20; iy += secGap;
 
+    // Rhythm
     iy += catH;
     inputEntries.push({ y: iy + barH / 2, colorBase: 'rgba(167,139,250,', inputIndices: [inputIdx] });
 
+    // Build lookup: input tensor index → entry index
     const inputOwner = new Array(brain.layers[0]).fill(-1);
     for (let ei = 0; ei < inputEntries.length; ei++) {
       for (const ii of inputEntries[ei].inputIndices) {
@@ -1347,6 +1167,8 @@
       }
     }
 
+    // ── Output entry positions ──
+    const outLayerIdx = brain.layers.length - 1;
     const outEntries = [];
     let oiy = titleH + catH;
     for (let i = 0; i < dispMuscles; i++) {
@@ -1354,10 +1176,12 @@
       oiy += barH + barGap;
     }
 
-    // PASS 2: Draw connections then nodes/bars
+    // ══════════════════════════════════════════════════════
+    // PASS 2: Draw (connections first, then nodes/bars)
+    // ══════════════════════════════════════════════════════
     nCtx.textBaseline = 'middle';
 
-    // Input → H1
+    // ── Signal lines: Input → H1 ──
     if (hiddenLayers > 0) {
       const h1Pos  = getHiddenPos(0);
       const h1Size = brain.layers[1];
@@ -1366,6 +1190,7 @@
       const fromX = colInputX + colInputTotalW + 2;
 
       for (let j = 0; j < h1Pos.length; j++) {
+        // Aggregate signal per entry
         const entrySignal = new Float32Array(inputEntries.length);
         for (let i = 0; i < inCount; i++) {
           const ei = inputOwner[i];
@@ -1386,6 +1211,7 @@
           nCtx.moveTo(fromX, srcY);
           nCtx.quadraticCurveTo(cpX, srcY, toX - 4, toY);
           nCtx.stroke();
+          // Pulse
           if (absS > 0.4) {
             const t = (simTime * 2.0 + j * 0.13 + srcY * 0.003) % 1;
             const mt = 1 - t;
@@ -1398,13 +1224,13 @@
       }
     }
 
-    // Hidden → Hidden
+    // ── Signal lines: Hidden → Hidden ──
     for (let hl = 0; hl < hiddenLayers - 1; hl++) {
       const fromPos = getHiddenPos(hl);
       const toPos   = getHiddenPos(hl + 1);
-      const fLayerIdx = hl + 1;
+      const fLayerIdx = hl + 1, tLayerIdx = hl + 2;
       const wt = brain.weights[hl + 1];
-      const tSize = brain.layers[hl + 2];
+      const tSize = brain.layers[tLayerIdx];
       for (let j = 0; j < toPos.length; j++) {
         for (let i = 0; i < fromPos.length; i++) {
           const w = (wt[i * tSize + j]) || 0;
@@ -1417,16 +1243,24 @@
           nCtx.moveTo(fromPos[i].x + 4, fromPos[i].y);
           nCtx.lineTo(toPos[j].x - 4, toPos[j].y);
           nCtx.stroke();
+          if (s > 0.2) {
+            const t = (simTime * 2.2 + i * 0.11 + j * 0.08) % 1;
+            const px = (fromPos[i].x + 4) + (toPos[j].x - 4 - fromPos[i].x - 4) * t;
+            const py = fromPos[i].y + (toPos[j].y - fromPos[i].y) * t;
+            nCtx.fillStyle = w > 0 ? `rgba(129,140,248,${alpha * 2})` : `rgba(248,113,113,${alpha * 2})`;
+            nCtx.beginPath(); nCtx.arc(px, py, 1.2, 0, Math.PI * 2); nCtx.fill();
+          }
         }
       }
     }
 
-    // Last Hidden → Output
+    // ── Signal lines: Last Hidden → Output ──
     if (hiddenLayers > 0) {
-      const lastPos = getHiddenPos(hiddenLayers - 1);
+      const lastHlIdx = hiddenLayers - 1;
+      const lastPos = getHiddenPos(lastHlIdx);
       const wt = brain.weights[brain.weights.length - 1];
-      const outSize = brain.layers[brain.layers.length - 1];
-      const actLayer = hiddenLayers;
+      const outSize = brain.layers[outLayerIdx];
+      const actLayer = hiddenLayers; // index into acts[]
       for (let j = 0; j < outEntries.length; j++) {
         for (let i = 0; i < lastPos.length; i++) {
           const w = (wt[i * outSize + j]) || 0;
@@ -1439,11 +1273,19 @@
           nCtx.moveTo(lastPos[i].x + 5, lastPos[i].y);
           nCtx.lineTo(colOutX - 2, outEntries[j].y);
           nCtx.stroke();
+          if (s > 0.25) {
+            const t = (simTime * 2.5 + i * 0.13 + j * 0.09) % 1;
+            const fx = lastPos[i].x + 5, tx = colOutX - 2;
+            nCtx.fillStyle = w > 0 ? `rgba(52,211,153,${alpha * 2})` : `rgba(248,113,113,${alpha * 2})`;
+            nCtx.beginPath();
+            nCtx.arc(fx + (tx - fx) * t, lastPos[i].y + (outEntries[j].y - lastPos[i].y) * t, 1.2, 0, Math.PI * 2);
+            nCtx.fill();
+          }
         }
       }
     }
 
-    // Hidden nodes
+    // ── Hidden nodes ──
     for (let hl = 0; hl < hiddenLayers; hl++) {
       const layerIdx = hl + 1;
       const positions = getHiddenPos(hl);
@@ -1454,8 +1296,10 @@
         nCtx.fillText(`H${hl + 1}(${brain.layers[layerIdx]})`, positions[0].x, 2);
         nCtx.textBaseline = 'middle';
       }
-      for (let n = 0; n < positions.length; n++) {
-        const { x: hx, y: hy } = positions[n];
+      for (const { x: hx, y: hy } of positions) {
+        const act = Math.abs(acts[layerIdx][positions.indexOf({ x: hx, y: hy })] || 0);
+        // Use index-based lookup
+        const n = positions.findIndex(p => p.x === hx && p.y === hy);
         const activation = Math.abs(acts[layerIdx][n] || 0);
         const r = 2.5 + activation * 3;
         if (activation > 0.2) {
@@ -1470,7 +1314,7 @@
       }
     }
 
-    // Title
+    // ─── Title bar ───
     nCtx.font = `bold 9px -apple-system,sans-serif`;
     nCtx.fillStyle = '#63d2ff'; nCtx.textAlign = 'left'; nCtx.textBaseline = 'middle';
     nCtx.fillText(`#${body.id}`, pad, 9);
@@ -1478,7 +1322,7 @@
     nCtx.font = `8px -apple-system,sans-serif`;
     nCtx.fillText(`Fit:${Math.round(body.fitness || 0)}`, pad + 24, 9);
 
-    // Draw helpers
+    // ─── Draw helpers ───
     function drawCatHeader(x, yy, text, color) {
       nCtx.fillStyle = color;
       nCtx.font = `bold 8px -apple-system,sans-serif`;
@@ -1508,10 +1352,11 @@
       }
     }
 
-    // Input column
+    // ─── Input column ───
     inputIdx = 0;
     let drawY = titleH;
 
+    // Velocity
     drawCatHeader(colInputX, drawY, '⚡速度', 'rgba(251,191,36,0.8)'); drawY += catH;
     for (let i = 0; i < dispNodes; i++) {
       const vx = acts[0][inputIdx] || 0, vy = acts[0][inputIdx + 1] || 0;
@@ -1520,6 +1365,7 @@
     }
     drawY += secGap;
 
+    // Muscle state
     drawCatHeader(colInputX, drawY, '🔗筋肉', 'rgba(52,211,153,0.8)'); drawY += catH;
     for (let i = 0; i < dispMuscles; i++) {
       drawBar(inputBarX, drawY, inputBarW, acts[0][inputIdx] || 0, 1, 'rgba(52,211,153,0.6)', `M${i}`);
@@ -1527,6 +1373,7 @@
     }
     drawY += secGap;
 
+    // Grounded dots
     drawCatHeader(colInputX, drawY, '⬇接地', 'rgba(99,210,255,0.8)'); drawY += catH;
     const dotSpacing = colInputTotalW / Math.max(1, dispNodes);
     for (let i = 0; i < dispNodes; i++) {
@@ -1541,23 +1388,25 @@
     }
     drawY += 20; drawY += secGap;
 
+    // Rhythm
     drawCatHeader(colInputX, drawY, '♪リズム', 'rgba(167,139,250,0.8)'); drawY += catH;
     drawBar(inputBarX, drawY, inputBarW, acts[0][inputIdx] || 0, 1, 'rgba(167,139,250,0.6)', 'sin');
 
-    // Output column
+    // ─── Output column ───
     drawCatHeader(colOutX, titleH, '💪出力', 'rgba(52,211,153,0.9)');
     let drawOY = titleH + catH;
     for (let i = 0; i < dispMuscles; i++) {
-      const act = acts[brain.layers.length - 1][i] || 0;
+      const act = acts[outLayerIdx][i] || 0;
       const g = Math.floor(120 + act * 135);
       drawBar01(outBarX, drawOY, outBarW, act, `rgba(50,${g},${Math.floor(g * 0.7)},0.8)`, `M${i}`);
+      // Percentage label
       nCtx.fillStyle = 'rgba(255,255,255,0.35)';
       nCtx.font = `6px -apple-system,sans-serif`; nCtx.textAlign = 'left';
       nCtx.fillText(`${Math.round(act * 100)}%`, outBarX + outBarW + 2, drawOY + barH / 2);
       drawOY += barH + barGap;
     }
 
-    // Legend
+    // ─── Legend ───
     const legendY = ch - 5;
     nCtx.font = `6px -apple-system,sans-serif`; nCtx.textBaseline = 'middle';
     const legends = [
@@ -1579,166 +1428,424 @@
   }
 
   // ═══════════════════════════════════════════════════
-  //  BRAIN INSIGHT PANEL — DOM-based thought interpreter
+  //  BRAIN ANALYSIS — 「なぜこの戦略？」を解析・可視化
   // ═══════════════════════════════════════════════════
-  let showInsight = false;
-  let insightSelectedMuscle = -1; // -1 = overview
-  let insightUpdateCounter = 0;
 
-  function renderInsightPanel() {
-    if (!showInsight) return;
-    const panel = document.getElementById('insight-content');
-    if (!panel) return;
-    if (population.length === 0 || focusedIndex >= population.length) {
-      panel.innerHTML = '<div class="insight-empty">個体を選択してください</div>';
-      return;
-    }
+  const CAT_DEFS = [
+    { key: 'vel', name: '速度', emoji: '⚡', color: '#fbbf24', rgba: 'rgba(251,191,36,' },
+    { key: 'mus', name: '筋肉FB', emoji: '🔗', color: '#34d399', rgba: 'rgba(52,211,153,' },
+    { key: 'gnd', name: '接地', emoji: '⬇', color: '#63d2ff', rgba: 'rgba(99,210,255,' },
+    { key: 'rht', name: 'リズム', emoji: '♪', color: '#a78bfa', rgba: 'rgba(167,139,250,' },
+  ];
 
-    // Throttle DOM updates
-    insightUpdateCounter++;
-    if (insightUpdateCounter % 15 !== 0) return;
-
-    const body = population[focusedIndex];
-    const brain = body.brain;
+  function computeStrategyProfile(brain) {
+    const nLayers = brain.layers.length;
+    const inputSize = brain.layers[0];
+    const outputSize = brain.layers[nLayers - 1];
+    const acts = brain.activations;
     const nodeCount = blueprint.nodes.length;
     const muscleCount = blueprint.muscles.length;
 
-    // Get attribution
-    const attribution = body.attributionCache || brain.computeAttribution();
-    const inputCats = getInputCategories(nodeCount, muscleCount);
-    const strategy = detectStrategy(body);
-    const narratives = generateThoughtNarrative(body, attribution, inputCats);
-
-    let html = '';
-
-    // ── Strategy fingerprint ──
-    html += `<div class="insight-strategy">`;
-    html += `<div class="insight-strategy-icon">${strategy.icon}</div>`;
-    html += `<div class="insight-strategy-info">`;
-    html += `<div class="insight-strategy-name">${strategy.name}</div>`;
-    html += `<div class="insight-strategy-desc">${strategy.desc}</div>`;
-    html += `</div></div>`;
-
-    // ── Quick stats ──
-    const fit = Math.round(body.fitness || (body.getCenterX() - body.startX));
-    const groundCount = body.nodes.filter(n => n.grounded).length;
-    const muscleAct = (body.totalMuscleOutput * 100).toFixed(0);
-    html += `<div class="insight-stats">`;
-    html += `<span class="istat"><b>${fit}</b> 適応度</span>`;
-    html += `<span class="istat"><b>${groundCount}/${nodeCount}</b> 接地</span>`;
-    html += `<span class="istat"><b>${muscleAct}%</b> 筋活性</span>`;
-    html += `</div>`;
-
-    // ── Thought narratives ──
-    html += `<div class="insight-section-title">💭 思考解釈</div>`;
-    if (narratives.length === 0) {
-      html += `<div class="insight-thought-empty">活性が低い — 休止状態</div>`;
-    } else {
-      html += `<div class="insight-thoughts">`;
-      for (const n of narratives) {
-        const barW = Math.min(100, n.act);
-        html += `<div class="insight-thought" data-muscle="${n.muscle}">`;
-        html += `<div class="ithought-header">`;
-        html += `<span class="ithought-muscle">M${n.muscle}</span>`;
-        html += `<span class="ithought-bar-wrap"><span class="ithought-bar" style="width:${barW}%;background:${n.color}"></span></span>`;
-        html += `<span class="ithought-pct">${n.act}%</span>`;
-        html += `</div>`;
-        html += `<div class="ithought-reason" style="color:${n.color}">${n.reason}</div>`;
-        html += `</div>`;
+    // ── End-to-end effective weight matrix (input→output) ──
+    // accounts for ReLU gating at current activation state
+    let matrix = [];
+    const h1Size = brain.layers[1];
+    for (let i = 0; i < inputSize; i++) {
+      matrix[i] = new Float32Array(h1Size);
+      for (let j = 0; j < h1Size; j++) {
+        matrix[i][j] = brain.weights[0][i * h1Size + j];
       }
-      html += `</div>`;
     }
-
-    // ── Attribution breakdown for selected muscle ──
-    const selMuscle = insightSelectedMuscle >= 0 ? insightSelectedMuscle : (narratives.length > 0 ? narratives[0].muscle : 0);
-    if (selMuscle < muscleCount && attribution[selMuscle]) {
-      const contrib = attribution[selMuscle];
-
-      // Aggregate by category
-      const catAgg = {};
-      for (const cat of Object.keys(CAT_COLORS)) catAgg[cat] = 0;
-      for (const ic of inputCats) {
-        if (ic.idx < contrib.length) {
-          const absVal = Math.abs(contrib[ic.idx]);
-          catAgg[ic.cat] = (catAgg[ic.cat] || 0) + absVal;
+    for (let l = 1; l < nLayers - 1; l++) {
+      const prevSize = brain.layers[l];
+      const nextSize = brain.layers[l + 1];
+      const reluMask = acts[l].map(a => a > 0 ? 1 : 0);
+      const wt = brain.weights[l];
+      const newMatrix = [];
+      for (let i = 0; i < inputSize; i++) {
+        newMatrix[i] = new Float32Array(nextSize);
+        for (let j = 0; j < nextSize; j++) {
+          let sum = 0;
+          for (let k = 0; k < prevSize; k++) {
+            sum += matrix[i][k] * reluMask[k] * wt[k * nextSize + j];
+          }
+          newMatrix[i][j] = sum;
         }
       }
+      matrix = newMatrix;
+    }
 
-      // Normalize
-      let totalContrib = 0;
-      for (const v of Object.values(catAgg)) totalContrib += v;
+    // ── Input category ranges ──
+    const velStart = 0, velEnd = nodeCount * 2;
+    const musStart = velEnd, musEnd = velEnd + muscleCount;
+    const gndStart = musEnd, gndEnd = musEnd + nodeCount;
+    const rhtStart = gndEnd;
+    const catRanges = [
+      { start: velStart, end: velEnd },
+      { start: musStart, end: musEnd },
+      { start: gndStart, end: gndEnd },
+      { start: rhtStart, end: rhtStart + 1 },
+    ];
 
-      html += `<div class="insight-section-title">📊 M${selMuscle} 入力寄与率</div>`;
-      html += `<div class="insight-attribution">`;
-
-      if (totalContrib > 0.01) {
-        const sortedCats = Object.entries(catAgg).sort((a, b) => b[1] - a[1]);
-        for (const [cat, val] of sortedCats) {
-          const pct = Math.round((val / totalContrib) * 100);
-          if (pct < 1) continue;
-          const info = CAT_COLORS[cat];
-          html += `<div class="iattr-row">`;
-          html += `<span class="iattr-label" style="color:${info.color}">${info.label}</span>`;
-          html += `<span class="iattr-bar-wrap"><span class="iattr-bar" style="width:${pct}%;background:${info.color}"></span></span>`;
-          html += `<span class="iattr-pct">${pct}%</span>`;
-          html += `</div>`;
+    // ── Per-muscle category attribution ──
+    const dispMuscles = Math.min(muscleCount, 10);
+    const muscleAttr = []; // [muscle][cat] = abs attribution
+    for (let j = 0; j < dispMuscles; j++) {
+      const attrs = [];
+      for (const range of catRanges) {
+        let absSum = 0;
+        for (let i = range.start; i < range.end && i < inputSize; i++) {
+          absSum += Math.abs(matrix[i][j]) * Math.abs(acts[0][i] || 0);
         }
-      } else {
-        html += `<div class="insight-thought-empty">寄与なし</div>`;
+        attrs.push(absSum);
       }
-      html += `</div>`;
-
-      // Top individual inputs
-      html += `<div class="insight-section-title">🔬 主要入力 Top5</div>`;
-      html += `<div class="insight-top-inputs">`;
-      const indexed = inputCats.map((ic, i) => ({
-        ...ic,
-        absContrib: ic.idx < contrib.length ? Math.abs(contrib[ic.idx]) : 0,
-        rawContrib: ic.idx < contrib.length ? contrib[ic.idx] : 0,
-      })).sort((a, b) => b.absContrib - a.absContrib).slice(0, 5);
-
-      for (const inp of indexed) {
-        if (inp.absContrib < 0.001) continue;
-        const sign = inp.rawContrib >= 0 ? '興奮' : '抑制';
-        const signColor = inp.rawContrib >= 0 ? '#34d399' : '#f87171';
-        const catInfo = CAT_COLORS[inp.cat];
-        html += `<div class="itop-row">`;
-        html += `<span class="itop-icon">${inp.icon}</span>`;
-        html += `<span class="itop-name">${inp.name}</span>`;
-        html += `<span class="itop-sign" style="color:${signColor}">${sign}</span>`;
-        html += `<span class="itop-val">${inp.absContrib.toFixed(3)}</span>`;
-        html += `</div>`;
-      }
-      html += `</div>`;
+      muscleAttr.push(attrs);
     }
 
-    // ── Evolution journey ──
-    if (evoHistory.length > 1) {
-      html += `<div class="insight-section-title">📈 進化の旅路</div>`;
-      html += `<div class="insight-evo-journey">`;
-      const recent = evoHistory.slice(-5);
-      for (const e of recent) {
-        html += `<div class="ievo-row">`;
-        html += `<span class="ievo-gen">世代${e.gen}</span>`;
-        html += `<span class="ievo-fit">${Math.round(e.bestFit)}</span>`;
-        html += `<span class="ievo-strat">${e.strategy}</span>`;
-        html += `</div>`;
-      }
-      html += `</div>`;
-    }
-
-    panel.innerHTML = html;
-
-    // Add click handlers for muscle selection
-    panel.querySelectorAll('.insight-thought').forEach(el => {
-      el.addEventListener('click', () => {
-        insightSelectedMuscle = parseInt(el.dataset.muscle);
-        insightUpdateCounter = 14; // force next update
-      });
+    // ── Overall category importance ──
+    const catScores = CAT_DEFS.map((_, ci) => {
+      let total = 0;
+      for (let j = 0; j < dispMuscles; j++) total += muscleAttr[j][ci];
+      return total;
     });
+    const maxScore = Math.max(...catScores, 0.001);
+    const normalized = catScores.map(v => v / maxScore);
+
+    // ── Strategy type classification ──
+    const dominantIdx = normalized.indexOf(Math.max(...normalized));
+    const typeNames = ['速度反応型', '自己フィードバック型', '接地感知型', 'リズム駆動型'];
+    const secondIdx = normalized.map((v, i) => i === dominantIdx ? -1 : v).indexOf(
+      Math.max(...normalized.filter((_, i) => i !== dominantIdx))
+    );
+    let strategyType = typeNames[dominantIdx];
+    if (normalized[secondIdx] > 0.7) {
+      strategyType += '＋' + typeNames[secondIdx].replace('型', '');
+    }
+
+    return { catScores, normalized, muscleAttr, strategyType, dominantIdx, matrix };
   }
 
-  // ─── Graph Rendering ──────────────────────────────
+  function generateStrategyNarrative(profile, body) {
+    const lines = [];
+    const { normalized, muscleAttr, dominantIdx, strategyType } = profile;
+    const dispMuscles = muscleAttr.length;
+
+    // ── Overall strategy description ──
+    const descriptions = [
+      '各ノードの速度を感知し、動きに応じて筋肉を制御する',
+      '自身の筋肉状態をフィードバックし、姿勢を自己調整する',
+      '接地を検出し、地面に触れた脚で踏み込む歩行パターンを発達させた',
+      'リズム信号に同期して周期的に筋肉を伸縮させる',
+    ];
+    lines.push(descriptions[dominantIdx]);
+
+    // ── Per-muscle insights (top 3 most active muscles) ──
+    const muscleTotalActivity = muscleAttr.map(attrs => attrs.reduce((a, b) => a + b, 0));
+    const topMuscles = muscleTotalActivity.map((v, i) => ({ i, v }))
+      .sort((a, b) => b.v - a.v).slice(0, 3);
+
+    for (const { i: mi } of topMuscles) {
+      const attrs = muscleAttr[mi];
+      const total = attrs.reduce((a, b) => a + b, 0.001);
+      const sorted = attrs.map((v, ci) => ({ ci, pct: v / total }))
+        .sort((a, b) => b.pct - a.pct);
+      const top = sorted[0];
+      if (top.pct > 0.4) {
+        const catName = CAT_DEFS[top.ci].emoji + CAT_DEFS[top.ci].name;
+        const pct = Math.round(top.pct * 100);
+        const action = body.muscleAct && body.muscleAct[mi] > 0.5 ? '収縮' : '伸長';
+        lines.push(`M${mi}: ${catName}(${pct}%)に依存 → ${action}傾向`);
+      }
+    }
+
+    return lines;
+  }
+
+  function renderBrainAnalysis() {
+    if (!showAnalysis) return;
+    const ac = document.getElementById('analysisCanvas');
+    if (!ac) return;
+    if (population.length === 0 || focusedIndex >= population.length) return;
+
+    const body = population[focusedIndex];
+    const brain = body.brain;
+    const dpr = window.devicePixelRatio || 1;
+    const muscleCount = blueprint.muscles.length;
+    const dispMuscles = Math.min(muscleCount, 10);
+    const pad = 10;
+
+    // ── Compute profile ──
+    let profile;
+    try {
+      profile = computeStrategyProfile(brain);
+    } catch(e) { return; }
+    const { catScores, normalized, muscleAttr, strategyType, dominantIdx } = profile;
+    const narrative = generateStrategyNarrative(profile, body);
+
+    // ── Canvas sizing ──
+    const radarH = 120;
+    const narrativeH = 14 * (narrative.length + 1) + 10;
+    const heatmapH = 16 + dispMuscles * 14 + 10;
+    const importanceH = CAT_DEFS.length * 18 + 20;
+    const trendH = strategyHistory.length > 1 ? 80 : 0;
+    const neededH = 22 + radarH + narrativeH + heatmapH + importanceH + trendH + 20;
+    const canvasH = Math.max(neededH, 380);
+    if (Math.abs(ac.clientHeight - canvasH) > 2) ac.style.height = canvasH + 'px';
+
+    const cw = ac.clientWidth, ch = ac.clientHeight;
+    if (ac.width !== Math.round(cw * dpr) || ac.height !== Math.round(ch * dpr)) {
+      ac.width = Math.round(cw * dpr); ac.height = Math.round(ch * dpr);
+    }
+    const ctx = ac.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cw, ch);
+    ctx.fillStyle = 'rgba(4,6,10,0.92)'; ctx.fillRect(0, 0, cw, ch);
+
+    // ── Title ──
+    ctx.font = 'bold 9px -apple-system,sans-serif';
+    ctx.fillStyle = '#fbbf24'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(`#${body.id}  戦略: ${strategyType}`, pad, 11);
+    ctx.fillStyle = 'rgba(251,191,36,0.5)';
+    ctx.font = '8px -apple-system,sans-serif';
+    ctx.fillText(`Fit: ${Math.round(body.fitness || 0)}`, cw - pad - 50, 11);
+
+    let y = 24;
+
+    // ══════════════════════════════════════════
+    // 1. STRATEGY RADAR CHART
+    // ══════════════════════════════════════════
+    const rcx = cw / 2, rcy = y + radarH / 2;
+    const rMax = Math.min(radarH / 2 - 14, (cw / 2) - 40);
+    const nAxes = 4;
+    const angles = CAT_DEFS.map((_, i) => -Math.PI / 2 + (Math.PI * 2 / nAxes) * i);
+
+    // Grid circles
+    for (let ring = 1; ring <= 3; ring++) {
+      const r = rMax * ring / 3;
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath(); ctx.arc(rcx, rcy, r, 0, Math.PI * 2); ctx.stroke();
+    }
+
+    // Axes + labels
+    for (let i = 0; i < nAxes; i++) {
+      const ax = rcx + Math.cos(angles[i]) * rMax;
+      const ay = rcy + Math.sin(angles[i]) * rMax;
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.5;
+      ctx.beginPath(); ctx.moveTo(rcx, rcy); ctx.lineTo(ax, ay); ctx.stroke();
+      // Label
+      const lx = rcx + Math.cos(angles[i]) * (rMax + 12);
+      const ly = rcy + Math.sin(angles[i]) * (rMax + 10);
+      ctx.fillStyle = CAT_DEFS[i].color;
+      ctx.font = 'bold 8px -apple-system,sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(CAT_DEFS[i].emoji + CAT_DEFS[i].name, lx, ly);
+    }
+
+    // Filled polygon
+    ctx.beginPath();
+    for (let i = 0; i < nAxes; i++) {
+      const r = rMax * Math.min(1, normalized[i]);
+      const px = rcx + Math.cos(angles[i]) * r;
+      const py = rcy + Math.sin(angles[i]) * r;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fillStyle = `${CAT_DEFS[dominantIdx].rgba}0.15)`;
+    ctx.fill();
+    ctx.strokeStyle = `${CAT_DEFS[dominantIdx].rgba}0.7)`;
+    ctx.lineWidth = 1.5; ctx.stroke();
+
+    // Data points
+    for (let i = 0; i < nAxes; i++) {
+      const r = rMax * Math.min(1, normalized[i]);
+      const px = rcx + Math.cos(angles[i]) * r;
+      const py = rcy + Math.sin(angles[i]) * r;
+      ctx.fillStyle = CAT_DEFS[i].color;
+      ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI * 2); ctx.fill();
+      // Value text
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = '7px -apple-system,sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(Math.round(normalized[i] * 100) + '%', px, py - 7);
+    }
+
+    y += radarH + 6;
+
+    // ══════════════════════════════════════════
+    // 2. STRATEGY NARRATIVE (なぜこの戦略？)
+    // ══════════════════════════════════════════
+    ctx.fillStyle = 'rgba(251,191,36,0.7)';
+    ctx.font = 'bold 8px -apple-system,sans-serif';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillText('── なぜこの戦略？ ──', pad, y);
+    y += 13;
+
+    ctx.font = '8px -apple-system,sans-serif';
+    for (const line of narrative) {
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.fillText(line.length > 44 ? line.slice(0, 44) + '…' : line, pad + 2, y);
+      y += 12;
+    }
+    y += 6;
+
+    // ══════════════════════════════════════════
+    // 3. INPUT→OUTPUT HEATMAP (入出力影響マップ)
+    // ══════════════════════════════════════════
+    ctx.fillStyle = 'rgba(251,191,36,0.7)';
+    ctx.font = 'bold 8px -apple-system,sans-serif';
+    ctx.fillText('── 入出力影響マップ ──', pad, y);
+    y += 14;
+
+    const hmLeft = pad + 24;
+    const hmRight = cw - pad;
+    const catColW = (hmRight - hmLeft) / CAT_DEFS.length;
+    const rowH = 12;
+
+    // Column headers
+    for (let ci = 0; ci < CAT_DEFS.length; ci++) {
+      const cx = hmLeft + catColW * ci + catColW / 2;
+      ctx.fillStyle = CAT_DEFS[ci].color;
+      ctx.font = 'bold 7px -apple-system,sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(CAT_DEFS[ci].emoji, cx, y - 2);
+    }
+    y += 4;
+
+    // Heatmap rows (one per muscle)
+    const maxAttr = Math.max(...muscleAttr.flat(), 0.001);
+    for (let mi = 0; mi < dispMuscles; mi++) {
+      // Row label
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = '7px -apple-system,sans-serif'; ctx.textAlign = 'right';
+      ctx.fillText(`M${mi}`, hmLeft - 4, y + rowH / 2);
+
+      // Category cells
+      for (let ci = 0; ci < CAT_DEFS.length; ci++) {
+        const cellX = hmLeft + catColW * ci + 1;
+        const cellW = catColW - 2;
+        const intensity = muscleAttr[mi][ci] / maxAttr;
+
+        // Background
+        ctx.fillStyle = 'rgba(255,255,255,0.04)';
+        ctx.fillRect(cellX, y, cellW, rowH - 1);
+
+        // Fill
+        if (intensity > 0.02) {
+          const alpha = Math.min(0.8, intensity * 0.9);
+          ctx.fillStyle = `${CAT_DEFS[ci].rgba}${alpha})`;
+          ctx.fillRect(cellX, y, cellW, rowH - 1);
+          // Percentage
+          if (intensity > 0.15) {
+            ctx.fillStyle = intensity > 0.5 ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.6)';
+            ctx.font = '6px -apple-system,sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText(Math.round(intensity * 100), cellX + cellW / 2, y + rowH / 2);
+          }
+        }
+      }
+      y += rowH;
+    }
+    y += 8;
+
+    // ══════════════════════════════════════════
+    // 4. INPUT IMPORTANCE RANKING (入力重要度)
+    // ══════════════════════════════════════════
+    ctx.fillStyle = 'rgba(251,191,36,0.7)';
+    ctx.font = 'bold 8px -apple-system,sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('── 入力重要度ランキング ──', pad, y);
+    y += 14;
+
+    const maxCatScore = Math.max(...catScores, 0.001);
+    const sortedCats = catScores.map((v, i) => ({ i, v })).sort((a, b) => b.v - a.v);
+    const impBarLeft = pad + 50;
+    const impBarW = cw - impBarLeft - pad - 30;
+
+    for (const { i: ci, v } of sortedCats) {
+      const ratio = v / maxCatScore;
+      // Label
+      ctx.fillStyle = CAT_DEFS[ci].color;
+      ctx.font = '8px -apple-system,sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText(CAT_DEFS[ci].emoji + ' ' + CAT_DEFS[ci].name, pad, y + 5);
+      // Bar background
+      ctx.fillStyle = 'rgba(255,255,255,0.06)';
+      ctx.fillRect(impBarLeft, y, impBarW, 10);
+      // Bar fill
+      ctx.fillStyle = `${CAT_DEFS[ci].rgba}0.6)`;
+      ctx.fillRect(impBarLeft, y, impBarW * ratio, 10);
+      // Value
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = '7px -apple-system,sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText(Math.round(ratio * 100) + '%', impBarLeft + impBarW + 3, y + 6);
+      y += 16;
+    }
+    y += 6;
+
+    // ══════════════════════════════════════════
+    // 5. STRATEGY EVOLUTION TREND (戦略変遷)
+    // ══════════════════════════════════════════
+    if (strategyHistory.length > 1) {
+      ctx.fillStyle = 'rgba(251,191,36,0.7)';
+      ctx.font = 'bold 8px -apple-system,sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText('── 戦略変遷 ──', pad, y);
+      y += 12;
+
+      const trendLeft = pad + 8;
+      const trendRight = cw - pad;
+      const trendW = trendRight - trendLeft;
+      const trendTop = y;
+      const trendBot = y + 50;
+
+      // Draw area chart showing category scores over generations
+      const hist = strategyHistory;
+      const len = hist.length;
+
+      // Normalize each generation's scores to sum to 1 (stacked area)
+      for (let ci = 0; ci < CAT_DEFS.length; ci++) {
+        ctx.beginPath();
+        for (let gi = 0; gi < len; gi++) {
+          const x = trendLeft + (gi / Math.max(1, len - 1)) * trendW;
+          const scores = hist[gi].catScores;
+          const total = scores.reduce((a, b) => a + b, 0.001);
+          let cumRatio = 0;
+          for (let k = 0; k <= ci; k++) cumRatio += scores[k] / total;
+          const py = trendBot - (trendBot - trendTop) * cumRatio;
+          if (gi === 0) ctx.moveTo(x, py); else ctx.lineTo(x, py);
+        }
+        // Close bottom
+        for (let gi = len - 1; gi >= 0; gi--) {
+          const x = trendLeft + (gi / Math.max(1, len - 1)) * trendW;
+          const scores = hist[gi].catScores;
+          const total = scores.reduce((a, b) => a + b, 0.001);
+          let cumRatio = 0;
+          for (let k = 0; k < ci; k++) cumRatio += scores[k] / total;
+          const py = trendBot - (trendBot - trendTop) * cumRatio;
+          ctx.lineTo(x, py);
+        }
+        ctx.closePath();
+        ctx.fillStyle = `${CAT_DEFS[ci].rgba}0.35)`;
+        ctx.fill();
+      }
+
+      // Axis labels
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.font = '6px -apple-system,sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText(`世代${hist[0].gen}`, trendLeft, trendBot + 8);
+      ctx.textAlign = 'right';
+      ctx.fillText(`世代${hist[len - 1].gen}`, trendRight, trendBot + 8);
+
+      y = trendBot + 16;
+    }
+
+    // ══════════════════════════════════════════
+    // 6. MINI LEGEND
+    // ══════════════════════════════════════════
+    ctx.font = '6px -apple-system,sans-serif'; ctx.textBaseline = 'middle';
+    let lx = pad;
+    for (const cat of CAT_DEFS) {
+      ctx.fillStyle = cat.color; ctx.fillRect(lx, y, 5, 3);
+      ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.textAlign = 'left';
+      ctx.fillText(cat.name, lx + 7, y + 2); lx += 40;
+    }
+  }
+
   function renderGraph() {
     if (!showGraph) return;
     const gc = document.getElementById('graphCanvas');
@@ -1785,7 +1892,7 @@
   // ═══════════════════════════════════════════════════
   let currentTool = 'observe';
   let showMuscles = true, showTrails = false, showGrid = false, showGraph = false;
-  let showLabels = true, showNeural = false;
+  let showLabels = true, showNeural = false, showAnalysis = false;
   let showConfig = false;
   let simSpeed = 1, isPaused = false;
   let pointers = new Map();
@@ -1796,6 +1903,7 @@
 
   function screenToWorld(sx, sy) { return { x: (sx - camX) / camZoom, y: (sy - camY) / camZoom }; }
 
+  // Build Phase Input
   function handleBuildClick(sx, sy) {
     const { x: wx, y: wy } = screenToWorld(sx, sy);
     switch (buildTool) {
@@ -1845,6 +1953,7 @@
     return nx*nx+ny*ny < threshold*threshold;
   }
 
+  // Sim Phase Input — REAL-TIME terrain editing
   function handleToolAction(sx, sy) {
     const { x, y } = screenToWorld(sx, sy);
     if (x < 0 || x >= COF.worldW || y < 0 || y >= COF.worldH) return;
@@ -2004,7 +2113,6 @@
     historyBest.length = 0; historyAvg.length = 0;
     evalTimer = 0; COF.worldW = BASE_WORLD_WIDTH;
     prevAvgFitness = 0; prevBestFitness = 0; patternDetectionCounters = {};
-    evoHistory = [];
     initWorld(); createPopulation(null); resizeCanvas();
     addEventMsg('🚀 ライブ進化シミュレーション開始！', '#63d2ff', false);
   }
@@ -2095,10 +2203,9 @@
     showNeural = !showNeural; e.target.classList.toggle('active', showNeural);
     document.getElementById('neural-panel').classList.toggle('hidden', !showNeural);
   });
-  document.getElementById('toggle-insight').addEventListener('click', e => {
-    showInsight = !showInsight; e.target.classList.toggle('active', showInsight);
-    document.getElementById('insight-panel').classList.toggle('hidden', !showInsight);
-    if (showInsight) insightUpdateCounter = 14; // trigger immediate update
+  document.getElementById('toggle-analysis').addEventListener('click', e => {
+    showAnalysis = !showAnalysis; e.target.classList.toggle('active', showAnalysis);
+    document.getElementById('analysis-panel').classList.toggle('hidden', !showAnalysis);
   });
 
   document.getElementById('close-graph').addEventListener('click', () => {
@@ -2109,9 +2216,9 @@
     showNeural = false; document.getElementById('toggle-neural').classList.remove('active');
     document.getElementById('neural-panel').classList.add('hidden');
   });
-  document.getElementById('close-insight').addEventListener('click', () => {
-    showInsight = false; document.getElementById('toggle-insight').classList.remove('active');
-    document.getElementById('insight-panel').classList.add('hidden');
+  document.getElementById('close-analysis').addEventListener('click', () => {
+    showAnalysis = false; document.getElementById('toggle-analysis').classList.remove('active');
+    document.getElementById('analysis-panel').classList.add('hidden');
   });
   document.getElementById('close-info').addEventListener('click', () => { document.getElementById('info-panel').classList.add('hidden'); });
 
@@ -2137,7 +2244,7 @@
     });
   });
 
-  // Config Panel
+  // ─── Config Panel — LIVE TUNING ───────────────────
   document.getElementById('btn-config').addEventListener('click', () => {
     showConfig = !showConfig;
     document.getElementById('config-panel').classList.toggle('hidden', !showConfig);
@@ -2165,6 +2272,7 @@
         row.className = 'config-row';
         const label = document.createElement('label');
         label.textContent = item.label;
+        // LIVE indicator
         if (item.live) {
           const liveSpan = document.createElement('span');
           liveSpan.className = 'config-live-indicator';
@@ -2185,6 +2293,7 @@
             COF[item.key] = parseFloat(slider.value);
             const decimals = item.step < 0.01 ? 3 : item.step < 0.1 ? 2 : item.step < 1 ? 1 : 0;
             valueDisplay.textContent = parseFloat(slider.value).toFixed(decimals);
+            // LIVE feedback
             if (item.live && oldVal !== COF[item.key]) {
               addEventMsg(`⚙ ${item.label}: ${parseFloat(slider.value).toFixed(decimals)} に変更 (即時反映)`, '#818cf8', false, true);
             }
@@ -2199,7 +2308,7 @@
     }
   }
 
-  // Info Panel
+  // ─── Info Panel ───────────────────────────────────
   function showInfoAt(wx, wy) {
     const panel = document.getElementById('info-panel');
     const content = document.getElementById('info-content');
@@ -2232,7 +2341,7 @@
     panel.classList.add('hidden');
   }
 
-  // Event Log
+  // ─── Event Log ────────────────────────────────────
   function addEventMsg(text, color, isRecord, isDiscovery) {
     const log = document.getElementById('event-log');
     const msg = document.createElement('div');
@@ -2270,7 +2379,7 @@
     }
   }
 
-  // World Initialization
+  // ─── World Initialization ─────────────────────────
   function generateFlatTerrain(startCol, endCol) {
     const groundRow = Math.floor(TERRAIN_H * COF.groundLevel);
     for (let y = groundRow; y < TERRAIN_H; y++) for (let x = startCol; x < endCol; x++) terrain[y * TERRAIN_W + x] = TERRAIN_SOLID;
@@ -2354,12 +2463,13 @@
   }
 
   // ═══════════════════════════════════════════════════
-  //  MAIN LOOP
+  //  MAIN LOOP — optimized RAF with separated logic
   // ═══════════════════════════════════════════════════
   let lastTime = 0;
   let simTime = 0;
+  // Accumulator for fixed-step physics
   let physicsAccum = 0;
-  const PHYSICS_DT = 1 / 60;
+  const PHYSICS_DT = 1 / 60; // fixed 60Hz physics
 
   function mainLoop(timestamp) {
     requestAnimationFrame(mainLoop);
@@ -2372,6 +2482,7 @@
       return;
     }
 
+    // ─── SIM PHASE ──────────────────────────────
     updateStats(rawDt);
 
     if (genFlashTimer > 0) {
@@ -2389,6 +2500,7 @@
       document.getElementById('eval-fill').style.width = `${progress}%`;
       document.getElementById('eval-timer').textContent = `⏱ ${evalTimer.toFixed(1)} / ${COF.evalSeconds.toFixed(1)}s`;
 
+      // Fixed-step physics with accumulator
       physicsAccum += dt;
       const maxSteps = simSpeed >= 3 ? 4 : 2;
       let steps = 0;
@@ -2398,8 +2510,9 @@
         physicsAccum -= PHYSICS_DT;
         steps++;
       }
-      if (physicsAccum > PHYSICS_DT * maxSteps) physicsAccum = 0;
+      if (physicsAccum > PHYSICS_DT * maxSteps) physicsAccum = 0; // prevent spiral
 
+      // Update fitness for all creatures (live)
       let bestIdx = 0, bestFit = -Infinity;
       for (let i = 0; i < population.length; i++) {
         const f = calcFitnessForBody(population[i]);
@@ -2408,15 +2521,18 @@
       if (cameraMode === 'follow') focusedIndex = bestIdx;
 
       updateCamera();
+
+      // Live commentary
       generateLiveCommentary();
 
       if (evalTimer >= COF.evalSeconds) evolve();
     }
 
+    // ─── RENDER (always runs, even when paused) ─────
     renderSimPhase(simTime);
     renderGraph();
     renderNeuralMonitor();
-    renderInsightPanel();
+    renderBrainAnalysis();
   }
 
   // ═══════════════════════════════════════════════════
