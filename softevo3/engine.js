@@ -1038,15 +1038,7 @@
   function renderNeuralMonitor() {
     if (!showNeural) return;
     const nc = document.getElementById('neuralCanvas');
-    const dpr = window.devicePixelRatio || 1;
-    const cw = nc.clientWidth, ch = nc.clientHeight;
-    if (nc.width !== cw * dpr || nc.height !== ch * dpr) {
-      nc.width = cw * dpr; nc.height = ch * dpr;
-    }
-    const nCtx = nc.getContext('2d');
-    nCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    nCtx.clearRect(0, 0, cw, ch);
-    nCtx.fillStyle = 'rgba(4,6,10,0.92)'; nCtx.fillRect(0, 0, cw, ch);
+    if (!nc) return;
 
     if (population.length === 0 || focusedIndex >= population.length) return;
     const body = population[focusedIndex];
@@ -1054,415 +1046,356 @@
     const acts = brain.activations;
     const nodeCount = blueprint.nodes.length;
     const muscleCount = blueprint.muscles.length;
+    const dpr = window.devicePixelRatio || 1;
+
+    // ── Displayed counts ──
+    const dispNodes   = Math.min(nodeCount, 8);
+    const dispMuscles = Math.min(muscleCount, 10);
+    const hiddenLayers = brain.layers.length - 2;
 
     // ── Layout constants ──
     const pad = 8;
-    const barH = 7, barGap = 2;
-    const sectionGap = 6;
-    const labelFontSz = 8;
-    const catFontSz = 9;
-    const colInput = pad;
-    const colInputW = 72;
-    const colHiddenX = colInput + colInputW + 12;
-    const colHiddenW = cw - colInputW - 80 - 36;
-    const colOutputX = cw - 80 - pad;
-    const colOutputW = 80;
+    const barH = 6, barGap = 1;
+    const catH = 11;   // category header height (px)
+    const secGap = 4;  // section gap
+    const labelW = 20; // px reserved left of each input bar for label
+    const inputBarW = 54;
+    const colInputX = pad;
+    const colInputTotalW = labelW + inputBarW;  // 74px
+    const inputBarX = colInputX + labelW;
 
+    // ── Dynamic canvas height based on actual input count ──
+    const titleH   = 18;
+    const velRows  = dispNodes;
+    const musRows  = dispMuscles;
+    const velH     = catH + velRows * (barH + barGap) + secGap;
+    const musH     = catH + musRows * (barH + barGap) + secGap;
+    const gndH     = catH + 20 + secGap;
+    const rhtH     = catH + barH + pad;
+    const neededH  = titleH + velH + musH + gndH + rhtH;
+    const canvasH  = Math.max(neededH, 200);
+    if (Math.abs(nc.clientHeight - canvasH) > 2) nc.style.height = canvasH + 'px';
+
+    const cw = nc.clientWidth, ch = nc.clientHeight;
+    if (nc.width !== Math.round(cw * dpr) || nc.height !== Math.round(ch * dpr)) {
+      nc.width = Math.round(cw * dpr); nc.height = Math.round(ch * dpr);
+    }
+    const nCtx = nc.getContext('2d');
+    nCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    nCtx.clearRect(0, 0, cw, ch);
+    nCtx.fillStyle = 'rgba(4,6,10,0.92)'; nCtx.fillRect(0, 0, cw, ch);
+
+    // ── Output column dimensions ──
+    const outLabelW = 20, outBarW = 56;
+    const colOutTotalW = outLabelW + outBarW;
+    const colOutX  = cw - pad - colOutTotalW;
+    const outBarX  = colOutX + outLabelW;
+
+    // ── Hidden area bounds ──
+    const hidX0 = colInputX + colInputTotalW + pad;
+    const hidX1 = colOutX - pad;
+    const hidW  = Math.max(1, hidX1 - hidX0);
+    const hidAreaTopY = 20;
+    const hidAreaH    = ch - 28;
+
+    // ── Helper: get hidden layer node positions ──
+    function getHiddenPos(hl) {
+      const layerIdx = hl + 1;
+      const count = Math.min(brain.layers[layerIdx], 20);
+      const hlX = hidX0 + (hidW / (hiddenLayers + 1)) * (hl + 1);
+      const spacing = Math.min(16, (hidAreaH - 8) / Math.max(1, count));
+      const totalH = (count - 1) * spacing;
+      const startY = hidAreaTopY + (hidAreaH - totalH) / 2;
+      return Array.from({ length: count }, (_, n) => ({ x: hlX, y: startY + n * spacing }));
+    }
+
+    // ══════════════════════════════════════════════════════
+    // PASS 1: Pre-compute input entry positions
+    // Each entry: { y, colorBase, inputIndices }
+    // ══════════════════════════════════════════════════════
+    const inputEntries = [];
+    let inputIdx = 0;
+    let iy = titleH;
+
+    // Velocity (vx,vy per node → 1 bar per node)
+    iy += catH;
+    for (let i = 0; i < dispNodes; i++) {
+      inputEntries.push({ y: iy + barH / 2, colorBase: 'rgba(251,191,36,', inputIndices: [inputIdx, inputIdx + 1] });
+      iy += barH + barGap; inputIdx += 2;
+    }
+    iy += secGap;
+
+    // Muscle state (1 bar per muscle)
+    iy += catH;
+    for (let i = 0; i < dispMuscles; i++) {
+      inputEntries.push({ y: iy + barH / 2, colorBase: 'rgba(52,211,153,', inputIndices: [inputIdx] });
+      iy += barH + barGap; inputIdx++;
+    }
+    iy += secGap;
+
+    // Grounded (dots, all share same row Y)
+    iy += catH;
+    const gndDotY = iy + 4;
+    for (let i = 0; i < dispNodes; i++) {
+      inputEntries.push({ y: gndDotY, colorBase: 'rgba(99,210,255,', inputIndices: [inputIdx] });
+      inputIdx++;
+    }
+    iy += 20; iy += secGap;
+
+    // Rhythm
+    iy += catH;
+    inputEntries.push({ y: iy + barH / 2, colorBase: 'rgba(167,139,250,', inputIndices: [inputIdx] });
+
+    // Build lookup: input tensor index → entry index
+    const inputOwner = new Array(brain.layers[0]).fill(-1);
+    for (let ei = 0; ei < inputEntries.length; ei++) {
+      for (const ii of inputEntries[ei].inputIndices) {
+        if (ii < inputOwner.length) inputOwner[ii] = ei;
+      }
+    }
+
+    // ── Output entry positions ──
+    const outLayerIdx = brain.layers.length - 1;
+    const outEntries = [];
+    let oiy = titleH + catH;
+    for (let i = 0; i < dispMuscles; i++) {
+      outEntries.push({ y: oiy + barH / 2, idx: i });
+      oiy += barH + barGap;
+    }
+
+    // ══════════════════════════════════════════════════════
+    // PASS 2: Draw (connections first, then nodes/bars)
+    // ══════════════════════════════════════════════════════
     nCtx.textBaseline = 'middle';
 
-    // ── TITLE BAR ──
-    nCtx.font = `bold 10px -apple-system,sans-serif`;
-    nCtx.fillStyle = '#63d2ff';
-    nCtx.textAlign = 'left';
-    nCtx.fillText(`#${body.id}`, pad, 10);
-    nCtx.fillStyle = 'rgba(99,210,255,0.6)';
-    nCtx.font = `9px -apple-system,sans-serif`;
-    nCtx.fillText(`Fit: ${Math.round(body.fitness || 0)}`, pad + 28, 10);
-
-    let y = 24;
-
-    // ════════════ INPUT COLUMN (left) ════════════
-    // Helper: draw a labeled horizontal bar
-    function drawBar(x, yy, w, val, maxVal, color, label) {
-      const ratio = Math.min(1, Math.max(0, (val + maxVal) / (2 * maxVal)));
-      // Background track
-      nCtx.fillStyle = 'rgba(255,255,255,0.06)';
-      nCtx.fillRect(x, yy, w, barH);
-      // Fill
-      const fillW = ratio * w;
-      nCtx.fillStyle = color;
-      nCtx.fillRect(x, yy, fillW, barH);
-      // Center line (zero marker)
-      nCtx.fillStyle = 'rgba(255,255,255,0.15)';
-      nCtx.fillRect(x + w * 0.5, yy, 1, barH);
-      // Label
-      if (label) {
-        nCtx.fillStyle = 'rgba(255,255,255,0.5)';
-        nCtx.font = `${labelFontSz}px -apple-system,sans-serif`;
-        nCtx.textAlign = 'right';
-        nCtx.fillText(label, x - 2, yy + barH / 2);
-      }
-    }
-
-    // Helper: draw a 0-1 bar (no center line)
-    function drawBar01(x, yy, w, val, color, label) {
-      const ratio = Math.min(1, Math.max(0, val));
-      nCtx.fillStyle = 'rgba(255,255,255,0.06)';
-      nCtx.fillRect(x, yy, w, barH);
-      nCtx.fillStyle = color;
-      nCtx.fillRect(x, yy, ratio * w, barH);
-      if (label) {
-        nCtx.fillStyle = 'rgba(255,255,255,0.5)';
-        nCtx.font = `${labelFontSz}px -apple-system,sans-serif`;
-        nCtx.textAlign = 'right';
-        nCtx.fillText(label, x - 2, yy + barH / 2);
-      }
-    }
-
-    // Category header
-    function drawCatHeader(x, yy, text, color) {
-      nCtx.fillStyle = color;
-      nCtx.font = `bold ${catFontSz}px -apple-system,sans-serif`;
-      nCtx.textAlign = 'left';
-      nCtx.fillText(text, x, yy);
-      return yy + catFontSz + 3;
-    }
-
-    // ── 1. Velocity (速度) ──
-    const barStartX = colInput + 20;
-    const barW = colInputW - 20;
-    y = drawCatHeader(colInput, y, '⚡速度', 'rgba(251,191,36,0.8)');
-    const velColor = 'rgba(251,191,36,0.6)';
-    let inputIdx = 0;
-    for (let i = 0; i < nodeCount && i < 8; i++) {
-      const vx = acts[0][inputIdx] || 0;
-      const vy = acts[0][inputIdx + 1] || 0;
-      // Combined velocity magnitude shown as single bar
-      const mag = Math.sqrt(vx * vx + vy * vy);
-      drawBar01(barStartX, y, barW, mag * 2, velColor, `N${i}`);
-      y += barH + barGap;
-      inputIdx += 2;
-    }
-
-    y += sectionGap;
-
-    // ── 2. Muscle state (筋肉状態) ──
-    y = drawCatHeader(colInput, y, '🔗筋肉', 'rgba(52,211,153,0.8)');
-    const mstColor = 'rgba(52,211,153,0.6)';
-    for (let i = 0; i < muscleCount && i < 8; i++) {
-      const val = acts[0][inputIdx] || 0;
-      drawBar(barStartX, y, barW, val, 1, mstColor, `M${i}`);
-      y += barH + barGap;
-      inputIdx++;
-    }
-
-    y += sectionGap;
-
-    // ── 3. Grounded (接地) ──
-    y = drawCatHeader(colInput, y, '⬇接地', 'rgba(99,210,255,0.8)');
-    for (let i = 0; i < nodeCount && i < 8; i++) {
-      const grounded = acts[0][inputIdx] || 0;
-      const dotX = barStartX + i * 10;
-      nCtx.fillStyle = grounded > 0.5 ? 'rgba(99,210,255,0.9)' : 'rgba(99,210,255,0.15)';
-      nCtx.beginPath();
-      nCtx.arc(dotX + 3, y + 4, 3, 0, Math.PI * 2);
-      nCtx.fill();
-      // Node number
-      nCtx.fillStyle = 'rgba(255,255,255,0.35)';
-      nCtx.font = `6px -apple-system,sans-serif`;
-      nCtx.textAlign = 'center';
-      nCtx.fillText(i, dotX + 3, y + 13);
-      inputIdx++;
-    }
-    y += 18;
-
-    y += sectionGap;
-
-    // ── 4. Rhythm (リズム) ──
-    y = drawCatHeader(colInput, y, '♪リズム', 'rgba(167,139,250,0.8)');
-    const rhythmVal = acts[0][inputIdx] || 0;
-    drawBar(barStartX, y, barW, rhythmVal, 1, 'rgba(167,139,250,0.6)', 'sin');
-    y += barH + 4;
-
-    // ════════════ HIDDEN LAYERS (center) ════════════
-    const hiddenLayers = brain.layers.length - 2;
-    const hiddenBaseY = 26;
-    const hiddenAreaH = ch - 36;
-
-    for (let hl = 0; hl < hiddenLayers; hl++) {
-      const layerIdx = hl + 1;
-      const count = Math.min(brain.layers[layerIdx], 14);
-      const hlX = colHiddenX + (colHiddenW / (hiddenLayers + 1)) * (hl + 1);
-
-      // Layer label
-      nCtx.fillStyle = 'rgba(129,140,248,0.5)';
-      nCtx.font = `8px -apple-system,sans-serif`;
-      nCtx.textAlign = 'center';
-      nCtx.fillText(`H${hl + 1}(${brain.layers[layerIdx]})`, hlX, hiddenBaseY - 2);
-
-      const nodeSpacing = Math.min(14, hiddenAreaH / (count + 1));
-      const startNodeY = hiddenBaseY + (hiddenAreaH - count * nodeSpacing) / 2;
-
-      for (let n = 0; n < count; n++) {
-        const ny = startNodeY + n * nodeSpacing;
-        const activation = Math.abs(acts[layerIdx][n] || 0);
-        const r = 2.5 + activation * 3;
-
-        // Glow for strong activations
-        if (activation > 0.2) {
-          nCtx.fillStyle = `rgba(129,140,248,${activation * 0.15})`;
-          nCtx.beginPath(); nCtx.arc(hlX, ny, r + 5, 0, Math.PI * 2); nCtx.fill();
-        }
-
-        // Node circle
-        const br = Math.floor(60 + activation * 190);
-        nCtx.fillStyle = `rgb(${Math.floor(br * 0.5)},${Math.floor(br * 0.6)},${br})`;
-        nCtx.beginPath(); nCtx.arc(hlX, ny, r, 0, Math.PI * 2); nCtx.fill();
-        nCtx.strokeStyle = `rgba(255,255,255,${0.15 + activation * 0.3})`;
-        nCtx.lineWidth = 0.5; nCtx.stroke();
-      }
-    }
-
-    // ════════════ OUTPUT COLUMN (right) ════════════
-    const outLayerIdx = brain.layers.length - 1;
-    const outBarStartX = colOutputX + 18;
-    const outBarW = colOutputW - 18;
-
-    let oy = 24;
-    oy = drawCatHeader(colOutputX, oy, '💪出力', 'rgba(52,211,153,0.9)');
-
-    for (let i = 0; i < muscleCount && i < 12; i++) {
-      const act = acts[outLayerIdx][i] || 0;
-      // Color intensity based on activation
-      const g = Math.floor(120 + act * 135);
-      const color = `rgba(50,${g},${Math.floor(g * 0.7)},0.8)`;
-      drawBar01(outBarStartX, oy, outBarW, act, color, `M${i}`);
-
-      // Show percentage on right
-      nCtx.fillStyle = 'rgba(255,255,255,0.35)';
-      nCtx.font = `7px -apple-system,sans-serif`;
-      nCtx.textAlign = 'left';
-      nCtx.fillText(`${Math.round(act * 100)}%`, outBarStartX + outBarW + 2, oy + barH / 2);
-
-      oy += barH + barGap;
-    }
-
-    // ════════════ SIGNAL FLOW LINES ════════════
-
-    // Helper: get hidden layer node positions
-    function getHiddenNodePositions(hlIndex) {
-      const layerIdx = hlIndex + 1;
-      const count = Math.min(brain.layers[layerIdx], 14);
-      const hlX = colHiddenX + (colHiddenW / (hiddenLayers + 1)) * (hlIndex + 1);
-      const nodeSpacing = Math.min(14, hiddenAreaH / (count + 1));
-      const startNodeY = hiddenBaseY + (hiddenAreaH - count * nodeSpacing) / 2;
-      const positions = [];
-      for (let n = 0; n < count; n++) {
-        positions.push({ x: hlX, y: startNodeY + n * nodeSpacing });
-      }
-      return positions;
-    }
-
-    // ── Input → H1: per-input-bar signal lines to H1 nodes ──
+    // ── Signal lines: Input → H1 ──
     if (hiddenLayers > 0) {
-      const h1Positions = getHiddenNodePositions(0);
-      const h1Count = h1Positions.length;
-      const wt0 = brain.weights[0];
-      const inputCount = brain.layers[0];
+      const h1Pos  = getHiddenPos(0);
       const h1Size = brain.layers[1];
+      const wt0    = brain.weights[0];
+      const inCount = brain.layers[0];
+      const fromX = colInputX + colInputTotalW + 2;
 
-      // Build map of input index → { y position, color, category }
-      const inputBarMap = [];
-      const nc2 = nodeCount;
-      const mc2 = muscleCount;
-      // Velocity: each node uses 2 inputs (vx, vy), displayed as 1 bar
-      let ii = 0;
-      const velStartY = 24 + catFontSz + 3; // after first category header
-      for (let i = 0; i < nc2 && i < 8; i++) {
-        const barY = velStartY + i * (barH + barGap) + barH / 2;
-        // Both vx and vy map to same bar
-        inputBarMap[ii] = { y: barY, color: 'rgba(251,191,36,', indices: [ii, ii + 1] };
-        inputBarMap[ii + 1] = inputBarMap[ii];
-        ii += 2;
-      }
-      // Muscle state
-      const musStartY = velStartY + Math.min(nc2, 8) * (barH + barGap) + sectionGap + catFontSz + 3;
-      for (let i = 0; i < mc2 && i < 8; i++) {
-        const barY = musStartY + i * (barH + barGap) + barH / 2;
-        inputBarMap[ii] = { y: barY, color: 'rgba(52,211,153,', indices: [ii] };
-        ii++;
-      }
-      // Grounded
-      const gndStartY = musStartY + Math.min(mc2, 8) * (barH + barGap) + sectionGap + catFontSz + 3 + 4;
-      for (let i = 0; i < nc2 && i < 8; i++) {
-        inputBarMap[ii] = { y: gndStartY, color: 'rgba(99,210,255,', indices: [ii] };
-        ii++;
-      }
-      // Rhythm
-      const rhtStartY = gndStartY + 18 + sectionGap + catFontSz + 3 + barH / 2;
-      inputBarMap[ii] = { y: rhtStartY, color: 'rgba(167,139,250,', indices: [ii] };
-
-      // For each H1 node, find the top contributing input categories
-      const fromX = colInput + colInputW + 2;
-
-      for (let j = 0; j < h1Count; j++) {
-        // Gather per-bar contributions (merge vx/vy into one bar)
-        const barContribs = new Map();
-        for (let i = 0; i < inputCount; i++) {
-          const info = inputBarMap[i];
-          if (!info) continue;
-          const w = wt0[i * h1Size + j];
-          const a = acts[0][i] || 0;
-          const s = w * a;
-          const key = info.y; // unique per bar row
-          if (!barContribs.has(key)) {
-            barContribs.set(key, { y: info.y, color: info.color, pos: 0, neg: 0 });
-          }
-          const entry = barContribs.get(key);
-          if (s > 0) entry.pos += s; else entry.neg -= s;
+      for (let j = 0; j < h1Pos.length; j++) {
+        // Aggregate signal per entry
+        const entrySignal = new Float32Array(inputEntries.length);
+        for (let i = 0; i < inCount; i++) {
+          const ei = inputOwner[i];
+          if (ei < 0) continue;
+          entrySignal[ei] += (wt0[i * h1Size + j] || 0) * (acts[0][i] || 0);
         }
-
-        // Draw lines for significant contributors
-        for (const [, entry] of barContribs) {
-          const totalSignal = entry.pos + entry.neg;
-          if (totalSignal < 0.15) continue;
-
-          const dominant = entry.pos >= entry.neg;
-          const alpha = Math.min(0.5, totalSignal * 0.12);
-          const lineWidth = Math.min(2.5, totalSignal * 0.2);
-
-          nCtx.strokeStyle = dominant
-            ? `${entry.color}${alpha})`
-            : `rgba(248,113,113,${alpha})`;
-          nCtx.lineWidth = lineWidth;
+        const { x: toX, y: toY } = h1Pos[j];
+        for (let ei = 0; ei < inputEntries.length; ei++) {
+          const s = entrySignal[ei];
+          const absS = Math.abs(s);
+          if (absS < 0.08) continue;
+          const alpha = Math.min(0.5, absS * 0.18);
+          const { colorBase, y: srcY } = inputEntries[ei];
+          nCtx.strokeStyle = s > 0 ? `${colorBase}${alpha})` : `rgba(248,113,113,${alpha})`;
+          nCtx.lineWidth = Math.min(2, absS * 0.3);
+          const cpX = fromX + (toX - 4 - fromX) * 0.5;
           nCtx.beginPath();
-          nCtx.moveTo(fromX, entry.y);
-          // Curve toward the H1 node
-          const toX = h1Positions[j].x - 4;
-          const toY = h1Positions[j].y;
-          const cpX = fromX + (toX - fromX) * 0.5;
-          nCtx.quadraticCurveTo(cpX, entry.y, toX, toY);
+          nCtx.moveTo(fromX, srcY);
+          nCtx.quadraticCurveTo(cpX, srcY, toX - 4, toY);
           nCtx.stroke();
-
-          // Traveling pulse along curve
-          if (totalSignal > 0.4) {
-            const t = (simTime * 2.0 + j * 0.12 + entry.y * 0.003) % 1;
-            // Approximate point on quadratic bezier
+          // Pulse
+          if (absS > 0.4) {
+            const t = (simTime * 2.0 + j * 0.13 + srcY * 0.003) % 1;
             const mt = 1 - t;
-            const px = mt * mt * fromX + 2 * mt * t * cpX + t * t * toX;
-            const py = mt * mt * entry.y + 2 * mt * t * entry.y + t * t * toY;
-            nCtx.fillStyle = dominant
-              ? `${entry.color}${Math.min(0.8, alpha * 2.5)})`
-              : `rgba(248,113,113,${Math.min(0.8, alpha * 2.5)})`;
+            const px = mt * mt * fromX + 2 * mt * t * cpX + t * t * (toX - 4);
+            const py = mt * mt * srcY  + 2 * mt * t * srcY  + t * t * toY;
+            nCtx.fillStyle = s > 0 ? `${colorBase}${Math.min(0.9, alpha * 3)})` : `rgba(248,113,113,${Math.min(0.9, alpha * 3)})`;
             nCtx.beginPath(); nCtx.arc(px, py, 1.5, 0, Math.PI * 2); nCtx.fill();
           }
         }
       }
     }
 
-    // ── H1 → H2 (and any hidden→hidden) ──
+    // ── Signal lines: Hidden → Hidden ──
     for (let hl = 0; hl < hiddenLayers - 1; hl++) {
-      const fromPositions = getHiddenNodePositions(hl);
-      const toPositions = getHiddenNodePositions(hl + 1);
-      const fromLayerIdx = hl + 1;
-      const toLayerIdx = hl + 2;
+      const fromPos = getHiddenPos(hl);
+      const toPos   = getHiddenPos(hl + 1);
+      const fLayerIdx = hl + 1, tLayerIdx = hl + 2;
       const wt = brain.weights[hl + 1];
-      const fromSize = brain.layers[fromLayerIdx];
-      const toSize = brain.layers[toLayerIdx];
-      const fromCount = fromPositions.length;
-      const toCount = toPositions.length;
-
-      for (let j = 0; j < toCount; j++) {
-        for (let i = 0; i < fromCount; i++) {
-          const w = wt[i * toSize + j];
-          const hAct = acts[fromLayerIdx][i] || 0;
-          const signal = Math.abs(w * hAct);
-          if (signal < 0.06) continue;
-
-          const alpha = Math.min(0.4, signal * 0.35);
-          const isPos = w > 0;
-
-          nCtx.strokeStyle = isPos
-            ? `rgba(129,140,248,${alpha})`
-            : `rgba(248,113,113,${alpha})`;
-          nCtx.lineWidth = Math.min(1.8, signal * 0.8);
+      const tSize = brain.layers[tLayerIdx];
+      for (let j = 0; j < toPos.length; j++) {
+        for (let i = 0; i < fromPos.length; i++) {
+          const w = (wt[i * tSize + j]) || 0;
+          const s = Math.abs(w * (acts[fLayerIdx][i] || 0));
+          if (s < 0.06) continue;
+          const alpha = Math.min(0.4, s * 0.35);
+          nCtx.strokeStyle = w > 0 ? `rgba(129,140,248,${alpha})` : `rgba(248,113,113,${alpha})`;
+          nCtx.lineWidth = Math.min(1.8, s * 0.8);
           nCtx.beginPath();
-          nCtx.moveTo(fromPositions[i].x + 4, fromPositions[i].y);
-          nCtx.lineTo(toPositions[j].x - 4, toPositions[j].y);
+          nCtx.moveTo(fromPos[i].x + 4, fromPos[i].y);
+          nCtx.lineTo(toPos[j].x - 4, toPos[j].y);
           nCtx.stroke();
-
-          // Traveling pulse
-          if (signal > 0.2) {
+          if (s > 0.2) {
             const t = (simTime * 2.2 + i * 0.11 + j * 0.08) % 1;
-            const fx = fromPositions[i].x + 4;
-            const tx = toPositions[j].x - 4;
-            const px = fx + (tx - fx) * t;
-            const py = fromPositions[i].y + (toPositions[j].y - fromPositions[i].y) * t;
-            nCtx.fillStyle = isPos
-              ? `rgba(129,140,248,${alpha * 2})`
-              : `rgba(248,113,113,${alpha * 2})`;
+            const px = (fromPos[i].x + 4) + (toPos[j].x - 4 - fromPos[i].x - 4) * t;
+            const py = fromPos[i].y + (toPos[j].y - fromPos[i].y) * t;
+            nCtx.fillStyle = w > 0 ? `rgba(129,140,248,${alpha * 2})` : `rgba(248,113,113,${alpha * 2})`;
             nCtx.beginPath(); nCtx.arc(px, py, 1.2, 0, Math.PI * 2); nCtx.fill();
           }
         }
       }
     }
 
-    // ── Last hidden → Output ──
+    // ── Signal lines: Last Hidden → Output ──
     if (hiddenLayers > 0) {
-      const lastHlIdx = hiddenLayers;
-      const lastPositions = getHiddenNodePositions(hiddenLayers - 1);
-      const lastHlCount = lastPositions.length;
-
+      const lastHlIdx = hiddenLayers - 1;
+      const lastPos = getHiddenPos(lastHlIdx);
       const wt = brain.weights[brain.weights.length - 1];
-      const outCount = Math.min(muscleCount, 12);
-
-      for (let j = 0; j < outCount; j++) {
-        const outY = 24 + catFontSz + 3 + j * (barH + barGap) + barH / 2;
-        for (let i = 0; i < lastHlCount; i++) {
-          const w = wt[i * brain.layers[outLayerIdx] + j];
-          const hAct = acts[lastHlIdx][i] || 0;
-          const signal = Math.abs(w * hAct);
-          if (signal < 0.08) continue;
-
-          const alpha = Math.min(0.35, signal * 0.3);
-          const hy = lastPositions[i].y;
-
-          nCtx.strokeStyle = w > 0
-            ? `rgba(52,211,153,${alpha})`
-            : `rgba(248,113,113,${alpha})`;
-          nCtx.lineWidth = Math.min(1.5, signal);
+      const outSize = brain.layers[outLayerIdx];
+      const actLayer = hiddenLayers; // index into acts[]
+      for (let j = 0; j < outEntries.length; j++) {
+        for (let i = 0; i < lastPos.length; i++) {
+          const w = (wt[i * outSize + j]) || 0;
+          const s = Math.abs(w * (acts[actLayer][i] || 0));
+          if (s < 0.08) continue;
+          const alpha = Math.min(0.35, s * 0.3);
+          nCtx.strokeStyle = w > 0 ? `rgba(52,211,153,${alpha})` : `rgba(248,113,113,${alpha})`;
+          nCtx.lineWidth = Math.min(1.5, s);
           nCtx.beginPath();
-          nCtx.moveTo(lastPositions[i].x + 5, hy);
-          nCtx.lineTo(outBarStartX - 2, outY);
+          nCtx.moveTo(lastPos[i].x + 5, lastPos[i].y);
+          nCtx.lineTo(colOutX - 2, outEntries[j].y);
           nCtx.stroke();
-
-          // Traveling pulse
-          if (signal > 0.25) {
+          if (s > 0.25) {
             const t = (simTime * 2.5 + i * 0.13 + j * 0.09) % 1;
-            const fx = lastPositions[i].x + 5;
-            const px = fx + (outBarStartX - 2 - fx) * t;
-            const py = hy + (outY - hy) * t;
-            nCtx.fillStyle = w > 0
-              ? `rgba(52,211,153,${alpha * 2})`
-              : `rgba(248,113,113,${alpha * 2})`;
-            nCtx.beginPath(); nCtx.arc(px, py, 1.2, 0, Math.PI * 2); nCtx.fill();
+            const fx = lastPos[i].x + 5, tx = colOutX - 2;
+            nCtx.fillStyle = w > 0 ? `rgba(52,211,153,${alpha * 2})` : `rgba(248,113,113,${alpha * 2})`;
+            nCtx.beginPath();
+            nCtx.arc(fx + (tx - fx) * t, lastPos[i].y + (outEntries[j].y - lastPos[i].y) * t, 1.2, 0, Math.PI * 2);
+            nCtx.fill();
           }
         }
       }
     }
 
-    // ════════════ COLUMN HEADERS ════════════
-    nCtx.font = `bold 8px -apple-system,sans-serif`;
-    nCtx.textAlign = 'center';
-    nCtx.fillStyle = 'rgba(251,191,36,0.5)';
-    nCtx.fillText('入力', colInput + colInputW / 2, 18);
-    nCtx.fillStyle = 'rgba(52,211,153,0.5)';
-    nCtx.fillText('出力', colOutputX + colOutputW / 2, 18);
+    // ── Hidden nodes ──
+    for (let hl = 0; hl < hiddenLayers; hl++) {
+      const layerIdx = hl + 1;
+      const positions = getHiddenPos(hl);
+      if (positions.length > 0) {
+        nCtx.fillStyle = 'rgba(129,140,248,0.55)';
+        nCtx.font = `7px -apple-system,sans-serif`;
+        nCtx.textAlign = 'center'; nCtx.textBaseline = 'top';
+        nCtx.fillText(`H${hl + 1}(${brain.layers[layerIdx]})`, positions[0].x, 2);
+        nCtx.textBaseline = 'middle';
+      }
+      for (const { x: hx, y: hy } of positions) {
+        const act = Math.abs(acts[layerIdx][positions.indexOf({ x: hx, y: hy })] || 0);
+        // Use index-based lookup
+        const n = positions.findIndex(p => p.x === hx && p.y === hy);
+        const activation = Math.abs(acts[layerIdx][n] || 0);
+        const r = 2.5 + activation * 3;
+        if (activation > 0.2) {
+          nCtx.fillStyle = `rgba(129,140,248,${activation * 0.15})`;
+          nCtx.beginPath(); nCtx.arc(hx, hy, r + 5, 0, Math.PI * 2); nCtx.fill();
+        }
+        const br = Math.floor(60 + activation * 190);
+        nCtx.fillStyle = `rgb(${Math.floor(br * 0.5)},${Math.floor(br * 0.6)},${br})`;
+        nCtx.beginPath(); nCtx.arc(hx, hy, r, 0, Math.PI * 2); nCtx.fill();
+        nCtx.strokeStyle = `rgba(255,255,255,${0.15 + activation * 0.3})`;
+        nCtx.lineWidth = 0.5; nCtx.stroke();
+      }
+    }
 
-    // ════════════ LEGEND (bottom) ════════════
-    const legendY = ch - 6;
-    nCtx.font = `7px -apple-system,sans-serif`;
-    nCtx.textAlign = 'left';
+    // ─── Title bar ───
+    nCtx.font = `bold 9px -apple-system,sans-serif`;
+    nCtx.fillStyle = '#63d2ff'; nCtx.textAlign = 'left'; nCtx.textBaseline = 'middle';
+    nCtx.fillText(`#${body.id}`, pad, 9);
+    nCtx.fillStyle = 'rgba(99,210,255,0.6)';
+    nCtx.font = `8px -apple-system,sans-serif`;
+    nCtx.fillText(`Fit:${Math.round(body.fitness || 0)}`, pad + 24, 9);
+
+    // ─── Draw helpers ───
+    function drawCatHeader(x, yy, text, color) {
+      nCtx.fillStyle = color;
+      nCtx.font = `bold 8px -apple-system,sans-serif`;
+      nCtx.textAlign = 'left'; nCtx.textBaseline = 'top';
+      nCtx.fillText(text, x, yy);
+      nCtx.textBaseline = 'middle';
+    }
+    function drawBar(x, yy, w, val, maxVal, color, label) {
+      const ratio = Math.min(1, Math.max(0, (val + maxVal) / (2 * maxVal)));
+      nCtx.fillStyle = 'rgba(255,255,255,0.06)'; nCtx.fillRect(x, yy, w, barH);
+      nCtx.fillStyle = color; nCtx.fillRect(x, yy, ratio * w, barH);
+      nCtx.fillStyle = 'rgba(255,255,255,0.12)'; nCtx.fillRect(x + w * 0.5, yy, 1, barH);
+      if (label) {
+        nCtx.fillStyle = 'rgba(255,255,255,0.5)';
+        nCtx.font = `6px -apple-system,sans-serif`; nCtx.textAlign = 'right';
+        nCtx.fillText(label, x - 2, yy + barH / 2);
+      }
+    }
+    function drawBar01(x, yy, w, val, color, label) {
+      const ratio = Math.min(1, Math.max(0, val));
+      nCtx.fillStyle = 'rgba(255,255,255,0.06)'; nCtx.fillRect(x, yy, w, barH);
+      nCtx.fillStyle = color; nCtx.fillRect(x, yy, ratio * w, barH);
+      if (label) {
+        nCtx.fillStyle = 'rgba(255,255,255,0.5)';
+        nCtx.font = `6px -apple-system,sans-serif`; nCtx.textAlign = 'right';
+        nCtx.fillText(label, x - 2, yy + barH / 2);
+      }
+    }
+
+    // ─── Input column ───
+    inputIdx = 0;
+    let drawY = titleH;
+
+    // Velocity
+    drawCatHeader(colInputX, drawY, '⚡速度', 'rgba(251,191,36,0.8)'); drawY += catH;
+    for (let i = 0; i < dispNodes; i++) {
+      const vx = acts[0][inputIdx] || 0, vy = acts[0][inputIdx + 1] || 0;
+      drawBar01(inputBarX, drawY, inputBarW, Math.sqrt(vx * vx + vy * vy) * 2, 'rgba(251,191,36,0.6)', `N${i}`);
+      drawY += barH + barGap; inputIdx += 2;
+    }
+    drawY += secGap;
+
+    // Muscle state
+    drawCatHeader(colInputX, drawY, '🔗筋肉', 'rgba(52,211,153,0.8)'); drawY += catH;
+    for (let i = 0; i < dispMuscles; i++) {
+      drawBar(inputBarX, drawY, inputBarW, acts[0][inputIdx] || 0, 1, 'rgba(52,211,153,0.6)', `M${i}`);
+      drawY += barH + barGap; inputIdx++;
+    }
+    drawY += secGap;
+
+    // Grounded dots
+    drawCatHeader(colInputX, drawY, '⬇接地', 'rgba(99,210,255,0.8)'); drawY += catH;
+    const dotSpacing = colInputTotalW / Math.max(1, dispNodes);
+    for (let i = 0; i < dispNodes; i++) {
+      const grounded = acts[0][inputIdx] || 0;
+      const dotX = colInputX + dotSpacing * (i + 0.5);
+      nCtx.fillStyle = grounded > 0.5 ? 'rgba(99,210,255,0.9)' : 'rgba(99,210,255,0.15)';
+      nCtx.beginPath(); nCtx.arc(dotX, drawY + 4, 3, 0, Math.PI * 2); nCtx.fill();
+      nCtx.fillStyle = 'rgba(255,255,255,0.3)';
+      nCtx.font = `5px -apple-system,sans-serif`; nCtx.textAlign = 'center'; nCtx.textBaseline = 'top';
+      nCtx.fillText(i, dotX, drawY + 9); nCtx.textBaseline = 'middle';
+      inputIdx++;
+    }
+    drawY += 20; drawY += secGap;
+
+    // Rhythm
+    drawCatHeader(colInputX, drawY, '♪リズム', 'rgba(167,139,250,0.8)'); drawY += catH;
+    drawBar(inputBarX, drawY, inputBarW, acts[0][inputIdx] || 0, 1, 'rgba(167,139,250,0.6)', 'sin');
+
+    // ─── Output column ───
+    drawCatHeader(colOutX, titleH, '💪出力', 'rgba(52,211,153,0.9)');
+    let drawOY = titleH + catH;
+    for (let i = 0; i < dispMuscles; i++) {
+      const act = acts[outLayerIdx][i] || 0;
+      const g = Math.floor(120 + act * 135);
+      drawBar01(outBarX, drawOY, outBarW, act, `rgba(50,${g},${Math.floor(g * 0.7)},0.8)`, `M${i}`);
+      // Percentage label
+      nCtx.fillStyle = 'rgba(255,255,255,0.35)';
+      nCtx.font = `6px -apple-system,sans-serif`; nCtx.textAlign = 'left';
+      nCtx.fillText(`${Math.round(act * 100)}%`, outBarX + outBarW + 2, drawOY + barH / 2);
+      drawOY += barH + barGap;
+    }
+
+    // ─── Legend ───
+    const legendY = ch - 5;
+    nCtx.font = `6px -apple-system,sans-serif`; nCtx.textBaseline = 'middle';
     const legends = [
       { color: 'rgba(251,191,36,0.8)', text: '速度' },
       { color: 'rgba(52,211,153,0.8)', text: '筋肉' },
@@ -1471,26 +1404,16 @@
     ];
     let lx = pad;
     for (const lg of legends) {
-      nCtx.fillStyle = lg.color;
-      nCtx.fillRect(lx, legendY - 4, 6, 4);
-      nCtx.fillStyle = 'rgba(255,255,255,0.4)';
-      nCtx.fillText(lg.text, lx + 8, legendY - 1);
-      lx += 36;
+      nCtx.fillStyle = lg.color; nCtx.fillRect(lx, legendY - 3, 5, 3);
+      nCtx.fillStyle = 'rgba(255,255,255,0.4)'; nCtx.textAlign = 'left';
+      nCtx.fillText(lg.text, lx + 7, legendY - 1); lx += 34;
     }
-
-    // Signal legend
-    nCtx.fillStyle = 'rgba(52,211,153,0.5)';
-    nCtx.fillRect(lx + 4, legendY - 4, 12, 2);
-    nCtx.fillStyle = 'rgba(255,255,255,0.4)';
-    nCtx.fillText('興奮', lx + 20, legendY - 1);
-    lx += 40;
-    nCtx.fillStyle = 'rgba(248,113,113,0.5)';
-    nCtx.fillRect(lx, legendY - 4, 12, 2);
-    nCtx.fillStyle = 'rgba(255,255,255,0.4)';
-    nCtx.fillText('抑制', lx + 16, legendY - 1);
+    nCtx.fillStyle = 'rgba(52,211,153,0.5)'; nCtx.fillRect(lx + 2, legendY - 2, 10, 1.5);
+    nCtx.fillStyle = 'rgba(255,255,255,0.4)'; nCtx.fillText('興奮', lx + 14, legendY - 1); lx += 34;
+    nCtx.fillStyle = 'rgba(248,113,113,0.5)'; nCtx.fillRect(lx, legendY - 2, 10, 1.5);
+    nCtx.fillStyle = 'rgba(255,255,255,0.4)'; nCtx.fillText('抑制', lx + 12, legendY - 1);
   }
 
-  // ─── Graph Rendering ──────────────────────────────
   function renderGraph() {
     if (!showGraph) return;
     const gc = document.getElementById('graphCanvas');

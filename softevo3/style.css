@@ -248,7 +248,7 @@ html, body {
 #neural-panel.hidden { display: none; }
 #neural-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 13px; font-weight: bold; color: #34d399; }
 #close-neural { background: none; border: none; color: #e2e8f0; font-size: 14px; cursor: pointer; }
-#neuralCanvas { width: 100%; height: 260px; border-radius: 4px; background: rgba(0,0,0,0.3); }
+#neuralCanvas { width: 100%; height: auto; min-height: 200px; border-radius: 4px; background: rgba(0,0,0,0.3); display: block; }
 
 /* Config Panel */
 #config-panel {
@@ -332,7 +332,7 @@ html, body {
   #graph-panel { width: 260px; }
   #graphCanvas { height: 140px; }
   #neural-panel { width: 300px; right: 8px; }
-  #neuralCanvas { height: 220px; }
+  #neuralCanvas { min-height: 180px; }
   #config-panel { width: 280px; }
   #event-log { width: 180px; }
   .event-msg { font-size: 10px; }
