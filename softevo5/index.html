@@ -13,7 +13,42 @@
 </head>
 <body>
 <div id="app">
-  <canvas id="mainCanvas"></canvas>
+
+  <!-- ═══ Brain Mode Bar ═══ -->
+  <div id="brain-bar" class="hidden">
+    <div id="brain-bar-info">
+      <span id="brain-creature-id">—</span>
+      <span id="brain-creature-fit">Fit: 0</span>
+    </div>
+    <div id="brain-bar-stats">
+      <span id="brain-gen">🧬 0</span>
+      <span id="brain-best">🏆 0</span>
+    </div>
+    <div id="brain-bar-controls">
+      <button class="brain-ctrl" id="brain-pause" title="一時停止">⏸</button>
+      <button class="brain-ctrl active" id="brain-play" title="再生">▶</button>
+      <button class="brain-ctrl" id="brain-fast" title="倍速">⏩</button>
+    </div>
+    <button id="close-brain-mode" title="脳モード終了">✕</button>
+  </div>
+
+  <!-- ═══ Neural Section (brain mode) ═══ -->
+  <div id="neural-section" class="brain-section">
+    <div class="section-divider"><span>🧠 ニューラルネットワーク</span></div>
+    <div class="section-canvas-wrap"><canvas id="neuralCanvas" width="380" height="260"></canvas></div>
+  </div>
+
+  <!-- ═══ Main Canvas ═══ -->
+  <div id="canvas-wrapper">
+    <canvas id="mainCanvas"></canvas>
+    <div id="creature-label" class="hidden"><span id="creature-label-text">▼ 選択した生物</span></div>
+  </div>
+
+  <!-- ═══ Analysis Section (brain mode) ═══ -->
+  <div id="analysis-section" class="brain-section">
+    <div class="section-divider"><span>🔬 解析</span></div>
+    <div class="section-canvas-wrap"><canvas id="analysisCanvas" width="380" height="420"></canvas></div>
+  </div>
 
   <!-- ═══ BUILD PHASE UI ═══ -->
   <div id="build-overlay">
@@ -124,32 +159,6 @@
     <canvas id="graphCanvas" width="360" height="180"></canvas>
   </div>
 
-  <!-- ═══ Integrated Brain Panel ═══ -->
-  <div id="brain-panel" class="hidden">
-    <div id="brain-panel-header">
-      <div id="brain-creature-info">
-        <span id="brain-creature-id">—</span>
-        <span id="brain-creature-fit">Fit: 0</span>
-      </div>
-      <div id="brain-tabs">
-        <button class="brain-tab active" data-tab="neural">🧠 脳波</button>
-        <button class="brain-tab" data-tab="analysis">🔬 解析</button>
-        <button class="brain-tab" data-tab="info">ℹ 情報</button>
-      </div>
-      <button id="close-brain">✕</button>
-    </div>
-    <div id="brain-tab-content">
-      <div id="tab-neural" class="brain-tab-pane active">
-        <canvas id="neuralCanvas" width="380" height="260"></canvas>
-      </div>
-      <div id="tab-analysis" class="brain-tab-pane">
-        <canvas id="analysisCanvas" width="380" height="420"></canvas>
-      </div>
-      <div id="tab-info" class="brain-tab-pane">
-        <div id="info-content"></div>
-      </div>
-    </div>
-  </div>
   <div id="config-panel" class="hidden">
     <div id="config-header">
       <span>⚙️ ライブ・チューニング</span>

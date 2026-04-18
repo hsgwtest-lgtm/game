@@ -10,7 +10,8 @@ html, body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: #e2e8f0; touch-action: none;
 }
-#app { width: 100%; height: 100%; position: relative; }
+#app { width: 100%; height: 100%; position: relative; display: flex; flex-direction: column; }
+#canvas-wrapper { flex: 1; position: relative; min-height: 0; }
 #mainCanvas { display: block; width: 100%; height: 100%; }
 
 /* ═══ BUILD PHASE ═══ */
@@ -230,45 +231,66 @@ html, body {
 #close-graph { background: none; border: none; color: #e2e8f0; font-size: 14px; cursor: pointer; }
 #graphCanvas { width: 100%; height: 180px; border-radius: 4px; background: rgba(0,0,0,0.3); }
 
-/* ═══ Integrated Brain Panel ═══ */
-#brain-panel {
-  position: absolute; right: 8px; top: 52px; width: 380px;
-  max-height: calc(100vh - 62px); overflow-y: auto;
-  background: rgba(6,10,20,0.96); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(99,210,255,0.3); border-radius: 10px; padding: 0;
-  pointer-events: auto; z-index: 12; -webkit-overflow-scrolling: touch;
+/* ═══ Integrated Brain Mode (vertical stack) ═══ */
+.brain-section { display: none; }
+#brain-bar { display: none; }
+#brain-bar.hidden { display: none; }
+#creature-label { display: none; }
+
+/* Brain Bar */
+#app.brain-mode #brain-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px; background: rgba(6,10,20,0.95);
+  border-bottom: 1px solid rgba(99,210,255,0.2);
+  flex-shrink: 0; z-index: 15;
+  padding-top: calc(6px + env(safe-area-inset-top));
 }
-#brain-panel.hidden { display: none; }
-#brain-panel-header {
-  display: flex; align-items: center; padding: 6px 10px;
-  border-bottom: 1px solid rgba(99,210,255,0.15); gap: 6px;
-  position: sticky; top: 0; background: rgba(6,10,20,0.98); z-index: 2; border-radius: 10px 10px 0 0;
-}
-#brain-creature-info {
-  display: flex; flex-direction: column; gap: 1px; min-width: 50px;
-}
-#brain-creature-id { font-size: 11px; font-weight: bold; color: #fbbf24; }
+#brain-bar-info { display: flex; flex-direction: column; gap: 1px; min-width: 60px; }
+#brain-creature-id { font-size: 11px; font-weight: bold; color: #fbbf24; white-space: nowrap; }
 #brain-creature-fit { font-size: 9px; color: rgba(251,191,36,0.6); }
-#brain-tabs {
-  display: flex; gap: 2px; flex: 1; justify-content: center;
+#brain-bar-stats { display: flex; gap: 8px; font-size: 11px; font-family: 'Menlo','Courier New',monospace; flex: 1; }
+#brain-bar-stats span { white-space: nowrap; }
+#brain-gen { color: rgba(99,210,255,0.8); }
+#brain-best { color: rgba(52,211,153,0.8); }
+#brain-bar-controls { display: flex; gap: 3px; }
+.brain-ctrl {
+  background: rgba(129,140,248,0.12); border: 1px solid rgba(129,140,248,0.25);
+  color: #e2e8f0; padding: 4px 8px; border-radius: 4px; font-size: 13px;
+  cursor: pointer; transition: all 0.15s;
 }
-.brain-tab {
-  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
-  color: rgba(255,255,255,0.5); font-size: 10px; padding: 4px 8px;
-  border-radius: 4px; cursor: pointer; white-space: nowrap; font-family: inherit;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+.brain-ctrl.active { background: rgba(129,140,248,0.35); border-color: rgba(129,140,248,0.6); }
+#close-brain-mode {
+  background: none; border: 1px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.6); font-size: 14px; padding: 4px 8px;
+  border-radius: 4px; cursor: pointer;
 }
-.brain-tab.active {
-  background: rgba(99,210,255,0.15); border-color: rgba(99,210,255,0.4);
-  color: #63d2ff; font-weight: bold;
+
+/* Brain Sections */
+#app.brain-mode .brain-section { display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; }
+#app.brain-mode #neural-section { flex: 0 0 28%; border-bottom: 1px solid rgba(99,210,255,0.15); }
+#app.brain-mode #canvas-wrapper { flex: 0 0 36%; }
+#app.brain-mode #analysis-section { flex: 0 0 36%; border-top: 1px solid rgba(251,191,36,0.15); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+.section-divider {
+  display: flex; align-items: center; padding: 3px 10px;
+  background: rgba(6,10,20,0.8); flex-shrink: 0;
 }
-#close-brain { background: none; border: none; color: rgba(255,255,255,0.5); font-size: 14px; cursor: pointer; padding: 4px; }
-#brain-tab-content { padding: 8px; }
-.brain-tab-pane { display: none; }
-.brain-tab-pane.active { display: block; }
-#neuralCanvas { width: 100%; height: auto; min-height: 200px; border-radius: 4px; background: rgba(0,0,0,0.3); display: block; }
-#analysisCanvas { width: 100%; height: auto; min-height: 380px; border-radius: 4px; background: rgba(0,0,0,0.3); display: block; }
-#tab-info #info-content { font-size: 12px; line-height: 1.6; color: #e2e8f0; }
+.section-divider span { font-size: 10px; font-weight: bold; color: rgba(255,255,255,0.5); letter-spacing: 0.5px; }
+.section-canvas-wrap { flex: 1; min-height: 0; position: relative; }
+.section-canvas-wrap canvas { display: block; width: 100%; height: 100%; }
+
+/* Creature Label (shown in brain mode) */
+#app.brain-mode #creature-label {
+  display: flex; position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
+  background: rgba(6,10,20,0.75); padding: 2px 10px; border-radius: 10px;
+  border: 1px solid rgba(251,191,36,0.3); z-index: 5;
+}
+#creature-label-text { font-size: 10px; color: #fbbf24; white-space: nowrap; }
+
+/* Hide overlays in brain mode */
+#app.brain-mode #sim-overlay { display: none !important; }
+#app.brain-mode #graph-panel { display: none !important; }
+#app.brain-mode #event-log { display: none !important; }
 
 /* Config Panel */
 #config-panel {
@@ -351,10 +373,11 @@ html, body {
   .tog-btn { padding: 4px 6px; font-size: 10px; }
   #graph-panel { width: 260px; }
   #graphCanvas { height: 140px; }
-  #brain-panel { width: 300px; right: 4px; top: 48px; }
-  #neuralCanvas { min-height: 180px; }
-  #analysisCanvas { min-height: 320px; }
-  .brain-tab { font-size: 9px; padding: 3px 5px; }
+  #app.brain-mode #neural-section { flex: 0 0 26%; }
+  #app.brain-mode #canvas-wrapper { flex: 0 0 38%; }
+  #app.brain-mode #analysis-section { flex: 0 0 36%; }
+  .brain-ctrl { padding: 3px 6px; font-size: 12px; }
+  #brain-bar-stats { font-size: 10px; }
   #config-panel { width: 280px; }
   #event-log { width: 180px; }
   .event-msg { font-size: 10px; }

@@ -752,19 +752,22 @@
   }
 
   function resizeCanvas() {
-    canvas.width = window.innerWidth * devicePixelRatio;
-    canvas.height = window.innerHeight * devicePixelRatio;
+    const wrapper = document.getElementById('canvas-wrapper');
+    const w = wrapper ? wrapper.clientWidth : window.innerWidth;
+    const h = wrapper ? wrapper.clientHeight : window.innerHeight;
+    canvas.width = w * devicePixelRatio;
+    canvas.height = h * devicePixelRatio;
     ctx.scale(devicePixelRatio, devicePixelRatio);
     if (currentPhase === PHASE_BUILD) {
-      const scaleX = window.innerWidth / 400, scaleY = window.innerHeight / 500;
+      const scaleX = w / 400, scaleY = h / 500;
       targetCamZoom = Math.min(scaleX, scaleY) * 0.8;
-      targetCamX = window.innerWidth / 2 - 200 * targetCamZoom;
-      targetCamY = window.innerHeight / 2 - 350 * targetCamZoom;
+      targetCamX = w / 2 - 200 * targetCamZoom;
+      targetCamY = h / 2 - 350 * targetCamZoom;
     } else {
-      const scaleX = window.innerWidth / COF.worldW, scaleY = window.innerHeight / COF.worldH;
+      const scaleX = w / COF.worldW, scaleY = h / COF.worldH;
       targetCamZoom = Math.min(scaleX, scaleY);
-      targetCamX = (window.innerWidth - COF.worldW * targetCamZoom) / 2;
-      targetCamY = (window.innerHeight - COF.worldH * targetCamZoom) / 2;
+      targetCamX = (w - COF.worldW * targetCamZoom) / 2;
+      targetCamY = (h - COF.worldH * targetCamZoom) / 2;
     }
   }
 
@@ -1079,7 +1082,7 @@
     const rhtH     = catH + barH + pad;
     const neededH  = titleH + velH + musH + gndH + rhtH;
     const canvasH  = Math.max(neededH, 200);
-    if (Math.abs(nc.clientHeight - canvasH) > 2) nc.style.height = canvasH + 'px';
+    if (!brainMode && Math.abs(nc.clientHeight - canvasH) > 2) nc.style.height = canvasH + 'px';
 
     const cw = nc.clientWidth, ch = nc.clientHeight;
     if (nc.width !== Math.round(cw * dpr) || nc.height !== Math.round(ch * dpr)) {
@@ -1582,7 +1585,7 @@
     const trendH = strategyHistory.length > 1 ? 80 : 0;
     const neededH = 22 + radarH + narrativeH + heatmapH + importanceH + trendH + 20;
     const canvasH = Math.max(neededH, 380);
-    if (Math.abs(ac.clientHeight - canvasH) > 2) ac.style.height = canvasH + 'px';
+    if (!brainMode && Math.abs(ac.clientHeight - canvasH) > 2) ac.style.height = canvasH + 'px';
 
     const cw = ac.clientWidth, ch = ac.clientHeight;
     if (ac.width !== Math.round(cw * dpr) || ac.height !== Math.round(ch * dpr)) {
@@ -1885,7 +1888,7 @@
   let currentTool = 'observe';
   let showMuscles = true, showTrails = false, showGrid = false, showGraph = false;
   let showLabels = true, showNeural = false, showAnalysis = false;
-  let showBrainPanel = false, brainTab = 'neural';
+  let brainMode = false;
   let showConfig = false;
   let simSpeed = 1, isPaused = false;
   let pointers = new Map();
@@ -2196,37 +2199,72 @@
   });
   document.getElementById('toggle-labels').addEventListener('click', e => { showLabels = !showLabels; e.target.classList.toggle('active', showLabels); });
 
-  // ── Integrated Brain Panel functions ──
-  function openBrainPanel(tab) {
-    showBrainPanel = true;
-    brainTab = tab || brainTab;
-    showNeural = brainTab === 'neural';
-    showAnalysis = brainTab === 'analysis';
-    document.getElementById('brain-panel').classList.remove('hidden');
+  // ── Brain Mode (vertical full-screen layout) ──
+  function activateBrainMode() {
+    brainMode = true; showNeural = true; showAnalysis = true;
+    document.getElementById('app').classList.add('brain-mode');
+    document.getElementById('brain-bar').classList.remove('hidden');
     document.getElementById('toggle-brain').classList.add('active');
-    document.querySelectorAll('.brain-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === brainTab));
-    document.querySelectorAll('.brain-tab-pane').forEach(p => p.classList.toggle('active', p.id === 'tab-' + brainTab));
+    // Update creature label
+    if (population.length > 0 && focusedIndex < population.length) {
+      const b = population[focusedIndex];
+      document.getElementById('creature-label-text').textContent = `▼ #${b.id} 観察中`;
+    }
+    document.getElementById('creature-label').classList.remove('hidden');
+    setTimeout(resizeCanvas, 0);
   }
-  function closeBrainPanel() {
-    showBrainPanel = false; showNeural = false; showAnalysis = false;
-    document.getElementById('brain-panel').classList.add('hidden');
+  function deactivateBrainMode() {
+    brainMode = false; showNeural = false; showAnalysis = false;
+    document.getElementById('app').classList.remove('brain-mode');
+    document.getElementById('brain-bar').classList.add('hidden');
+    document.getElementById('creature-label').classList.add('hidden');
     document.getElementById('toggle-brain').classList.remove('active');
+    setTimeout(resizeCanvas, 0);
   }
-  function updateBrainPanelHeader() {
-    if (!showBrainPanel) return;
+  function updateBrainBar() {
+    if (!brainMode) return;
     if (population.length === 0 || focusedIndex >= population.length) return;
     const body = population[focusedIndex];
     document.getElementById('brain-creature-id').textContent = `🦠 #${body.id} 観察中`;
     document.getElementById('brain-creature-fit').textContent = `Fit: ${Math.round(body.fitness || 0)}`;
+    document.getElementById('creature-label-text').textContent = `▼ #${body.id} 観察中`;
+    // Sync stats
+    const genEl = document.getElementById('gen-info');
+    const bestEl = document.getElementById('best-info');
+    if (genEl) document.getElementById('brain-gen').textContent = genEl.textContent;
+    if (bestEl) document.getElementById('brain-best').textContent = bestEl.textContent;
   }
 
-  document.getElementById('toggle-brain').addEventListener('click', e => {
-    if (showBrainPanel) { closeBrainPanel(); } else { openBrainPanel('neural'); }
+  document.getElementById('toggle-brain').addEventListener('click', () => {
+    if (brainMode) deactivateBrainMode(); else activateBrainMode();
   });
-  document.querySelectorAll('.brain-tab').forEach(tab => {
-    tab.addEventListener('click', () => openBrainPanel(tab.dataset.tab));
+  document.getElementById('close-brain-mode').addEventListener('click', deactivateBrainMode);
+
+  // Brain bar speed controls
+  document.getElementById('brain-pause').addEventListener('click', () => {
+    isPaused = true; simSpeed = 0;
+    document.querySelectorAll('.brain-ctrl').forEach(b => b.classList.remove('active'));
+    document.getElementById('brain-pause').classList.add('active');
+    document.getElementById('btn-pause').classList.add('active');
+    document.getElementById('btn-play').classList.remove('active');
+    document.getElementById('btn-fast').classList.remove('active');
   });
-  document.getElementById('close-brain').addEventListener('click', closeBrainPanel);
+  document.getElementById('brain-play').addEventListener('click', () => {
+    isPaused = false; simSpeed = 1;
+    document.querySelectorAll('.brain-ctrl').forEach(b => b.classList.remove('active'));
+    document.getElementById('brain-play').classList.add('active');
+    document.getElementById('btn-play').classList.add('active');
+    document.getElementById('btn-pause').classList.remove('active');
+    document.getElementById('btn-fast').classList.remove('active');
+  });
+  document.getElementById('brain-fast').addEventListener('click', () => {
+    isPaused = false; simSpeed = 4;
+    document.querySelectorAll('.brain-ctrl').forEach(b => b.classList.remove('active'));
+    document.getElementById('brain-fast').classList.add('active');
+    document.getElementById('btn-fast').classList.add('active');
+    document.getElementById('btn-pause').classList.remove('active');
+    document.getElementById('btn-play').classList.remove('active');
+  });
 
   document.getElementById('close-graph').addEventListener('click', () => {
     showGraph = false; document.getElementById('toggle-graph').classList.remove('active');
@@ -2319,35 +2357,14 @@
     }
   }
 
-  // ─── Info Panel (integrated into brain panel) ────
+  // ─── Info → activate brain mode on creature tap ──
   function showInfoAt(wx, wy) {
-    const content = document.getElementById('info-content');
     for (let i = 0; i < population.length; i++) {
       const body = population[i];
       const cx2 = body.getCenterX(), cy2 = body.getCenterY();
       if ((wx-cx2)*(wx-cx2)+(wy-cy2)*(wy-cy2) < 2500) {
         focusedIndex = i;
-        const fit = Math.round(body.fitness || (body.getCenterX() - body.startX));
-        const groundCount = body.nodes.filter(n => n.grounded).length;
-        const muscleInfo = body.muscleAct.map((a, mi) => {
-          const pct = (a*100).toFixed(0);
-          const barLen = Math.round(a * 10);
-          return `M${mi}: ${'▓'.repeat(barLen)}${'░'.repeat(10-barLen)} ${pct}%`;
-        }).join('<br>');
-        content.innerHTML =
-          `<b>🦠 個体 #${body.id}</b><br>適応度: <span style="color:#fbbf24">${fit}</span><br>` +
-          `接地ノード: ${groundCount} / ${body.nodes.length}<br>ノード数: ${body.nodes.length} | 筋肉数: ${body.muscles.length}<br>` +
-          `筋活性: ${(body.totalMuscleOutput*100).toFixed(0)}%<br><br><b>筋肉活性:</b><br>` +
-          `<span style="font-size:10px;font-family:monospace;line-height:1.5">${muscleInfo}</span>`;
-        // Open brain panel on info tab
-        openBrainPanel('info');
-        return;
-      }
-    }
-    for (const g of goals) {
-      if ((wx-g.x)*(wx-g.x)+(wy-g.y)*(wy-g.y) < 900) {
-        content.innerHTML = `<b>🎯 ゴール</b><br>位置: (${Math.floor(g.x)}, ${Math.floor(g.y)})<br>ボーナス: +${COF.goalBonus}<br>到達半径: ${COF.goalRadius}px`;
-        openBrainPanel('info');
+        if (!brainMode) activateBrainMode();
         return;
       }
     }
@@ -2545,7 +2562,7 @@
     renderGraph();
     renderNeuralMonitor();
     renderBrainAnalysis();
-    updateBrainPanelHeader();
+    updateBrainBar();
   }
 
   // ═══════════════════════════════════════════════════
