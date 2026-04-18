@@ -790,7 +790,7 @@
 
   // ─── Build Phase Rendering ────────────────────────
   function renderBuildPhase() {
-    const w = window.innerWidth, h = window.innerHeight;
+    const w = canvas.width / devicePixelRatio, h = canvas.height / devicePixelRatio;
     ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
     const grad = ctx.createLinearGradient(0, 0, 0, h);
     grad.addColorStop(0, '#060c1a'); grad.addColorStop(0.5, '#060a14'); grad.addColorStop(1, '#040810');
@@ -839,7 +839,7 @@
 
   // ─── Sim Phase Rendering ──────────────────────────
   function renderSimPhase(simTime) {
-    const w = window.innerWidth, h = window.innerHeight;
+    const w = canvas.width / devicePixelRatio, h = canvas.height / devicePixelRatio;
     ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
     const grad = ctx.createLinearGradient(0, 0, 0, h);
     grad.addColorStop(0, '#060c1a'); grad.addColorStop(0.5, '#060a14'); grad.addColorStop(1, '#040810');
@@ -1061,27 +1061,28 @@
     const dispMuscles = Math.min(muscleCount, 10);
     const hiddenLayers = brain.layers.length - 2;
 
-    // ── Layout constants ──
-    const pad = 8;
-    const barH = 6, barGap = 1;
-    const catH = 11;   // category header height (px)
-    const secGap = 4;  // section gap
-    const labelW = 20; // px reserved left of each input bar for label
-    const inputBarW = 54;
+    // ── Layout constants (compact in brain-mode) ──
+    const compact = brainMode && !expandedSection;
+    const pad = compact ? 5 : 8;
+    const barH = compact ? 4 : 6, barGap = 1;
+    const catH = compact ? 8 : 11;
+    const secGap = compact ? 2 : 4;
+    const labelW = compact ? 16 : 20;
+    const inputBarW = compact ? 42 : 54;
     const colInputX = pad;
-    const colInputTotalW = labelW + inputBarW;  // 74px
+    const colInputTotalW = labelW + inputBarW;
     const inputBarX = colInputX + labelW;
 
     // ── Dynamic canvas height based on actual input count ──
-    const titleH   = 18;
+    const titleH   = compact ? 13 : 18;
     const velRows  = dispNodes;
     const musRows  = dispMuscles;
     const velH     = catH + velRows * (barH + barGap) + secGap;
     const musH     = catH + musRows * (barH + barGap) + secGap;
-    const gndH     = catH + 20 + secGap;
+    const gndH     = catH + (compact ? 14 : 20) + secGap;
     const rhtH     = catH + barH + pad;
     const neededH  = titleH + velH + musH + gndH + rhtH;
-    const canvasH  = Math.max(neededH, 200);
+    const canvasH  = Math.max(neededH, compact ? 120 : 200);
     if (!brainMode && Math.abs(nc.clientHeight - canvasH) > 2) nc.style.height = canvasH + 'px';
 
     const cw = nc.clientWidth, ch = nc.clientHeight;
@@ -1094,7 +1095,7 @@
     nCtx.fillStyle = 'rgba(4,6,10,0.92)'; nCtx.fillRect(0, 0, cw, ch);
 
     // ── Output column dimensions ──
-    const outLabelW = 20, outBarW = 56;
+    const outLabelW = compact ? 16 : 20, outBarW = compact ? 42 : 56;
     const colOutTotalW = outLabelW + outBarW;
     const colOutX  = cw - pad - colOutTotalW;
     const outBarX  = colOutX + outLabelW;
@@ -1148,7 +1149,7 @@
       inputEntries.push({ y: gndDotY, colorBase: 'rgba(99,210,255,', inputIndices: [inputIdx] });
       inputIdx++;
     }
-    iy += 20; iy += secGap;
+    iy += (compact ? 14 : 20); iy += secGap;
 
     // Rhythm
     iy += catH;
@@ -1310,17 +1311,19 @@
     }
 
     // ─── Title bar ───
-    nCtx.font = `bold 9px -apple-system,sans-serif`;
+    const titleFont = compact ? 7 : 9;
+    const subFont = compact ? 6 : 8;
+    nCtx.font = `bold ${titleFont}px -apple-system,sans-serif`;
     nCtx.fillStyle = '#63d2ff'; nCtx.textAlign = 'left'; nCtx.textBaseline = 'middle';
-    nCtx.fillText(`#${body.id}`, pad, 9);
+    nCtx.fillText(`#${body.id}`, pad, compact ? 6 : 9);
     nCtx.fillStyle = 'rgba(99,210,255,0.6)';
-    nCtx.font = `8px -apple-system,sans-serif`;
-    nCtx.fillText(`Fit:${Math.round(body.fitness || 0)}`, pad + 24, 9);
+    nCtx.font = `${subFont}px -apple-system,sans-serif`;
+    nCtx.fillText(`Fit:${Math.round(body.fitness || 0)}`, pad + 24, compact ? 6 : 9);
 
     // ─── Draw helpers ───
     function drawCatHeader(x, yy, text, color) {
       nCtx.fillStyle = color;
-      nCtx.font = `bold 8px -apple-system,sans-serif`;
+      nCtx.font = `bold ${compact ? 6 : 8}px -apple-system,sans-serif`;
       nCtx.textAlign = 'left'; nCtx.textBaseline = 'top';
       nCtx.fillText(text, x, yy);
       nCtx.textBaseline = 'middle';
@@ -1567,7 +1570,8 @@
     const dpr = window.devicePixelRatio || 1;
     const muscleCount = blueprint.muscles.length;
     const dispMuscles = Math.min(muscleCount, 10);
-    const pad = 10;
+    const aCompact = brainMode && !expandedSection;
+    const pad = aCompact ? 6 : 10;
 
     // ── Compute profile ──
     let profile;
@@ -1578,13 +1582,17 @@
     const narrative = generateStrategyNarrative(profile, body);
 
     // ── Canvas sizing ──
-    const radarH = 120;
-    const narrativeH = 14 * (narrative.length + 1) + 10;
-    const heatmapH = 16 + dispMuscles * 14 + 10;
-    const importanceH = CAT_DEFS.length * 18 + 20;
-    const trendH = strategyHistory.length > 1 ? 80 : 0;
-    const neededH = 22 + radarH + narrativeH + heatmapH + importanceH + trendH + 20;
-    const canvasH = Math.max(neededH, 380);
+    const radarH = aCompact ? 80 : 120;
+    const narrativeLineH = aCompact ? 10 : 14;
+    const maxNarrative = aCompact ? Math.min(narrative.length, 3) : narrative.length;
+    const narrativeH = narrativeLineH * (maxNarrative + 1) + (aCompact ? 4 : 10);
+    const heatmapRowH = aCompact ? 10 : 14;
+    const heatmapH = (aCompact ? 12 : 16) + dispMuscles * heatmapRowH + (aCompact ? 4 : 10);
+    const importBarH = aCompact ? 12 : 18;
+    const importanceH = CAT_DEFS.length * importBarH + (aCompact ? 10 : 20);
+    const trendH = strategyHistory.length > 1 ? (aCompact ? 50 : 80) : 0;
+    const neededH = (aCompact ? 16 : 22) + radarH + narrativeH + heatmapH + importanceH + trendH + (aCompact ? 8 : 20);
+    const canvasH = Math.max(neededH, aCompact ? 200 : 380);
     if (!brainMode && Math.abs(ac.clientHeight - canvasH) > 2) ac.style.height = canvasH + 'px';
 
     const cw = ac.clientWidth, ch = ac.clientHeight;
@@ -1597,20 +1605,22 @@
     ctx.fillStyle = 'rgba(4,6,10,0.92)'; ctx.fillRect(0, 0, cw, ch);
 
     // ── Title ──
-    ctx.font = 'bold 9px -apple-system,sans-serif';
+    const aTitleFontSz = aCompact ? 7 : 9;
+    const aSubFontSz = aCompact ? 6 : 8;
+    ctx.font = `bold ${aTitleFontSz}px -apple-system,sans-serif`;
     ctx.fillStyle = '#fbbf24'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.fillText(`#${body.id}  戦略: ${strategyType}`, pad, 11);
+    ctx.fillText(`#${body.id}  戦略: ${strategyType}`, pad, aCompact ? 8 : 11);
     ctx.fillStyle = 'rgba(251,191,36,0.5)';
-    ctx.font = '8px -apple-system,sans-serif';
-    ctx.fillText(`Fit: ${Math.round(body.fitness || 0)}`, cw - pad - 50, 11);
+    ctx.font = `${aSubFontSz}px -apple-system,sans-serif`;
+    ctx.fillText(`Fit: ${Math.round(body.fitness || 0)}`, cw - pad - 50, aCompact ? 8 : 11);
 
-    let y = 24;
+    let y = aCompact ? 16 : 24;
 
     // ══════════════════════════════════════════
     // 1. STRATEGY RADAR CHART
     // ══════════════════════════════════════════
     const rcx = cw / 2, rcy = y + radarH / 2;
-    const rMax = Math.min(radarH / 2 - 14, (cw / 2) - 40);
+    const rMax = Math.min(radarH / 2 - (aCompact ? 10 : 14), (cw / 2) - (aCompact ? 30 : 40));
     const nAxes = 4;
     const angles = CAT_DEFS.map((_, i) => -Math.PI / 2 + (Math.PI * 2 / nAxes) * i);
 
@@ -1629,12 +1639,12 @@
       ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.5;
       ctx.beginPath(); ctx.moveTo(rcx, rcy); ctx.lineTo(ax, ay); ctx.stroke();
       // Label
-      const lx = rcx + Math.cos(angles[i]) * (rMax + 12);
-      const ly = rcy + Math.sin(angles[i]) * (rMax + 10);
+      const lx = rcx + Math.cos(angles[i]) * (rMax + (aCompact ? 8 : 12));
+      const ly = rcy + Math.sin(angles[i]) * (rMax + (aCompact ? 6 : 10));
       ctx.fillStyle = CAT_DEFS[i].color;
-      ctx.font = 'bold 8px -apple-system,sans-serif';
+      ctx.font = `bold ${aCompact ? 6 : 8}px -apple-system,sans-serif`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(CAT_DEFS[i].emoji + CAT_DEFS[i].name, lx, ly);
+      ctx.fillText(aCompact ? CAT_DEFS[i].emoji : CAT_DEFS[i].emoji + CAT_DEFS[i].name, lx, ly);
     }
 
     // Filled polygon
@@ -1664,53 +1674,55 @@
       ctx.fillText(Math.round(normalized[i] * 100) + '%', px, py - 7);
     }
 
-    y += radarH + 6;
+    y += radarH + (aCompact ? 2 : 6);
 
     // ══════════════════════════════════════════
     // 2. STRATEGY NARRATIVE (なぜこの戦略？)
     // ══════════════════════════════════════════
     ctx.fillStyle = 'rgba(251,191,36,0.7)';
-    ctx.font = 'bold 8px -apple-system,sans-serif';
+    ctx.font = `bold ${aCompact ? 6 : 8}px -apple-system,sans-serif`;
     ctx.textAlign = 'left'; ctx.textBaseline = 'top';
     ctx.fillText('── なぜこの戦略？ ──', pad, y);
-    y += 13;
+    y += aCompact ? 9 : 13;
 
-    ctx.font = '8px -apple-system,sans-serif';
-    for (const line of narrative) {
+    ctx.font = `${aCompact ? 6 : 8}px -apple-system,sans-serif`;
+    const dispNarrative = aCompact ? narrative.slice(0, maxNarrative) : narrative;
+    const narCharLimit = aCompact ? 38 : 44;
+    for (const line of dispNarrative) {
       ctx.fillStyle = 'rgba(255,255,255,0.7)';
-      ctx.fillText(line.length > 44 ? line.slice(0, 44) + '…' : line, pad + 2, y);
-      y += 12;
+      ctx.fillText(line.length > narCharLimit ? line.slice(0, narCharLimit) + '…' : line, pad + 2, y);
+      y += aCompact ? 9 : 12;
     }
-    y += 6;
+    y += aCompact ? 2 : 6;
 
     // ══════════════════════════════════════════
     // 3. INPUT→OUTPUT HEATMAP (入出力影響マップ)
     // ══════════════════════════════════════════
     ctx.fillStyle = 'rgba(251,191,36,0.7)';
-    ctx.font = 'bold 8px -apple-system,sans-serif';
+    ctx.font = `bold ${aCompact ? 6 : 8}px -apple-system,sans-serif`;
     ctx.fillText('── 入出力影響マップ ──', pad, y);
-    y += 14;
+    y += aCompact ? 10 : 14;
 
-    const hmLeft = pad + 24;
+    const hmLeft = pad + (aCompact ? 18 : 24);
     const hmRight = cw - pad;
     const catColW = (hmRight - hmLeft) / CAT_DEFS.length;
-    const rowH = 12;
+    const rowH = aCompact ? 9 : 12;
 
     // Column headers
     for (let ci = 0; ci < CAT_DEFS.length; ci++) {
       const cx = hmLeft + catColW * ci + catColW / 2;
       ctx.fillStyle = CAT_DEFS[ci].color;
-      ctx.font = 'bold 7px -apple-system,sans-serif'; ctx.textAlign = 'center';
+      ctx.font = `bold ${aCompact ? 6 : 7}px -apple-system,sans-serif`; ctx.textAlign = 'center';
       ctx.fillText(CAT_DEFS[ci].emoji, cx, y - 2);
     }
-    y += 4;
+    y += aCompact ? 2 : 4;
 
     // Heatmap rows (one per muscle)
     const maxAttr = Math.max(...muscleAttr.flat(), 0.001);
     for (let mi = 0; mi < dispMuscles; mi++) {
       // Row label
       ctx.fillStyle = 'rgba(255,255,255,0.5)';
-      ctx.font = '7px -apple-system,sans-serif'; ctx.textAlign = 'right';
+      ctx.font = `${aCompact ? 5 : 7}px -apple-system,sans-serif`; ctx.textAlign = 'right';
       ctx.fillText(`M${mi}`, hmLeft - 4, y + rowH / 2);
 
       // Category cells
@@ -1731,62 +1743,62 @@
           // Percentage
           if (intensity > 0.15) {
             ctx.fillStyle = intensity > 0.5 ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.6)';
-            ctx.font = '6px -apple-system,sans-serif'; ctx.textAlign = 'center';
+            ctx.font = `${aCompact ? 5 : 6}px -apple-system,sans-serif`; ctx.textAlign = 'center';
             ctx.fillText(Math.round(intensity * 100), cellX + cellW / 2, y + rowH / 2);
           }
         }
       }
       y += rowH;
     }
-    y += 8;
+    y += aCompact ? 4 : 8;
 
     // ══════════════════════════════════════════
     // 4. INPUT IMPORTANCE RANKING (入力重要度)
     // ══════════════════════════════════════════
     ctx.fillStyle = 'rgba(251,191,36,0.7)';
-    ctx.font = 'bold 8px -apple-system,sans-serif'; ctx.textAlign = 'left';
+    ctx.font = `bold ${aCompact ? 6 : 8}px -apple-system,sans-serif`; ctx.textAlign = 'left';
     ctx.fillText('── 入力重要度ランキング ──', pad, y);
-    y += 14;
+    y += aCompact ? 10 : 14;
 
     const maxCatScore = Math.max(...catScores, 0.001);
     const sortedCats = catScores.map((v, i) => ({ i, v })).sort((a, b) => b.v - a.v);
-    const impBarLeft = pad + 50;
-    const impBarW = cw - impBarLeft - pad - 30;
+    const impBarLeft = pad + (aCompact ? 36 : 50);
+    const impBarW = cw - impBarLeft - pad - (aCompact ? 20 : 30);
 
     for (const { i: ci, v } of sortedCats) {
       const ratio = v / maxCatScore;
       // Label
       ctx.fillStyle = CAT_DEFS[ci].color;
-      ctx.font = '8px -apple-system,sans-serif'; ctx.textAlign = 'left';
-      ctx.fillText(CAT_DEFS[ci].emoji + ' ' + CAT_DEFS[ci].name, pad, y + 5);
+      ctx.font = `${aCompact ? 6 : 8}px -apple-system,sans-serif`; ctx.textAlign = 'left';
+      ctx.fillText(CAT_DEFS[ci].emoji + ' ' + CAT_DEFS[ci].name, pad, y + (aCompact ? 3 : 5));
       // Bar background
       ctx.fillStyle = 'rgba(255,255,255,0.06)';
-      ctx.fillRect(impBarLeft, y, impBarW, 10);
+      ctx.fillRect(impBarLeft, y, impBarW, aCompact ? 7 : 10);
       // Bar fill
       ctx.fillStyle = `${CAT_DEFS[ci].rgba}0.6)`;
-      ctx.fillRect(impBarLeft, y, impBarW * ratio, 10);
+      ctx.fillRect(impBarLeft, y, impBarW * ratio, aCompact ? 7 : 10);
       // Value
       ctx.fillStyle = 'rgba(255,255,255,0.5)';
-      ctx.font = '7px -apple-system,sans-serif'; ctx.textAlign = 'left';
-      ctx.fillText(Math.round(ratio * 100) + '%', impBarLeft + impBarW + 3, y + 6);
-      y += 16;
+      ctx.font = `${aCompact ? 5 : 7}px -apple-system,sans-serif`; ctx.textAlign = 'left';
+      ctx.fillText(Math.round(ratio * 100) + '%', impBarLeft + impBarW + 3, y + (aCompact ? 4 : 6));
+      y += aCompact ? 10 : 16;
     }
-    y += 6;
+    y += aCompact ? 2 : 6;
 
     // ══════════════════════════════════════════
     // 5. STRATEGY EVOLUTION TREND (戦略変遷)
     // ══════════════════════════════════════════
     if (strategyHistory.length > 1) {
       ctx.fillStyle = 'rgba(251,191,36,0.7)';
-      ctx.font = 'bold 8px -apple-system,sans-serif'; ctx.textAlign = 'left';
+      ctx.font = `bold ${aCompact ? 6 : 8}px -apple-system,sans-serif`; ctx.textAlign = 'left';
       ctx.fillText('── 戦略変遷 ──', pad, y);
-      y += 12;
+      y += aCompact ? 8 : 12;
 
       const trendLeft = pad + 8;
       const trendRight = cw - pad;
       const trendW = trendRight - trendLeft;
       const trendTop = y;
-      const trendBot = y + 50;
+      const trendBot = y + (aCompact ? 30 : 50);
 
       // Draw area chart showing category scores over generations
       const hist = strategyHistory;
@@ -2087,7 +2099,7 @@
     const target = population[focusedIndex]; if (!target) return;
     const wcx = target.getCenterX(), wcy = target.getCenterY();
     const screenCx = wcx * camZoom + camX, screenCy = wcy * camZoom + camY;
-    const sw = window.innerWidth, sh = window.innerHeight, margin = 0.3;
+    const sw = canvas.width / devicePixelRatio, sh = canvas.height / devicePixelRatio, margin = 0.3;
     if (screenCx < sw * margin || screenCx > sw * (1 - margin)) targetCamX = sw / 2 - wcx * targetCamZoom;
     if (screenCy < sh * margin || screenCy > sh * (1 - margin)) targetCamY = sh / 2 - wcy * targetCamZoom;
   }

@@ -280,12 +280,16 @@ html, body {
 #app.brain-mode #analysis-section { flex: 0 0 44%; border-top: 1px solid rgba(251,191,36,0.15); overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
 /* Section expand (individual full-screen) */
-#app.brain-mode.expand-neural #neural-section { flex: 1 1 100%; }
-#app.brain-mode.expand-neural #canvas-wrapper { display: none; }
+#app.brain-mode.expand-neural #neural-section { flex: 1 1 0; min-height: 0; }
+#app.brain-mode.expand-neural #canvas-wrapper { flex: 0 0 18%; max-height: 18%; }
 #app.brain-mode.expand-neural #analysis-section { display: none !important; }
-#app.brain-mode.expand-analysis #analysis-section { flex: 1 1 100%; }
-#app.brain-mode.expand-analysis #canvas-wrapper { display: none; }
+#app.brain-mode.expand-analysis #analysis-section { flex: 1 1 0; min-height: 0; }
+#app.brain-mode.expand-analysis #canvas-wrapper { flex: 0 0 18%; max-height: 18%; }
 #app.brain-mode.expand-analysis #neural-section { display: none !important; }
+#app.brain-mode.expand-neural #brain-info-overlay,
+#app.brain-mode.expand-analysis #brain-info-overlay { display: none !important; }
+#app.brain-mode.expand-neural #creature-label,
+#app.brain-mode.expand-analysis #creature-label { display: none !important; }
 
 .section-divider {
   display: flex; align-items: center; justify-content: space-between;
