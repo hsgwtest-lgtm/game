@@ -1,0 +1,14 @@
+{
+  "name": "SoftEvo4 — 思考が見える進化",
+  "short_name": "SoftEvo4",
+  "description": "脳の思考を可視化する軟体生物進化シミュレータ",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#060a14",
+  "theme_color": "#060a14",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
