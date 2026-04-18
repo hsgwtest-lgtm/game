@@ -2200,25 +2200,50 @@
   document.getElementById('toggle-labels').addEventListener('click', e => { showLabels = !showLabels; e.target.classList.toggle('active', showLabels); });
 
   // ── Brain Mode (vertical full-screen layout) ──
+  let expandedSection = null; // null | 'neural' | 'analysis'
+
   function activateBrainMode() {
     brainMode = true; showNeural = true; showAnalysis = true;
     document.getElementById('app').classList.add('brain-mode');
     document.getElementById('brain-bar').classList.remove('hidden');
     document.getElementById('toggle-brain').classList.add('active');
-    // Update creature label
+    // Sync camera buttons
+    document.querySelectorAll('.brain-cam').forEach(b => b.classList.toggle('active', b.dataset.cam === cameraMode));
     if (population.length > 0 && focusedIndex < population.length) {
       const b = population[focusedIndex];
       document.getElementById('creature-label-text').textContent = `▼ #${b.id} 観察中`;
     }
     document.getElementById('creature-label').classList.remove('hidden');
+    document.getElementById('brain-info-overlay').classList.remove('hidden');
     setTimeout(resizeCanvas, 0);
   }
   function deactivateBrainMode() {
     brainMode = false; showNeural = false; showAnalysis = false;
+    expandedSection = null;
     document.getElementById('app').classList.remove('brain-mode');
+    document.getElementById('app').classList.remove('expand-neural', 'expand-analysis');
     document.getElementById('brain-bar').classList.add('hidden');
     document.getElementById('creature-label').classList.add('hidden');
+    document.getElementById('brain-info-overlay').classList.add('hidden');
     document.getElementById('toggle-brain').classList.remove('active');
+    document.querySelectorAll('.section-expand').forEach(b => b.classList.remove('active'));
+    setTimeout(resizeCanvas, 0);
+  }
+  function toggleExpandSection(section) {
+    const app = document.getElementById('app');
+    if (expandedSection === section) {
+      // Collapse back to 3-pane
+      expandedSection = null;
+      app.classList.remove('expand-neural', 'expand-analysis');
+      document.querySelectorAll('.section-expand').forEach(b => b.classList.remove('active'));
+    } else {
+      expandedSection = section;
+      app.classList.remove('expand-neural', 'expand-analysis');
+      app.classList.add('expand-' + section);
+      document.querySelectorAll('.section-expand').forEach(b => {
+        b.classList.toggle('active', b.dataset.section === section);
+      });
+    }
     setTimeout(resizeCanvas, 0);
   }
   function updateBrainBar() {
@@ -2233,12 +2258,48 @@
     const bestEl = document.getElementById('best-info');
     if (genEl) document.getElementById('brain-gen').textContent = genEl.textContent;
     if (bestEl) document.getElementById('brain-best').textContent = bestEl.textContent;
+    // Update info overlay
+    updateBrainInfoOverlay(body);
+  }
+  function updateBrainInfoOverlay(body) {
+    const left = document.getElementById('brain-info-left');
+    const right = document.getElementById('brain-info-right');
+    if (!left || !right) return;
+    const fit = Math.round(body.fitness || 0);
+    const grnd = body.nodes.filter(n => n.grounded).length;
+    const muscAct = (body.totalMuscleOutput * 100).toFixed(0);
+    left.innerHTML = `N:${body.nodes.length} M:${body.muscles.length}<br>接地:${grnd} 筋活:${muscAct}%`;
+    // Strategy info if available
+    try {
+      const profile = computeStrategyProfile(body.brain);
+      right.innerHTML = `${profile.strategyType}<br>Fit:${fit}`;
+    } catch(e) {
+      right.innerHTML = `Fit:${fit}`;
+    }
   }
 
   document.getElementById('toggle-brain').addEventListener('click', () => {
     if (brainMode) deactivateBrainMode(); else activateBrainMode();
   });
   document.getElementById('close-brain-mode').addEventListener('click', deactivateBrainMode);
+
+  // Brain bar camera mode
+  document.querySelectorAll('.brain-cam').forEach(btn => {
+    btn.addEventListener('click', () => {
+      cameraMode = btn.dataset.cam;
+      document.querySelectorAll('.brain-cam').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      // Also sync main cam buttons
+      document.querySelectorAll('.cam-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.cam === cameraMode);
+      });
+    });
+  });
+
+  // Section expand buttons
+  document.querySelectorAll('.section-expand').forEach(btn => {
+    btn.addEventListener('click', () => toggleExpandSection(btn.dataset.section));
+  });
 
   // Brain bar speed controls
   document.getElementById('brain-pause').addEventListener('click', () => {
@@ -2276,6 +2337,8 @@
     btn.addEventListener('click', () => {
       document.querySelectorAll('.cam-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active'); cameraMode = btn.dataset.cam;
+      // Sync brain-bar cam buttons
+      document.querySelectorAll('.brain-cam').forEach(b => b.classList.toggle('active', b.dataset.cam === cameraMode));
     });
   });
 
