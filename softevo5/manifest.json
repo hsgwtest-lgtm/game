@@ -1,0 +1,14 @@
+{
+  "name": "SoftEvo5 — 統合脳解析進化シミュレータ",
+  "short_name": "SoftEvo5",
+  "description": "統合ニューラルUI付き軟体生物進化シミュレータ",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#060a14",
+  "theme_color": "#060a14",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
