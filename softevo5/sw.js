@@ -1,4 +1,4 @@
-const CACHE_NAME = 'softevo5-v6';
+const CACHE_NAME = 'softevo5-v7';
 const ASSETS = [
   './',
   './index.html',

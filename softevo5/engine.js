@@ -888,6 +888,38 @@
 
     ctx.restore();
 
+    // ── Brain mode: muscle activity mini-bars ──
+    if (brainMode && population.length > 0 && focusedIndex < population.length) {
+      const body = population[focusedIndex];
+      const w = canvas.width / devicePixelRatio, h = canvas.height / devicePixelRatio;
+      ctx.save();
+      ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+      const barW = 3, barMaxH = Math.min(20, h * 0.25), barGap = 2;
+      const totalW = body.muscles.length * (barW + barGap);
+      const startX = w - totalW - 4;
+      const baseY = h - 4;
+      // Background
+      ctx.fillStyle = 'rgba(4,6,10,0.6)';
+      ctx.fillRect(startX - 3, baseY - barMaxH - 10, totalW + 6, barMaxH + 14);
+      // Label
+      ctx.fillStyle = 'rgba(52,211,153,0.6)';
+      ctx.font = '5px -apple-system,sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+      ctx.fillText('筋肉活動', startX, baseY - barMaxH - 2);
+      for (let mi = 0; mi < body.muscles.length; mi++) {
+        const m = body.muscles[mi];
+        const act = Math.abs(m.currentOutput || 0);
+        const bh = act * barMaxH;
+        const x = startX + mi * (barW + barGap);
+        ctx.fillStyle = 'rgba(52,211,153,0.15)';
+        ctx.fillRect(x, baseY - barMaxH, barW, barMaxH);
+        const alpha = 0.4 + act * 0.6;
+        ctx.fillStyle = `rgba(52,211,153,${alpha})`;
+        ctx.fillRect(x, baseY - bh, barW, bh);
+      }
+      ctx.restore();
+    }
+
     // Cursor overlay for brush tools
     if (cursorVisible && (currentTool === 'block' || currentTool === 'erase')) {
       const radiusScreen = BRUSH_SIZE * COF.cellSize * camZoom;
@@ -1628,11 +1660,24 @@
       // ═══════════════════════════════════════
       // COMPACT 2-COLUMN LAYOUT
       // Left:  Radar → Heatmap
-      // Right: Narrative → Importance → Trend
+      // Right: Narrative (flex) → Importance (fixed) → Trend (fixed at bottom)
       // ═══════════════════════════════════════
       const halfW = Math.floor(cw / 2);
       const colL = pad, colR = halfW + 4;
       const rightW = cw - colR - pad;
+      const contentBottom = ch - 4; // canvas bottom with small margin
+
+      // ── Pre-calculate fixed-height right column items (bottom-up) ──
+      const trendChartH = 30;
+      const trendTotalH = strategyHistory.length > 1 ? (9 + trendChartH + 10) : 0; // header + chart + labels
+      const impRowH = 10;
+      const impTotalH = 10 + CAT_DEFS.length * impRowH + 4; // header + rows + gap
+
+      // Right column fixed zone starts at:
+      const fixedZoneH = impTotalH + trendTotalH;
+      const fixedZoneTop = contentBottom - fixedZoneH;
+      // Narrative fills from y to fixedZoneTop
+      const narrativeZoneH = fixedZoneTop - y - 4;
 
       // ════════ LEFT COLUMN ════════
       let ly = y;
@@ -1723,29 +1768,28 @@
         }
         ly += rowH2;
       }
-      const leftBottom = ly;
 
       // ════════ RIGHT COLUMN ════════
-      let ry = y;
 
-      // ── Narrative ──
+      // ── Narrative (fills top area) ──
+      let ry = y;
       ctx.fillStyle = 'rgba(251,191,36,0.7)';
       ctx.font = 'bold 7px -apple-system,sans-serif';
       ctx.textAlign = 'left'; ctx.textBaseline = 'top';
       ctx.fillText('── なぜこの戦略？ ──', colR, ry);
       ry += 10;
       ctx.font = '7px -apple-system,sans-serif';
-      const maxNarLines = Math.min(narrative.length, 4);
       const maxCh = Math.floor(rightW / 4.2);
+      const maxNarLines = Math.max(1, Math.min(narrative.length, Math.floor((narrativeZoneH - 10) / 10)));
       for (let li = 0; li < maxNarLines; li++) {
         ctx.fillStyle = 'rgba(255,255,255,0.7)';
         const txt = narrative[li].length > maxCh ? narrative[li].slice(0, maxCh) + '…' : narrative[li];
         ctx.fillText(txt, colR, ry);
         ry += 10;
       }
-      ry += 4;
 
-      // ── Importance ranking (no legend) ──
+      // ── Importance ranking (fixed position above trend) ──
+      ry = fixedZoneTop;
       ctx.fillStyle = 'rgba(251,191,36,0.7)';
       ctx.font = 'bold 7px -apple-system,sans-serif'; ctx.textBaseline = 'top';
       ctx.fillText('── 入力重要度 ──', colR, ry);
@@ -1766,11 +1810,11 @@
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
         ctx.font = '5px -apple-system,sans-serif'; ctx.textAlign = 'left';
         ctx.fillText(Math.round(ratio * 100) + '%', impBarLeft2 + impBarW2 + 2, ry + 4);
-        ry += 10;
+        ry += impRowH;
       }
       ry += 4;
 
-      // ── Strategy trend (right, compact) ──
+      // ── Strategy trend (fixed at bottom) ──
       if (strategyHistory.length > 1) {
         ctx.fillStyle = 'rgba(251,191,36,0.7)';
         ctx.font = 'bold 7px -apple-system,sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
@@ -1780,7 +1824,7 @@
         const trendRight = cw - pad;
         const trendW = trendRight - trendLeft;
         const trendTop = ry;
-        const trendBot = ry + 30;
+        const trendBot = ry + trendChartH;
         const hist = strategyHistory;
         const len = hist.length;
         for (let ci = 0; ci < CAT_DEFS.length; ci++) {
@@ -1812,14 +1856,13 @@
         ctx.fillText(`世代${hist[0].gen}`, trendLeft, trendBot + 3);
         ctx.textAlign = 'right';
         ctx.fillText(`世代${hist[len - 1].gen}`, trendRight, trendBot + 3);
-        ry = trendBot + 10;
       }
-      const rightBottom = ry;
 
-      // ── Bottom alignment line ──
-      const bottomY = Math.max(leftBottom, rightBottom);
+      // ── Left-right bottom alignment line ──
       ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 0.5;
-      ctx.beginPath(); ctx.moveTo(pad, bottomY + 2); ctx.lineTo(cw - pad, bottomY + 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(pad, contentBottom); ctx.lineTo(cw - pad, contentBottom); ctx.stroke();
+      // Vertical separator
+      ctx.beginPath(); ctx.moveTo(halfW, y); ctx.lineTo(halfW, contentBottom); ctx.stroke();
 
     } else {
 
@@ -2438,13 +2481,19 @@
     const fit = Math.round(body.fitness || 0);
     const grnd = body.nodes.filter(n => n.grounded).length;
     const muscAct = (body.totalMuscleOutput * 100).toFixed(0);
-    left.innerHTML = `N:${body.nodes.length} M:${body.muscles.length}<br>接地:${grnd} 筋活:${muscAct}%`;
-    // Strategy info if available
+    // Speed: average velocity magnitude
+    let avgSpd = 0;
+    for (const n of body.nodes) {
+      avgSpd += Math.sqrt(n.vx * n.vx + n.vy * n.vy);
+    }
+    avgSpd = (avgSpd / Math.max(1, body.nodes.length)).toFixed(1);
+    left.innerHTML = `N:${body.nodes.length} M:${body.muscles.length}<br>接地:${grnd} 筋活:${muscAct}%<br>速度:${avgSpd}`;
+    // Strategy info
     try {
       const profile = computeStrategyProfile(body.brain);
-      right.innerHTML = `${profile.strategyType}<br>Fit:${fit}`;
+      right.innerHTML = `${profile.strategyType}<br>Fit:${fit}<br>世代:${generation}`;
     } catch(e) {
-      right.innerHTML = `Fit:${fit}`;
+      right.innerHTML = `Fit:${fit}<br>世代:${generation}`;
     }
   }
 
