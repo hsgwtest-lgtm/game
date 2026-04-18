@@ -1590,9 +1590,17 @@
     const heatmapH = (aCompact ? 12 : 16) + dispMuscles * heatmapRowH + (aCompact ? 4 : 10);
     const importBarH = aCompact ? 12 : 18;
     const importanceH = CAT_DEFS.length * importBarH + (aCompact ? 10 : 20);
-    const trendH = strategyHistory.length > 1 ? (aCompact ? 50 : 80) : 0;
-    const neededH = (aCompact ? 16 : 22) + radarH + narrativeH + heatmapH + importanceH + trendH + (aCompact ? 8 : 20);
-    const canvasH = Math.max(neededH, aCompact ? 200 : 380);
+    const trendH = !aCompact && strategyHistory.length > 1 ? 80 : 0;
+    let neededH;
+    if (aCompact) {
+      // 2-column layout: row1 = max(radar, narrative), row2 = max(importance, heatmap) + legend
+      const row1H = Math.max(radarH, narrativeH) + 4;
+      const row2H = Math.max(importanceH, heatmapH) + 4;
+      neededH = 16 + row1H + row2H + 16;
+    } else {
+      neededH = 22 + radarH + narrativeH + heatmapH + importanceH + trendH + 20;
+    }
+    const canvasH = Math.max(neededH, aCompact ? 180 : 380);
     if (!brainMode && Math.abs(ac.clientHeight - canvasH) > 2) ac.style.height = canvasH + 'px';
 
     const cw = ac.clientWidth, ch = ac.clientHeight;
@@ -1616,38 +1624,195 @@
 
     let y = aCompact ? 16 : 24;
 
+    if (aCompact) {
+      // ═══════════════════════════════════════
+      // COMPACT 2-COLUMN LAYOUT
+      // ═══════════════════════════════════════
+      const halfW = Math.floor(cw / 2);
+      const colL = pad, colR = halfW + 2;
+
+      // ── ROW 1: Radar (left) + Narrative (right) ──
+      const row1Y = y;
+
+      // Radar chart (left half)
+      const rcx = halfW / 2, rcy = row1Y + radarH / 2;
+      const rMax = Math.min(radarH / 2 - 10, halfW / 2 - 20);
+      const nAxes = 4;
+      const angles = CAT_DEFS.map((_, i) => -Math.PI / 2 + (Math.PI * 2 / nAxes) * i);
+      for (let ring = 1; ring <= 3; ring++) {
+        const r = rMax * ring / 3;
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 0.5;
+        ctx.beginPath(); ctx.arc(rcx, rcy, r, 0, Math.PI * 2); ctx.stroke();
+      }
+      for (let i = 0; i < nAxes; i++) {
+        const ax = rcx + Math.cos(angles[i]) * rMax;
+        const ay = rcy + Math.sin(angles[i]) * rMax;
+        ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.5;
+        ctx.beginPath(); ctx.moveTo(rcx, rcy); ctx.lineTo(ax, ay); ctx.stroke();
+        const lx = rcx + Math.cos(angles[i]) * (rMax + 8);
+        const ly = rcy + Math.sin(angles[i]) * (rMax + 6);
+        ctx.fillStyle = CAT_DEFS[i].color;
+        ctx.font = 'bold 6px -apple-system,sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(CAT_DEFS[i].emoji + CAT_DEFS[i].name, lx, ly);
+      }
+      ctx.beginPath();
+      for (let i = 0; i < nAxes; i++) {
+        const r = rMax * Math.min(1, normalized[i]);
+        const px = rcx + Math.cos(angles[i]) * r;
+        const py = rcy + Math.sin(angles[i]) * r;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fillStyle = `${CAT_DEFS[dominantIdx].rgba}0.15)`;
+      ctx.fill();
+      ctx.strokeStyle = `${CAT_DEFS[dominantIdx].rgba}0.7)`;
+      ctx.lineWidth = 1.5; ctx.stroke();
+      for (let i = 0; i < nAxes; i++) {
+        const r = rMax * Math.min(1, normalized[i]);
+        const px = rcx + Math.cos(angles[i]) * r;
+        const py = rcy + Math.sin(angles[i]) * r;
+        ctx.fillStyle = CAT_DEFS[i].color;
+        ctx.beginPath(); ctx.arc(px, py, 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.font = '6px -apple-system,sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText(Math.round(normalized[i] * 100) + '%', px, py - 6);
+      }
+
+      // Narrative (right half)
+      let ny = row1Y;
+      ctx.fillStyle = 'rgba(251,191,36,0.7)';
+      ctx.font = 'bold 7px -apple-system,sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.fillText('── なぜこの戦略？ ──', colR, ny);
+      ny += 10;
+      ctx.font = '7px -apple-system,sans-serif';
+      const narW = halfW - pad - 4;
+      for (let li = 0; li < Math.min(narrative.length, 6); li++) {
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        const maxCh = Math.floor(narW / 4.2);
+        const txt = narrative[li].length > maxCh ? narrative[li].slice(0, maxCh) + '…' : narrative[li];
+        ctx.fillText(txt, colR, ny);
+        ny += 10;
+      }
+
+      y = row1Y + radarH + 4;
+
+      // ── Separator ──
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 0.5;
+      ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(cw - pad, y); ctx.stroke();
+      y += 4;
+
+      // ── ROW 2: Importance (left) + Heatmap (right) ──
+      const row2Y = y;
+
+      // Importance ranking (left half)
+      let iy2 = row2Y;
+      ctx.fillStyle = 'rgba(251,191,36,0.7)';
+      ctx.font = 'bold 7px -apple-system,sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.fillText('── 入力重要度 ──', colL, iy2);
+      iy2 += 10;
+      const maxCatScore = Math.max(...catScores, 0.001);
+      const sortedCats = catScores.map((v, i) => ({ i, v })).sort((a, b) => b.v - a.v);
+      const impBarLeft2 = colL + 34;
+      const impBarW2 = halfW - impBarLeft2 - 24;
+      for (const { i: ci, v } of sortedCats) {
+        const ratio = v / maxCatScore;
+        ctx.fillStyle = CAT_DEFS[ci].color;
+        ctx.font = '6px -apple-system,sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ctx.fillText(CAT_DEFS[ci].emoji + ' ' + CAT_DEFS[ci].name, colL, iy2 + 4);
+        ctx.fillStyle = 'rgba(255,255,255,0.06)';
+        ctx.fillRect(impBarLeft2, iy2, impBarW2, 7);
+        ctx.fillStyle = `${CAT_DEFS[ci].rgba}0.6)`;
+        ctx.fillRect(impBarLeft2, iy2, impBarW2 * ratio, 7);
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.font = '5px -apple-system,sans-serif'; ctx.textAlign = 'left';
+        ctx.fillText(Math.round(ratio * 100) + '%', impBarLeft2 + impBarW2 + 2, iy2 + 4);
+        iy2 += 10;
+      }
+
+      // Heatmap (right half)
+      let hy = row2Y;
+      ctx.fillStyle = 'rgba(251,191,36,0.7)';
+      ctx.font = 'bold 7px -apple-system,sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.fillText('── 入出力影響マップ ──', colR, hy);
+      hy += 10;
+      const hmLeft2 = colR + 16;
+      const hmRight2 = cw - pad;
+      const catColW2 = (hmRight2 - hmLeft2) / CAT_DEFS.length;
+      const rowH2 = 9;
+      // Column headers
+      for (let ci = 0; ci < CAT_DEFS.length; ci++) {
+        const cx = hmLeft2 + catColW2 * ci + catColW2 / 2;
+        ctx.fillStyle = CAT_DEFS[ci].color;
+        ctx.font = 'bold 6px -apple-system,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(CAT_DEFS[ci].emoji, cx, hy + 2);
+      }
+      hy += 6;
+      const maxAttr = Math.max(...muscleAttr.flat(), 0.001);
+      for (let mi = 0; mi < dispMuscles; mi++) {
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.font = '5px -apple-system,sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+        ctx.fillText(`M${mi}`, hmLeft2 - 3, hy + rowH2 / 2);
+        for (let ci = 0; ci < CAT_DEFS.length; ci++) {
+          const cellX = hmLeft2 + catColW2 * ci + 1;
+          const cellW = catColW2 - 2;
+          const intensity = muscleAttr[mi][ci] / maxAttr;
+          ctx.fillStyle = 'rgba(255,255,255,0.04)';
+          ctx.fillRect(cellX, hy, cellW, rowH2 - 1);
+          if (intensity > 0.02) {
+            const alpha = Math.min(0.8, intensity * 0.9);
+            ctx.fillStyle = `${CAT_DEFS[ci].rgba}${alpha})`;
+            ctx.fillRect(cellX, hy, cellW, rowH2 - 1);
+            if (intensity > 0.15) {
+              ctx.fillStyle = intensity > 0.5 ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.6)';
+              ctx.font = '5px -apple-system,sans-serif'; ctx.textAlign = 'center';
+              ctx.fillText(Math.round(intensity * 100), cellX + cellW / 2, hy + rowH2 / 2);
+            }
+          }
+        }
+        hy += rowH2;
+      }
+
+      y = Math.max(iy2, hy) + 4;
+
+      // ── Mini Legend ──
+      ctx.font = '5px -apple-system,sans-serif'; ctx.textBaseline = 'middle';
+      let lx = pad;
+      for (const cat of CAT_DEFS) {
+        ctx.fillStyle = cat.color; ctx.fillRect(lx, y, 4, 3);
+        ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.textAlign = 'left';
+        ctx.fillText(cat.name, lx + 6, y + 2); lx += 36;
+      }
+
+    } else {
+
     // ══════════════════════════════════════════
+    // NON-COMPACT (single column) LAYOUT
+    // ══════════════════════════════════════════
+
     // 1. STRATEGY RADAR CHART
-    // ══════════════════════════════════════════
     const rcx = cw / 2, rcy = y + radarH / 2;
-    const rMax = Math.min(radarH / 2 - (aCompact ? 10 : 14), (cw / 2) - (aCompact ? 30 : 40));
+    const rMax = Math.min(radarH / 2 - 14, (cw / 2) - 40);
     const nAxes = 4;
     const angles = CAT_DEFS.map((_, i) => -Math.PI / 2 + (Math.PI * 2 / nAxes) * i);
-
-    // Grid circles
     for (let ring = 1; ring <= 3; ring++) {
       const r = rMax * ring / 3;
-      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-      ctx.lineWidth = 0.5;
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 0.5;
       ctx.beginPath(); ctx.arc(rcx, rcy, r, 0, Math.PI * 2); ctx.stroke();
     }
-
-    // Axes + labels
     for (let i = 0; i < nAxes; i++) {
       const ax = rcx + Math.cos(angles[i]) * rMax;
       const ay = rcy + Math.sin(angles[i]) * rMax;
       ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.5;
       ctx.beginPath(); ctx.moveTo(rcx, rcy); ctx.lineTo(ax, ay); ctx.stroke();
-      // Label
-      const lx = rcx + Math.cos(angles[i]) * (rMax + (aCompact ? 8 : 12));
-      const ly = rcy + Math.sin(angles[i]) * (rMax + (aCompact ? 6 : 10));
+      const lx = rcx + Math.cos(angles[i]) * (rMax + 12);
+      const ly = rcy + Math.sin(angles[i]) * (rMax + 10);
       ctx.fillStyle = CAT_DEFS[i].color;
-      ctx.font = `bold ${aCompact ? 6 : 8}px -apple-system,sans-serif`;
+      ctx.font = 'bold 8px -apple-system,sans-serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(aCompact ? CAT_DEFS[i].emoji : CAT_DEFS[i].emoji + CAT_DEFS[i].name, lx, ly);
+      ctx.fillText(CAT_DEFS[i].emoji + CAT_DEFS[i].name, lx, ly);
     }
-
-    // Filled polygon
     ctx.beginPath();
     for (let i = 0; i < nAxes; i++) {
       const r = rMax * Math.min(1, normalized[i]);
@@ -1660,151 +1825,112 @@
     ctx.fill();
     ctx.strokeStyle = `${CAT_DEFS[dominantIdx].rgba}0.7)`;
     ctx.lineWidth = 1.5; ctx.stroke();
-
-    // Data points
     for (let i = 0; i < nAxes; i++) {
       const r = rMax * Math.min(1, normalized[i]);
       const px = rcx + Math.cos(angles[i]) * r;
       const py = rcy + Math.sin(angles[i]) * r;
       ctx.fillStyle = CAT_DEFS[i].color;
       ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI * 2); ctx.fill();
-      // Value text
       ctx.fillStyle = 'rgba(255,255,255,0.5)';
       ctx.font = '7px -apple-system,sans-serif'; ctx.textAlign = 'center';
       ctx.fillText(Math.round(normalized[i] * 100) + '%', px, py - 7);
     }
+    y += radarH + 6;
 
-    y += radarH + (aCompact ? 2 : 6);
-
-    // ══════════════════════════════════════════
-    // 2. STRATEGY NARRATIVE (なぜこの戦略？)
-    // ══════════════════════════════════════════
+    // 2. STRATEGY NARRATIVE
     ctx.fillStyle = 'rgba(251,191,36,0.7)';
-    ctx.font = `bold ${aCompact ? 6 : 8}px -apple-system,sans-serif`;
+    ctx.font = 'bold 8px -apple-system,sans-serif';
     ctx.textAlign = 'left'; ctx.textBaseline = 'top';
     ctx.fillText('── なぜこの戦略？ ──', pad, y);
-    y += aCompact ? 9 : 13;
-
-    ctx.font = `${aCompact ? 6 : 8}px -apple-system,sans-serif`;
-    const dispNarrative = aCompact ? narrative.slice(0, maxNarrative) : narrative;
-    const narCharLimit = aCompact ? 38 : 44;
-    for (const line of dispNarrative) {
+    y += 13;
+    ctx.font = '8px -apple-system,sans-serif';
+    for (const line of narrative) {
       ctx.fillStyle = 'rgba(255,255,255,0.7)';
-      ctx.fillText(line.length > narCharLimit ? line.slice(0, narCharLimit) + '…' : line, pad + 2, y);
-      y += aCompact ? 9 : 12;
+      ctx.fillText(line.length > 44 ? line.slice(0, 44) + '…' : line, pad + 2, y);
+      y += 12;
     }
-    y += aCompact ? 2 : 6;
+    y += 6;
 
-    // ══════════════════════════════════════════
-    // 3. INPUT→OUTPUT HEATMAP (入出力影響マップ)
-    // ══════════════════════════════════════════
+    // 3. INPUT→OUTPUT HEATMAP
     ctx.fillStyle = 'rgba(251,191,36,0.7)';
-    ctx.font = `bold ${aCompact ? 6 : 8}px -apple-system,sans-serif`;
+    ctx.font = 'bold 8px -apple-system,sans-serif';
     ctx.fillText('── 入出力影響マップ ──', pad, y);
-    y += aCompact ? 10 : 14;
-
-    const hmLeft = pad + (aCompact ? 18 : 24);
+    y += 14;
+    const hmLeft = pad + 24;
     const hmRight = cw - pad;
     const catColW = (hmRight - hmLeft) / CAT_DEFS.length;
-    const rowH = aCompact ? 9 : 12;
-
-    // Column headers
+    const rowH = 12;
     for (let ci = 0; ci < CAT_DEFS.length; ci++) {
       const cx = hmLeft + catColW * ci + catColW / 2;
       ctx.fillStyle = CAT_DEFS[ci].color;
-      ctx.font = `bold ${aCompact ? 6 : 7}px -apple-system,sans-serif`; ctx.textAlign = 'center';
+      ctx.font = 'bold 7px -apple-system,sans-serif'; ctx.textAlign = 'center';
       ctx.fillText(CAT_DEFS[ci].emoji, cx, y - 2);
     }
-    y += aCompact ? 2 : 4;
-
-    // Heatmap rows (one per muscle)
+    y += 4;
     const maxAttr = Math.max(...muscleAttr.flat(), 0.001);
     for (let mi = 0; mi < dispMuscles; mi++) {
-      // Row label
       ctx.fillStyle = 'rgba(255,255,255,0.5)';
-      ctx.font = `${aCompact ? 5 : 7}px -apple-system,sans-serif`; ctx.textAlign = 'right';
+      ctx.font = '7px -apple-system,sans-serif'; ctx.textAlign = 'right';
       ctx.fillText(`M${mi}`, hmLeft - 4, y + rowH / 2);
-
-      // Category cells
       for (let ci = 0; ci < CAT_DEFS.length; ci++) {
         const cellX = hmLeft + catColW * ci + 1;
         const cellW = catColW - 2;
         const intensity = muscleAttr[mi][ci] / maxAttr;
-
-        // Background
         ctx.fillStyle = 'rgba(255,255,255,0.04)';
         ctx.fillRect(cellX, y, cellW, rowH - 1);
-
-        // Fill
         if (intensity > 0.02) {
           const alpha = Math.min(0.8, intensity * 0.9);
           ctx.fillStyle = `${CAT_DEFS[ci].rgba}${alpha})`;
           ctx.fillRect(cellX, y, cellW, rowH - 1);
-          // Percentage
           if (intensity > 0.15) {
             ctx.fillStyle = intensity > 0.5 ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.6)';
-            ctx.font = `${aCompact ? 5 : 6}px -apple-system,sans-serif`; ctx.textAlign = 'center';
+            ctx.font = '6px -apple-system,sans-serif'; ctx.textAlign = 'center';
             ctx.fillText(Math.round(intensity * 100), cellX + cellW / 2, y + rowH / 2);
           }
         }
       }
       y += rowH;
     }
-    y += aCompact ? 4 : 8;
+    y += 8;
 
-    // ══════════════════════════════════════════
-    // 4. INPUT IMPORTANCE RANKING (入力重要度)
-    // ══════════════════════════════════════════
+    // 4. INPUT IMPORTANCE RANKING
     ctx.fillStyle = 'rgba(251,191,36,0.7)';
-    ctx.font = `bold ${aCompact ? 6 : 8}px -apple-system,sans-serif`; ctx.textAlign = 'left';
+    ctx.font = 'bold 8px -apple-system,sans-serif'; ctx.textAlign = 'left';
     ctx.fillText('── 入力重要度ランキング ──', pad, y);
-    y += aCompact ? 10 : 14;
-
+    y += 14;
     const maxCatScore = Math.max(...catScores, 0.001);
     const sortedCats = catScores.map((v, i) => ({ i, v })).sort((a, b) => b.v - a.v);
-    const impBarLeft = pad + (aCompact ? 36 : 50);
-    const impBarW = cw - impBarLeft - pad - (aCompact ? 20 : 30);
-
+    const impBarLeft = pad + 50;
+    const impBarW = cw - impBarLeft - pad - 30;
     for (const { i: ci, v } of sortedCats) {
       const ratio = v / maxCatScore;
-      // Label
       ctx.fillStyle = CAT_DEFS[ci].color;
-      ctx.font = `${aCompact ? 6 : 8}px -apple-system,sans-serif`; ctx.textAlign = 'left';
-      ctx.fillText(CAT_DEFS[ci].emoji + ' ' + CAT_DEFS[ci].name, pad, y + (aCompact ? 3 : 5));
-      // Bar background
+      ctx.font = '8px -apple-system,sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText(CAT_DEFS[ci].emoji + ' ' + CAT_DEFS[ci].name, pad, y + 5);
       ctx.fillStyle = 'rgba(255,255,255,0.06)';
-      ctx.fillRect(impBarLeft, y, impBarW, aCompact ? 7 : 10);
-      // Bar fill
+      ctx.fillRect(impBarLeft, y, impBarW, 10);
       ctx.fillStyle = `${CAT_DEFS[ci].rgba}0.6)`;
-      ctx.fillRect(impBarLeft, y, impBarW * ratio, aCompact ? 7 : 10);
-      // Value
+      ctx.fillRect(impBarLeft, y, impBarW * ratio, 10);
       ctx.fillStyle = 'rgba(255,255,255,0.5)';
-      ctx.font = `${aCompact ? 5 : 7}px -apple-system,sans-serif`; ctx.textAlign = 'left';
-      ctx.fillText(Math.round(ratio * 100) + '%', impBarLeft + impBarW + 3, y + (aCompact ? 4 : 6));
-      y += aCompact ? 10 : 16;
+      ctx.font = '7px -apple-system,sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText(Math.round(ratio * 100) + '%', impBarLeft + impBarW + 3, y + 6);
+      y += 16;
     }
-    y += aCompact ? 2 : 6;
+    y += 6;
 
-    // ══════════════════════════════════════════
-    // 5. STRATEGY EVOLUTION TREND (戦略変遷)
-    // ══════════════════════════════════════════
+    // 5. STRATEGY EVOLUTION TREND
     if (strategyHistory.length > 1) {
       ctx.fillStyle = 'rgba(251,191,36,0.7)';
-      ctx.font = `bold ${aCompact ? 6 : 8}px -apple-system,sans-serif`; ctx.textAlign = 'left';
+      ctx.font = 'bold 8px -apple-system,sans-serif'; ctx.textAlign = 'left';
       ctx.fillText('── 戦略変遷 ──', pad, y);
-      y += aCompact ? 8 : 12;
-
+      y += 12;
       const trendLeft = pad + 8;
       const trendRight = cw - pad;
       const trendW = trendRight - trendLeft;
       const trendTop = y;
-      const trendBot = y + (aCompact ? 30 : 50);
-
-      // Draw area chart showing category scores over generations
+      const trendBot = y + 50;
       const hist = strategyHistory;
       const len = hist.length;
-
-      // Normalize each generation's scores to sum to 1 (stacked area)
       for (let ci = 0; ci < CAT_DEFS.length; ci++) {
         ctx.beginPath();
         for (let gi = 0; gi < len; gi++) {
@@ -1816,7 +1942,6 @@
           const py = trendBot - (trendBot - trendTop) * cumRatio;
           if (gi === 0) ctx.moveTo(x, py); else ctx.lineTo(x, py);
         }
-        // Close bottom
         for (let gi = len - 1; gi >= 0; gi--) {
           const x = trendLeft + (gi / Math.max(1, len - 1)) * trendW;
           const scores = hist[gi].catScores;
@@ -1830,20 +1955,15 @@
         ctx.fillStyle = `${CAT_DEFS[ci].rgba}0.35)`;
         ctx.fill();
       }
-
-      // Axis labels
       ctx.fillStyle = 'rgba(255,255,255,0.3)';
       ctx.font = '6px -apple-system,sans-serif'; ctx.textAlign = 'left';
       ctx.fillText(`世代${hist[0].gen}`, trendLeft, trendBot + 8);
       ctx.textAlign = 'right';
       ctx.fillText(`世代${hist[len - 1].gen}`, trendRight, trendBot + 8);
-
       y = trendBot + 16;
     }
 
-    // ══════════════════════════════════════════
     // 6. MINI LEGEND
-    // ══════════════════════════════════════════
     ctx.font = '6px -apple-system,sans-serif'; ctx.textBaseline = 'middle';
     let lx = pad;
     for (const cat of CAT_DEFS) {
@@ -1851,6 +1971,8 @@
       ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.textAlign = 'left';
       ctx.fillText(cat.name, lx + 7, y + 2); lx += 40;
     }
+
+    } // end if/else aCompact
   }
 
   function renderGraph() {
@@ -2314,30 +2436,20 @@
   });
 
   // Brain bar speed controls
-  document.getElementById('brain-pause').addEventListener('click', () => {
-    isPaused = true; simSpeed = 0;
+  function syncBrainSpeed(speed, paused, activeBrainId) {
+    isPaused = paused; simSpeed = speed;
     document.querySelectorAll('.brain-ctrl').forEach(b => b.classList.remove('active'));
-    document.getElementById('brain-pause').classList.add('active');
-    document.getElementById('btn-pause').classList.add('active');
-    document.getElementById('btn-play').classList.remove('active');
-    document.getElementById('btn-fast').classList.remove('active');
-  });
-  document.getElementById('brain-play').addEventListener('click', () => {
-    isPaused = false; simSpeed = 1;
-    document.querySelectorAll('.brain-ctrl').forEach(b => b.classList.remove('active'));
-    document.getElementById('brain-play').classList.add('active');
-    document.getElementById('btn-play').classList.add('active');
-    document.getElementById('btn-pause').classList.remove('active');
-    document.getElementById('btn-fast').classList.remove('active');
-  });
-  document.getElementById('brain-fast').addEventListener('click', () => {
-    isPaused = false; simSpeed = 4;
-    document.querySelectorAll('.brain-ctrl').forEach(b => b.classList.remove('active'));
-    document.getElementById('brain-fast').classList.add('active');
-    document.getElementById('btn-fast').classList.add('active');
-    document.getElementById('btn-pause').classList.remove('active');
-    document.getElementById('btn-play').classList.remove('active');
-  });
+    document.getElementById(activeBrainId).classList.add('active');
+    document.querySelectorAll('#speed-control button').forEach(b => b.classList.remove('active'));
+    if (paused) document.getElementById('btn-pause').classList.add('active');
+    else if (speed <= 0.25) document.getElementById('btn-slow').classList.add('active');
+    else if (speed >= 3) document.getElementById('btn-fast').classList.add('active');
+    else document.getElementById('btn-play').classList.add('active');
+  }
+  document.getElementById('brain-pause').addEventListener('click', () => syncBrainSpeed(0, true, 'brain-pause'));
+  document.getElementById('brain-slow').addEventListener('click', () => syncBrainSpeed(0.25, false, 'brain-slow'));
+  document.getElementById('brain-play').addEventListener('click', () => syncBrainSpeed(1, false, 'brain-play'));
+  document.getElementById('brain-fast').addEventListener('click', () => syncBrainSpeed(4, false, 'brain-fast'));
 
   document.getElementById('close-graph').addEventListener('click', () => {
     showGraph = false; document.getElementById('toggle-graph').classList.remove('active');
