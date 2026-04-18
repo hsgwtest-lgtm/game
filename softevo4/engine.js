@@ -550,19 +550,6 @@
     if (tickerCooldown > 0) { tickerCooldown--; return; }
     if (population.length === 0) return;
 
-    // Check for new movement patterns
-    for (let i = 0; i < population.length; i++) {
-      const body = population[i];
-      const key = `pattern_${body.id}`;
-      if (!patternDetectionCounters[key]) patternDetectionCounters[key] = 0;
-      if (body.movementPattern > patternDetectionCounters[key] + 10) {
-        patternDetectionCounters[key] = body.movementPattern;
-        addEventMsg(`⚡ #${body.id}: 新しい動きパターンを検知！`, '#34d399', false, true);
-        tickerCooldown = 60;
-        return;
-      }
-    }
-
     // Check for sudden fitness jumps
     for (const body of population) {
       if (body.fitnessVelocity > 3) {
@@ -926,6 +913,11 @@
     if (isFocused) {
       ctx.strokeStyle = 'rgba(251,191,36,0.4)'; ctx.lineWidth = 2;
       ctx.setLineDash([5,5]); ctx.beginPath(); ctx.arc(cx, cy, 50, 0, Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+      // Focused indicator label
+      ctx.fillStyle = 'rgba(251,191,36,0.8)';
+      ctx.font = 'bold 8px -apple-system,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText(`▼ #${body.id} 観察中`, cx, cy - 54);
+      ctx.textBaseline = 'middle';
     }
 
     // Membrane
@@ -2011,14 +2003,23 @@
       if (pointers.size === 1) {
         if (currentTool === 'observe') {
           isPanning = true; panStartX = e.clientX; panStartY = e.clientY; camStartX = targetCamX; camStartY = targetCamY;
-          if (cameraMode === 'follow') {
-            const tapX = e.clientX, tapY = e.clientY;
-            canvas.addEventListener('pointerup', function checkTap() {
-              if (Math.abs(e.clientX - tapX) < 5 && Math.abs(e.clientY - tapY) < 5) {
-                const { x: wx, y: wy } = screenToWorld(tapX, tapY); showInfoAt(wx, wy);
+          const tapX = e.clientX, tapY = e.clientY;
+          canvas.addEventListener('pointerup', function checkTap() {
+            if (Math.abs(e.clientX - tapX) < 5 && Math.abs(e.clientY - tapY) < 5) {
+              const { x: wx, y: wy } = screenToWorld(tapX, tapY);
+              // Select nearest creature and update focusedIndex
+              let nearestIdx = -1, nearestD2 = Infinity;
+              for (let i = 0; i < population.length; i++) {
+                const cx2 = population[i].getCenterX(), cy2 = population[i].getCenterY();
+                const d2 = (wx - cx2) * (wx - cx2) + (wy - cy2) * (wy - cy2);
+                if (d2 < nearestD2) { nearestD2 = d2; nearestIdx = i; }
               }
-            }, { once: true });
-          }
+              if (nearestIdx >= 0 && nearestD2 < 6400) {
+                focusedIndex = nearestIdx;
+              }
+              showInfoAt(wx, wy);
+            }
+          }, { once: true });
         } else { isDrawing = true; handleToolAction(e.clientX, e.clientY); }
       }
     }
@@ -2149,21 +2150,15 @@
   });
 
   // Speed Controls
-  document.getElementById('btn-pause').addEventListener('click', () => {
-    isPaused = true; simSpeed = 0;
+  function setSpeed(speed, paused, activeBtn) {
+    isPaused = paused; simSpeed = speed;
     document.querySelectorAll('#speed-control button').forEach(b => b.classList.remove('active'));
-    document.getElementById('btn-pause').classList.add('active');
-  });
-  document.getElementById('btn-play').addEventListener('click', () => {
-    isPaused = false; simSpeed = 1;
-    document.querySelectorAll('#speed-control button').forEach(b => b.classList.remove('active'));
-    document.getElementById('btn-play').classList.add('active');
-  });
-  document.getElementById('btn-fast').addEventListener('click', () => {
-    isPaused = false; simSpeed = 3;
-    document.querySelectorAll('#speed-control button').forEach(b => b.classList.remove('active'));
-    document.getElementById('btn-fast').classList.add('active');
-  });
+    document.getElementById(activeBtn).classList.add('active');
+  }
+  document.getElementById('btn-pause').addEventListener('click', () => setSpeed(0, true, 'btn-pause'));
+  document.getElementById('btn-slow').addEventListener('click', () => setSpeed(0.25, false, 'btn-slow'));
+  document.getElementById('btn-play').addEventListener('click', () => setSpeed(1, false, 'btn-play'));
+  document.getElementById('btn-fast').addEventListener('click', () => setSpeed(3, false, 'btn-fast'));
   document.getElementById('btn-skip').addEventListener('click', () => {
     if (!isPaused && population.length > 0) evalTimer = COF.evalSeconds;
   });
@@ -2502,7 +2497,7 @@
 
       // Fixed-step physics with accumulator
       physicsAccum += dt;
-      const maxSteps = simSpeed >= 3 ? 4 : 2;
+      const maxSteps = simSpeed >= 3 ? 4 : simSpeed <= 0.25 ? 1 : 2;
       let steps = 0;
       while (physicsAccum >= PHYSICS_DT && steps < maxSteps) {
         for (const body of population) body.updateBrain(simTime);
