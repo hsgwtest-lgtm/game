@@ -1992,7 +1992,6 @@
           judge: stability > 0.75 ? '安定' : stability > 0.4 ? '振動' : '不安定' },
       ];
       const mBarW = halfW - colL - 50;
-      const lowerH = contentBottom - lowerY;
       const metricRowH = Math.min(11, Math.floor(lowerH / (metrics.length + 0.5)));
       for (const m of metrics) {
         if (bly + metricRowH > contentBottom) break;
