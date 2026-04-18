@@ -1590,13 +1590,13 @@
     const heatmapH = (aCompact ? 12 : 16) + dispMuscles * heatmapRowH + (aCompact ? 4 : 10);
     const importBarH = aCompact ? 12 : 18;
     const importanceH = CAT_DEFS.length * importBarH + (aCompact ? 10 : 20);
-    const trendH = !aCompact && strategyHistory.length > 1 ? 80 : 0;
+    const trendH = strategyHistory.length > 1 ? (aCompact ? 45 : 80) : 0;
     let neededH;
     if (aCompact) {
-      // 2-column layout: row1 = max(radar, narrative), row2 = max(importance, heatmap) + legend
-      const row1H = Math.max(radarH, narrativeH) + 4;
-      const row2H = Math.max(importanceH, heatmapH) + 4;
-      neededH = 16 + row1H + row2H + 16;
+      // 2-column: left = radar + heatmap, right = narrative + importance + trend
+      const leftH = radarH + 4 + 10 + 6 + dispMuscles * 10;
+      const rightH = 10 + Math.min(narrative.length, 4) * 10 + 4 + 10 + CAT_DEFS.length * 10 + 4 + trendH;
+      neededH = 16 + Math.max(leftH, rightH) + 8;
     } else {
       neededH = 22 + radarH + narrativeH + heatmapH + importanceH + trendH + 20;
     }
@@ -1627,15 +1627,18 @@
     if (aCompact) {
       // ═══════════════════════════════════════
       // COMPACT 2-COLUMN LAYOUT
+      // Left:  Radar → Heatmap
+      // Right: Narrative → Importance → Trend
       // ═══════════════════════════════════════
       const halfW = Math.floor(cw / 2);
-      const colL = pad, colR = halfW + 2;
+      const colL = pad, colR = halfW + 4;
+      const rightW = cw - colR - pad;
 
-      // ── ROW 1: Radar (left) + Narrative (right) ──
-      const row1Y = y;
+      // ════════ LEFT COLUMN ════════
+      let ly = y;
 
-      // Radar chart (left half)
-      const rcx = halfW / 2, rcy = row1Y + radarH / 2;
+      // ── Radar chart ──
+      const rcx = halfW / 2, rcy = ly + radarH / 2;
       const rMax = Math.min(radarH / 2 - 10, halfW / 2 - 20);
       const nAxes = 4;
       const angles = CAT_DEFS.map((_, i) => -Math.PI / 2 + (Math.PI * 2 / nAxes) * i);
@@ -1649,12 +1652,12 @@
         const ay = rcy + Math.sin(angles[i]) * rMax;
         ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.5;
         ctx.beginPath(); ctx.moveTo(rcx, rcy); ctx.lineTo(ax, ay); ctx.stroke();
-        const lx = rcx + Math.cos(angles[i]) * (rMax + 8);
-        const ly = rcy + Math.sin(angles[i]) * (rMax + 6);
+        const lbx = rcx + Math.cos(angles[i]) * (rMax + 8);
+        const lby = rcy + Math.sin(angles[i]) * (rMax + 6);
         ctx.fillStyle = CAT_DEFS[i].color;
         ctx.font = 'bold 6px -apple-system,sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(CAT_DEFS[i].emoji + CAT_DEFS[i].name, lx, ly);
+        ctx.fillText(CAT_DEFS[i].emoji + CAT_DEFS[i].name, lbx, lby);
       }
       ctx.beginPath();
       for (let i = 0; i < nAxes; i++) {
@@ -1678,112 +1681,145 @@
         ctx.font = '6px -apple-system,sans-serif'; ctx.textAlign = 'center';
         ctx.fillText(Math.round(normalized[i] * 100) + '%', px, py - 6);
       }
+      ly += radarH + 4;
 
-      // Narrative (right half)
-      let ny = row1Y;
-      ctx.fillStyle = 'rgba(251,191,36,0.7)';
-      ctx.font = 'bold 7px -apple-system,sans-serif';
-      ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-      ctx.fillText('── なぜこの戦略？ ──', colR, ny);
-      ny += 10;
-      ctx.font = '7px -apple-system,sans-serif';
-      const narW = halfW - pad - 4;
-      for (let li = 0; li < Math.min(narrative.length, 6); li++) {
-        ctx.fillStyle = 'rgba(255,255,255,0.7)';
-        const maxCh = Math.floor(narW / 4.2);
-        const txt = narrative[li].length > maxCh ? narrative[li].slice(0, maxCh) + '…' : narrative[li];
-        ctx.fillText(txt, colR, ny);
-        ny += 10;
-      }
-
-      y = row1Y + radarH + 4;
-
-      // ── Separator ──
-      ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 0.5;
-      ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(cw - pad, y); ctx.stroke();
-      y += 4;
-
-      // ── ROW 2: Importance (left) + Heatmap (right) ──
-      const row2Y = y;
-
-      // Importance ranking (left half)
-      let iy2 = row2Y;
+      // ── Heatmap (left, below radar) ──
       ctx.fillStyle = 'rgba(251,191,36,0.7)';
       ctx.font = 'bold 7px -apple-system,sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-      ctx.fillText('── 入力重要度 ──', colL, iy2);
-      iy2 += 10;
-      const maxCatScore = Math.max(...catScores, 0.001);
-      const sortedCats = catScores.map((v, i) => ({ i, v })).sort((a, b) => b.v - a.v);
-      const impBarLeft2 = colL + 34;
-      const impBarW2 = halfW - impBarLeft2 - 24;
-      for (const { i: ci, v } of sortedCats) {
-        const ratio = v / maxCatScore;
-        ctx.fillStyle = CAT_DEFS[ci].color;
-        ctx.font = '6px -apple-system,sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-        ctx.fillText(CAT_DEFS[ci].emoji + ' ' + CAT_DEFS[ci].name, colL, iy2 + 4);
-        ctx.fillStyle = 'rgba(255,255,255,0.06)';
-        ctx.fillRect(impBarLeft2, iy2, impBarW2, 7);
-        ctx.fillStyle = `${CAT_DEFS[ci].rgba}0.6)`;
-        ctx.fillRect(impBarLeft2, iy2, impBarW2 * ratio, 7);
-        ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.font = '5px -apple-system,sans-serif'; ctx.textAlign = 'left';
-        ctx.fillText(Math.round(ratio * 100) + '%', impBarLeft2 + impBarW2 + 2, iy2 + 4);
-        iy2 += 10;
-      }
-
-      // Heatmap (right half)
-      let hy = row2Y;
-      ctx.fillStyle = 'rgba(251,191,36,0.7)';
-      ctx.font = 'bold 7px -apple-system,sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-      ctx.fillText('── 入出力影響マップ ──', colR, hy);
-      hy += 10;
-      const hmLeft2 = colR + 16;
-      const hmRight2 = cw - pad;
+      ctx.fillText('── 入出力影響マップ ──', colL, ly);
+      ly += 10;
+      const hmLeft2 = colL + 16;
+      const hmRight2 = halfW - 2;
       const catColW2 = (hmRight2 - hmLeft2) / CAT_DEFS.length;
       const rowH2 = 9;
-      // Column headers
       for (let ci = 0; ci < CAT_DEFS.length; ci++) {
         const cx = hmLeft2 + catColW2 * ci + catColW2 / 2;
         ctx.fillStyle = CAT_DEFS[ci].color;
         ctx.font = 'bold 6px -apple-system,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(CAT_DEFS[ci].emoji, cx, hy + 2);
+        ctx.fillText(CAT_DEFS[ci].emoji, cx, ly + 2);
       }
-      hy += 6;
+      ly += 6;
       const maxAttr = Math.max(...muscleAttr.flat(), 0.001);
       for (let mi = 0; mi < dispMuscles; mi++) {
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
         ctx.font = '5px -apple-system,sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-        ctx.fillText(`M${mi}`, hmLeft2 - 3, hy + rowH2 / 2);
+        ctx.fillText(`M${mi}`, hmLeft2 - 3, ly + rowH2 / 2);
         for (let ci = 0; ci < CAT_DEFS.length; ci++) {
           const cellX = hmLeft2 + catColW2 * ci + 1;
           const cellW = catColW2 - 2;
           const intensity = muscleAttr[mi][ci] / maxAttr;
           ctx.fillStyle = 'rgba(255,255,255,0.04)';
-          ctx.fillRect(cellX, hy, cellW, rowH2 - 1);
+          ctx.fillRect(cellX, ly, cellW, rowH2 - 1);
           if (intensity > 0.02) {
             const alpha = Math.min(0.8, intensity * 0.9);
             ctx.fillStyle = `${CAT_DEFS[ci].rgba}${alpha})`;
-            ctx.fillRect(cellX, hy, cellW, rowH2 - 1);
+            ctx.fillRect(cellX, ly, cellW, rowH2 - 1);
             if (intensity > 0.15) {
               ctx.fillStyle = intensity > 0.5 ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.6)';
               ctx.font = '5px -apple-system,sans-serif'; ctx.textAlign = 'center';
-              ctx.fillText(Math.round(intensity * 100), cellX + cellW / 2, hy + rowH2 / 2);
+              ctx.fillText(Math.round(intensity * 100), cellX + cellW / 2, ly + rowH2 / 2);
             }
           }
         }
-        hy += rowH2;
+        ly += rowH2;
       }
+      const leftBottom = ly;
 
-      y = Math.max(iy2, hy) + 4;
+      // ════════ RIGHT COLUMN ════════
+      let ry = y;
 
-      // ── Mini Legend ──
-      ctx.font = '5px -apple-system,sans-serif'; ctx.textBaseline = 'middle';
-      let lx = pad;
-      for (const cat of CAT_DEFS) {
-        ctx.fillStyle = cat.color; ctx.fillRect(lx, y, 4, 3);
-        ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.textAlign = 'left';
-        ctx.fillText(cat.name, lx + 6, y + 2); lx += 36;
+      // ── Narrative ──
+      ctx.fillStyle = 'rgba(251,191,36,0.7)';
+      ctx.font = 'bold 7px -apple-system,sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.fillText('── なぜこの戦略？ ──', colR, ry);
+      ry += 10;
+      ctx.font = '7px -apple-system,sans-serif';
+      const maxNarLines = Math.min(narrative.length, 4);
+      const maxCh = Math.floor(rightW / 4.2);
+      for (let li = 0; li < maxNarLines; li++) {
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        const txt = narrative[li].length > maxCh ? narrative[li].slice(0, maxCh) + '…' : narrative[li];
+        ctx.fillText(txt, colR, ry);
+        ry += 10;
       }
+      ry += 4;
+
+      // ── Importance ranking (no legend) ──
+      ctx.fillStyle = 'rgba(251,191,36,0.7)';
+      ctx.font = 'bold 7px -apple-system,sans-serif'; ctx.textBaseline = 'top';
+      ctx.fillText('── 入力重要度 ──', colR, ry);
+      ry += 10;
+      const maxCatScore = Math.max(...catScores, 0.001);
+      const sortedCats = catScores.map((v, i) => ({ i, v })).sort((a, b) => b.v - a.v);
+      const impBarLeft2 = colR + 34;
+      const impBarW2 = cw - pad - impBarLeft2 - 20;
+      for (const { i: ci, v } of sortedCats) {
+        const ratio = v / maxCatScore;
+        ctx.fillStyle = CAT_DEFS[ci].color;
+        ctx.font = '6px -apple-system,sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ctx.fillText(CAT_DEFS[ci].emoji + ' ' + CAT_DEFS[ci].name, colR, ry + 4);
+        ctx.fillStyle = 'rgba(255,255,255,0.06)';
+        ctx.fillRect(impBarLeft2, ry, impBarW2, 7);
+        ctx.fillStyle = `${CAT_DEFS[ci].rgba}0.6)`;
+        ctx.fillRect(impBarLeft2, ry, impBarW2 * ratio, 7);
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.font = '5px -apple-system,sans-serif'; ctx.textAlign = 'left';
+        ctx.fillText(Math.round(ratio * 100) + '%', impBarLeft2 + impBarW2 + 2, ry + 4);
+        ry += 10;
+      }
+      ry += 4;
+
+      // ── Strategy trend (right, compact) ──
+      if (strategyHistory.length > 1) {
+        ctx.fillStyle = 'rgba(251,191,36,0.7)';
+        ctx.font = 'bold 7px -apple-system,sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+        ctx.fillText('── 戦略変遷 ──', colR, ry);
+        ry += 9;
+        const trendLeft = colR;
+        const trendRight = cw - pad;
+        const trendW = trendRight - trendLeft;
+        const trendTop = ry;
+        const trendBot = ry + 30;
+        const hist = strategyHistory;
+        const len = hist.length;
+        for (let ci = 0; ci < CAT_DEFS.length; ci++) {
+          ctx.beginPath();
+          for (let gi = 0; gi < len; gi++) {
+            const x = trendLeft + (gi / Math.max(1, len - 1)) * trendW;
+            const scores = hist[gi].catScores;
+            const total = scores.reduce((a, b) => a + b, 0.001);
+            let cumRatio = 0;
+            for (let k = 0; k <= ci; k++) cumRatio += scores[k] / total;
+            const py = trendBot - (trendBot - trendTop) * cumRatio;
+            if (gi === 0) ctx.moveTo(x, py); else ctx.lineTo(x, py);
+          }
+          for (let gi = len - 1; gi >= 0; gi--) {
+            const x = trendLeft + (gi / Math.max(1, len - 1)) * trendW;
+            const scores = hist[gi].catScores;
+            const total = scores.reduce((a, b) => a + b, 0.001);
+            let cumRatio = 0;
+            for (let k = 0; k < ci; k++) cumRatio += scores[k] / total;
+            const py = trendBot - (trendBot - trendTop) * cumRatio;
+            ctx.lineTo(x, py);
+          }
+          ctx.closePath();
+          ctx.fillStyle = `${CAT_DEFS[ci].rgba}0.35)`;
+          ctx.fill();
+        }
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.font = '5px -apple-system,sans-serif'; ctx.textAlign = 'left';
+        ctx.fillText(`世代${hist[0].gen}`, trendLeft, trendBot + 3);
+        ctx.textAlign = 'right';
+        ctx.fillText(`世代${hist[len - 1].gen}`, trendRight, trendBot + 3);
+        ry = trendBot + 10;
+      }
+      const rightBottom = ry;
+
+      // ── Bottom alignment line ──
+      const bottomY = Math.max(leftBottom, rightBottom);
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 0.5;
+      ctx.beginPath(); ctx.moveTo(pad, bottomY + 2); ctx.lineTo(cw - pad, bottomY + 2); ctx.stroke();
 
     } else {
 
