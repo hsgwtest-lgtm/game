@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#060a14">
+<title>SoftEvo — 軟体生物進化シミュレータ</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ═══ Brain Mode Bar ═══ -->
+  <div id="brain-bar" class="hidden">
+    <div id="brain-bar-info">
+      <span id="brain-creature-id">—</span>
+      <span id="brain-creature-fit">Fit: 0</span>
+    </div>
+    <div id="brain-bar-stats">
+      <span id="brain-gen">🧬 0</span>
+      <span id="brain-best">🏆 0</span>
+    </div>
+    <div id="brain-bar-cam">
+      <button class="brain-cam active" data-cam="follow">📹</button>
+      <button class="brain-cam" data-cam="free">🎥</button>
+    </div>
+    <div id="brain-bar-controls">
+      <button class="brain-ctrl" id="brain-pause" title="一時停止">⏸</button>
+      <button class="brain-ctrl" id="brain-slow" title="スロー">🐢</button>
+      <button class="brain-ctrl active" id="brain-play" title="再生">▶</button>
+      <button class="brain-ctrl" id="brain-fast" title="倍速">⏩</button>
+    </div>
+    <button id="close-brain-mode" title="脳モード終了">✕</button>
+  </div>
+
+  <!-- ═══ Neural Section (brain mode) ═══ -->
+  <div id="neural-section" class="brain-section">
+    <div class="section-divider">
+      <span>🧠 ニューラルネットワーク</span>
+      <button class="section-expand" data-section="neural" title="全画面表示">⤢</button>
+    </div>
+    <div class="section-canvas-wrap"><canvas id="neuralCanvas" width="380" height="260"></canvas></div>
+  </div>
+
+  <!-- ═══ Main Canvas ═══ -->
+  <div id="canvas-wrapper">
+    <canvas id="mainCanvas"></canvas>
+    <div id="creature-label" class="hidden"><span id="creature-label-text">▼ 選択した生物</span></div>
+    <!-- Brain mode inline info (creature stats shown over canvas) -->
+    <div id="brain-info-overlay" class="hidden">
+      <div id="brain-info-left"></div>
+      <div id="brain-info-right"></div>
+    </div>
+  </div>
+
+  <!-- ═══ Analysis Section (brain mode) ═══ -->
+  <div id="analysis-section" class="brain-section">
+    <div class="section-divider">
+      <span>🔬 解析</span>
+      <button class="section-expand" data-section="analysis" title="全画面表示">⤢</button>
+    </div>
+    <div class="section-canvas-wrap"><canvas id="analysisCanvas" width="380" height="420"></canvas></div>
+  </div>
+
+  <!-- ═══ BUILD PHASE UI ═══ -->
+  <div id="build-overlay">
+    <div id="build-top-bar">
+      <div id="build-title">🧬 SoftEvo — 生物設計</div>
+      <div id="build-tools">
+        <button class="build-btn active" data-btool="add-node" title="ノード追加">⊕</button>
+        <button class="build-btn" data-btool="add-bone" title="ボーン接続">🦴</button>
+        <button class="build-btn" data-btool="add-muscle" title="筋肉接続">💪</button>
+        <button class="build-btn" data-btool="move-node" title="ノード移動">✥</button>
+        <button class="build-btn" data-btool="resize-node" title="サイズ変更">⊚</button>
+        <button class="build-btn" data-btool="pan" title="視点移動">🖐</button>
+        <button class="build-btn build-del" data-btool="delete" title="削除">🗑</button>
+        <div class="build-sep"></div>
+        <button class="build-btn build-action" id="btn-preset-biped" title="プリセット: 二足">🚶</button>
+        <button class="build-btn build-action" id="btn-preset-snake" title="プリセット: 蛇">🐍</button>
+        <button class="build-btn build-action" id="btn-preset-spider" title="プリセット: クモ">🕷</button>
+        <button class="build-btn build-action" id="btn-preset-blob" title="プリセット: ブロブ">🫧</button>
+        <button class="build-btn build-action" id="btn-clear-build" title="クリア">🔄</button>
+      </div>
+    </div>
+    <div id="build-info">
+      <span id="build-node-count">ノード: 0</span>
+      <span id="build-bone-count">ボーン: 0</span>
+      <span id="build-muscle-count">筋肉: 0</span>
+    </div>
+    <div id="build-hint">キャンバスをタップしてノードを配置</div>
+    <button id="btn-start-sim" class="big-action-btn" disabled>▶ 進化スタート</button>
+  </div>
+
+  <!-- ═══ SIM PHASE UI ═══ -->
+  <div id="sim-overlay" class="hidden">
+    <div id="top-bar">
+      <div id="stats">
+        <span id="gen-info">🧬 世代 0</span>
+        <span id="best-info">🏆 0</span>
+        <span id="avg-info">📊 0</span>
+        <span id="fps-counter">FPS: 0</span>
+      </div>
+      <div id="ranking"></div>
+      <div id="speed-control">
+        <button id="btn-pause" title="一時停止">⏸</button>
+        <button id="btn-slow" title="スロー (0.25x)">🐢</button>
+        <button id="btn-play" title="再生" class="active">▶</button>
+        <button id="btn-fast" title="倍速">⏩</button>
+        <button id="btn-skip" title="世代スキップ">⏭</button>
+        <button id="btn-reset-gen" title="世代リセット">🔄</button>
+        <button id="btn-config" title="ライブ・チューニング">⚙️</button>
+        <button id="btn-save-modal" title="生物を保存 / ロード">💾</button>
+        <button id="btn-leaderboard-modal" title="グローバルリーダーボード">🏆</button>
+        <button id="btn-back-build" title="設計に戻る">🔧</button>
+      </div>
+    </div>
+    <div id="toolbar">
+      <button class="tool-btn active" data-tool="observe" title="観察">👁</button>
+      <button class="tool-btn" data-tool="block" title="ブロック配置">🧱</button>
+      <button class="tool-btn" data-tool="erase" title="消しゴム">🧹</button>
+      <button class="tool-btn" data-tool="goal" title="ゴール配置">🎯</button>
+      <button class="tool-btn tool-del" data-tool="delete-goal" title="ゴール削除">❌</button>
+      <div id="brush-radius-control" class="hidden">
+        <label>範囲</label>
+        <input type="range" id="brush-radius-slider" min="1" max="10" value="2" step="1">
+        <span id="brush-radius-value">2</span>
+      </div>
+      <div class="tool-separator"></div>
+      <button class="tool-btn tool-action" data-tool="poke" title="つつく">👆</button>
+    </div>
+    <div id="camera-mode-bar">
+      <button class="cam-btn active" data-cam="follow">📹 追従</button>
+      <button class="cam-btn" data-cam="free">🎥 フリー</button>
+    </div>
+    <div id="stage-bar">
+      <span class="stage-label">🗺 ステージ:</span>
+      <button class="stage-btn active" data-stage="flat">平地</button>
+      <button class="stage-btn" data-stage="hills">丘陵</button>
+      <button class="stage-btn" data-stage="obstacles">障害物</button>
+      <button class="stage-btn" data-stage="random">ランダム</button>
+      <button class="stage-btn stage-reset" id="btn-stage-reset" title="地形リセット">🔄</button>
+    </div>
+    <div id="bottom-bar">
+      <div id="eval-progress-bar"><div id="eval-fill"></div></div>
+      <div id="objective-bar">
+        <span class="obj-label">学習目標:</span>
+        <button class="obj-btn active" data-obj="distance">📏 移動距離</button>
+        <button class="obj-btn" data-obj="height">⬆ 跳躍高</button>
+        <button class="obj-btn" data-obj="goal-speed">🎯 ゴール到達</button>
+        <button class="obj-btn" data-obj="stability">⚖ 安定性</button>
+      </div>
+      <div id="display-bar">
+        <span class="tog-label">表示：</span>
+        <button class="tog-btn active" id="toggle-muscles">筋肉</button>
+        <button class="tog-btn" id="toggle-trails">軌跡</button>
+        <button class="tog-btn" id="toggle-grid">グリッド</button>
+        <button class="tog-btn" id="toggle-graph">グラフ</button>
+        <button class="tog-btn active" id="toggle-labels">ラベル</button>
+        <button class="tog-btn" id="toggle-brain">🧠 脳</button>
+      </div>
+      <div id="bottom-content">
+        <div id="eval-timer">⏱ 0.0 / 10.0s</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Panels ═══ -->
+  <div id="graph-panel" class="hidden">
+    <div id="graph-header">
+      <span>📈 適応度推移</span>
+      <button id="close-graph">✕</button>
+    </div>
+    <canvas id="graphCanvas" width="360" height="180"></canvas>
+  </div>
+
+  <div id="config-panel" class="hidden">
+    <div id="config-header">
+      <span>⚙️ ライブ・チューニング</span>
+      <button id="close-config">✕</button>
+    </div>
+    <div id="config-content"></div>
+  </div>
+  <div id="event-log"></div>
+  <div id="gen-flash"></div>
+  <div id="stage-flash"></div>
+
+  <!-- ═══ Race Bar ═══ -->
+  <div id="race-bar" class="hidden">
+    <span class="race-bar-label">🏎️ レース中</span>
+    <div id="race-bar-info"></div>
+    <button id="btn-stop-race" class="race-stop-btn">🏁 レース終了</button>
+  </div>
+
+  <!-- ═══ Modal Backdrop ═══ -->
+  <div id="modal-backdrop" class="hidden"></div>
+
+  <!-- ═══ Save Modal ═══ -->
+  <div id="modal-save" class="modal-panel hidden">
+    <div class="modal-header">
+      <span>💾 生物を保存</span>
+      <button id="close-save-modal" class="modal-close">✕</button>
+    </div>
+    <div class="modal-hint">現在の最優秀個体をスロットに保存します。保存済みのスロットからクラウドに投稿できます。</div>
+    <div id="save-slots-grid" class="slots-grid"></div>
+    <div class="modal-footer">
+      <label class="nickname-label">投稿用ニックネーム</label>
+      <input type="text" id="save-nickname" class="nickname-input" placeholder="Anonymous" maxlength="20" autocomplete="off">
+    </div>
+  </div>
+
+  <!-- ═══ Leaderboard Modal ═══ -->
+  <div id="modal-leaderboard" class="modal-panel hidden">
+    <div class="modal-header">
+      <span>🏆 グローバルリーダーボード</span>
+      <button id="close-lb-modal" class="modal-close">✕</button>
+    </div>
+    <div class="lb-hint">🏎️ ボタンでその生物とレースできます。保存モーダルの「☁️ 投稿」から自分の生物を登録しましょう。</div>
+    <div id="lb-list" class="lb-list"></div>
+  </div>
+
+  <!-- ═══ Toast Container ═══ -->
+  <div id="toast-container"></div>
+
+</div>
+<script src="engine.js"></script>
+<script type="module" src="saveUI.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js');
+}
+</script>
+</body>
+</html>

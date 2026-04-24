@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#060a14">
+<title>SoftEvo — 生物閲覧</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="viewer-app">
+
+  <!-- ═══ Header ═══ -->
+  <div id="viewer-header">
+    <a href="index.html" id="viewer-back-btn">← 戻る</a>
+    <h1 id="viewer-title">🔬 生物閲覧</h1>
+    <div id="viewer-header-right"></div>
+  </div>
+
+  <!-- ═══ Slot Bar ═══ -->
+  <div id="viewer-slot-bar">
+    <div id="viewer-slot-list"><!-- 動的生成 --></div>
+  </div>
+
+  <!-- ═══ Main Area ═══ -->
+  <div id="viewer-main">
+
+    <!-- Simulation Panel -->
+    <div id="viewer-sim-panel">
+      <canvas id="viewer-canvas"></canvas>
+      <div id="viewer-sim-controls">
+        <button class="viewer-speed-btn active" data-speed="1">▶ 1×</button>
+        <button class="viewer-speed-btn" data-speed="2">⏩ 2×</button>
+        <button class="viewer-speed-btn" data-speed="0.25">🐢</button>
+        <button id="btn-viewer-pause" title="一時停止/再生">⏸</button>
+        <button id="btn-viewer-reset" title="リセット">🔄</button>
+        <span id="viewer-distance" class="viewer-dist-label">距離: 0</span>
+      </div>
+    </div>
+
+    <!-- Info Panel -->
+    <div id="viewer-info-panel">
+
+      <!-- Stats -->
+      <div class="viewer-section">
+        <div class="viewer-section-header">📊 解析</div>
+        <div id="viewer-stats-grid"></div>
+      </div>
+
+      <!-- Environment COF Settings -->
+      <div class="viewer-section" id="viewer-cof-section">
+        <div class="viewer-section-header" id="viewer-cof-toggle">
+          ⚙ 環境設定 <span id="viewer-cof-arrow">▾</span>
+        </div>
+        <div id="viewer-cof-panel"><!-- 動的生成 --></div>
+      </div>
+
+      <!-- Neural Net -->
+      <div class="viewer-section viewer-neural-section">
+        <div class="viewer-section-header">🧠 ニューラルネットワーク</div>
+        <div class="viewer-neural-wrap">
+          <canvas id="viewer-neural"></canvas>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══ Action Bar ═══ -->
+  <div id="viewer-action-bar">
+    <div id="viewer-no-selection" class="viewer-action-hint">← スロットを選択してください</div>
+    <div id="viewer-relearn-buttons" class="hidden">
+      <button id="btn-relearn-fresh"  class="viewer-action-btn v-btn-fresh">🔄 ゼロから再学習</button>
+      <button id="btn-relearn-seed"   class="viewer-action-btn v-btn-seed">✨ 継続改善で再学習</button>
+    </div>
+  </div>
+
+</div>
+<script type="module" src="viewer.js"></script>
+</body>
+</html>
