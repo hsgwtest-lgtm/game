@@ -45,23 +45,25 @@
     <!-- Info Panel -->
     <div id="viewer-info-panel">
 
+      <!-- Tab buttons -->
+      <div id="viewer-info-tabs">
+        <button class="v-tab-btn active" data-tab="stats">📊 解析</button>
+        <button class="v-tab-btn" data-tab="cof">⚙ 環境設定</button>
+        <button class="v-tab-btn" data-tab="neural">🧠 NN</button>
+      </div>
+
       <!-- Stats -->
-      <div class="viewer-section">
-        <div class="viewer-section-header">📊 解析</div>
+      <div class="viewer-section v-tab-content active" id="viewer-stats-section">
         <div id="viewer-stats-grid"></div>
       </div>
 
       <!-- Environment COF Settings -->
-      <div class="viewer-section" id="viewer-cof-section">
-        <div class="viewer-section-header" id="viewer-cof-toggle">
-          ⚙ 環境設定 <span id="viewer-cof-arrow">▾</span>
-        </div>
+      <div class="viewer-section v-tab-content" id="viewer-cof-section">
         <div id="viewer-cof-panel"><!-- 動的生成 --></div>
       </div>
 
       <!-- Neural Net -->
-      <div class="viewer-section viewer-neural-section">
-        <div class="viewer-section-header">🧠 ニューラルネットワーク</div>
+      <div class="viewer-section viewer-neural-section v-tab-content" id="viewer-neural-section">
         <div class="viewer-neural-wrap">
           <canvas id="viewer-neural"></canvas>
         </div>
@@ -74,8 +76,8 @@
   <div id="viewer-action-bar">
     <div id="viewer-no-selection" class="viewer-action-hint">← スロットを選択してください</div>
     <div id="viewer-relearn-buttons" class="hidden">
-      <button id="btn-relearn-fresh"  class="viewer-action-btn v-btn-fresh">🔄 ゼロから再学習</button>
-      <button id="btn-relearn-seed"   class="viewer-action-btn v-btn-seed">✨ 継続改善で再学習</button>
+      <button id="btn-restore-env"  class="viewer-action-btn v-btn-env">🌍 環境を再現</button>
+      <button id="btn-relearn-seed" class="viewer-action-btn v-btn-seed">✨ 継続改善で再学習</button>
     </div>
   </div>
 
