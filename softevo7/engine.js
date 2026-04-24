@@ -2668,6 +2668,7 @@
     document.getElementById('sim-overlay').classList.remove('hidden');
     generation = 0; bestEverFitness = 0; bestEverGen = 0;
     historyBest.length = 0; historyAvg.length = 0;
+    strategyHistory.length = 0;
     evalTimer = 0; COF.worldW = BASE_WORLD_WIDTH;
     prevAvgFitness = 0; prevBestFitness = 0; patternDetectionCounters = {};
     initWorld(); createPopulation(null); spawnRaceOpponents(); resizeCanvas();

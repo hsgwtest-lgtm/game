@@ -105,9 +105,10 @@ function renderSlots() {
   }
 
   grid.querySelectorAll('.s-view').forEach(b =>
-    b.addEventListener('click', () => {
+    b.addEventListener('click', async () => {
       if (api()?.isInSim()) {
-        if (!confirm('現在学習中の状態が失われます。生物閲覧画面に移動しますか？')) return;
+        const ok = await showConfirm('現在学習中の状態が失われます。生物閲覧画面に移動しますか？');
+        if (!ok) return;
       }
       window.location.href = `viewer.html?slot=${b.dataset.slot}`;
     }));
@@ -282,6 +283,46 @@ function showRaceBar(opponents) {
 
 function hideRaceBar() {
   document.getElementById('race-bar')?.classList.add('hidden');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  CONFIRM DIALOG
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Show a styled in-page confirm dialog.
+ * Returns a Promise<boolean> that resolves true (OK) or false (Cancel).
+ */
+function showConfirm(message, okLabel = '移動する', title = '⚠️ 確認') {
+  return new Promise(resolve => {
+    const backdrop = document.getElementById('modal-backdrop');
+    const modal    = document.getElementById('modal-confirm');
+    const titleEl  = document.getElementById('modal-confirm-title');
+    const textEl   = document.getElementById('modal-confirm-text');
+    const okBtn    = document.getElementById('btn-confirm-ok');
+    const cancelBtn = document.getElementById('btn-confirm-cancel');
+    if (!modal || !backdrop) { resolve(window.confirm(message)); return; }
+
+    titleEl.textContent  = title;
+    textEl.textContent   = message;
+    okBtn.textContent    = okLabel;
+
+    modal.classList.remove('hidden');
+    backdrop.classList.remove('hidden');
+
+    function cleanup(result) {
+      modal.classList.add('hidden');
+      backdrop.classList.add('hidden');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      resolve(result);
+    }
+    function onOk()     { cleanup(true); }
+    function onCancel() { cleanup(false); }
+
+    okBtn.addEventListener('click', onOk, { once: true });
+    cancelBtn.addEventListener('click', onCancel, { once: true });
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════

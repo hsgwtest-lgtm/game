@@ -485,6 +485,26 @@ html, body {
   padding: 7px 16px 6px; border-bottom: 1px solid rgba(129,140,248,0.08);
   flex-shrink: 0;
 }
+#modal-confirm .modal-hint {
+  font-size: 13px; color: rgba(226,232,240,0.8); line-height: 1.5;
+  padding: 14px 16px; border-bottom: none;
+}
+.modal-confirm-actions {
+  display: flex; gap: 10px; justify-content: flex-end;
+  padding: 8px 16px 14px; flex-shrink: 0;
+}
+.modal-confirm-btn {
+  padding: 8px 18px; border-radius: 8px; font-size: 13px; cursor: pointer;
+  background: rgba(129,140,248,0.10); border: 1px solid rgba(129,140,248,0.28);
+  color: rgba(226,232,240,0.75); transition: all 0.15s;
+}
+.modal-confirm-btn:hover { background: rgba(129,140,248,0.22); border-color: rgba(129,140,248,0.55); }
+.modal-confirm-ok-btn {
+  padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer;
+  background: rgba(99,210,255,0.14); border: 1px solid rgba(99,210,255,0.40);
+  color: #7dd3fc; transition: all 0.15s;
+}
+.modal-confirm-ok-btn:hover { background: rgba(99,210,255,0.24); border-color: rgba(99,210,255,0.65); box-shadow: 0 0 10px rgba(99,210,255,0.18); }
 
 /* ─── Save Slots Grid ─── */
 .slots-grid {
@@ -743,6 +763,16 @@ html, body {
   flex: 1; display: flex; min-height: 0; overflow: hidden;
 }
 
+/* ─── Control Bar (above main area) ─── */
+#viewer-ctrl-bar {
+  flex-shrink: 0; display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+  padding: 6px 10px;
+  background: rgba(6,10,20,0.92); border-bottom: 1px solid rgba(99,210,255,0.10);
+}
+.viewer-ctrl-sep {
+  width: 1px; height: 20px; background: rgba(129,140,248,0.20); margin: 0 4px; flex-shrink: 0;
+}
+
 /* ─── Sim Panel ─── */
 #viewer-sim-panel {
   flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative;
@@ -825,30 +855,23 @@ html, body {
 .v-small { font-size: 9px !important; }
 .v-stat-divider { height: 1px; background: rgba(129,140,248,0.10); margin: 4px 0; }
 
-/* ─── Action Bar ─── */
-#viewer-action-bar {
-  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-  gap: 10px; padding: 8px 14px;
-  padding-bottom: max(8px, env(safe-area-inset-bottom));
-  background: rgba(6,10,20,0.94); border-top: 1px solid rgba(129,140,248,0.12);
-}
-.viewer-action-hint { font-size: 12px; color: rgba(129,140,248,0.4); font-style: italic; }
-#viewer-relearn-buttons { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+/* ─── Action Buttons (compact, used in ctrl-bar) ─── */
 .viewer-action-btn {
-  padding: 9px 18px; border-radius: 10px; font-size: 13px; font-weight: bold;
-  cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  padding: 5px 9px; border-radius: 6px; font-size: 14px; font-weight: bold;
+  cursor: pointer; transition: all 0.15s; white-space: nowrap;
 }
 .v-btn-env {
-  background: rgba(99,210,255,0.12); border: 1px solid rgba(99,210,255,0.35);
+  background: rgba(99,210,255,0.10); border: 1px solid rgba(99,210,255,0.28);
   color: #7dd3fc;
 }
-.v-btn-env:hover { background: rgba(99,210,255,0.22); border-color: rgba(99,210,255,0.60); box-shadow: 0 0 12px rgba(99,210,255,0.2); }
+.v-btn-env:hover:not(:disabled) { background: rgba(99,210,255,0.20); border-color: rgba(99,210,255,0.55); box-shadow: 0 0 10px rgba(99,210,255,0.15); }
 .v-btn-env:disabled { opacity: 0.35; cursor: not-allowed; }
 .v-btn-seed {
-  background: rgba(52,211,153,0.15); border: 1px solid rgba(52,211,153,0.40);
+  background: rgba(52,211,153,0.12); border: 1px solid rgba(52,211,153,0.32);
   color: #6ee7b7;
 }
-.v-btn-seed:hover { background: rgba(52,211,153,0.25); border-color: rgba(52,211,153,0.65); box-shadow: 0 0 12px rgba(52,211,153,0.2); }
+.v-btn-seed:hover:not(:disabled) { background: rgba(52,211,153,0.22); border-color: rgba(52,211,153,0.58); box-shadow: 0 0 10px rgba(52,211,153,0.15); }
+.v-btn-seed:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* ─── Viewer: mobile layout ─── */
 @media (max-width: 680px) {

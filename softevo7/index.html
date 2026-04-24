@@ -30,7 +30,7 @@
     </div>
     <div id="brain-bar-controls">
       <button class="brain-ctrl" id="brain-pause" title="一時停止">⏸</button>
-      <button class="brain-ctrl" id="brain-slow" title="スロー">🐢</button>
+      <button class="brain-ctrl" id="brain-slow" title="スロー (0.25x)">⏭</button>
       <button class="brain-ctrl active" id="brain-play" title="再生">▶</button>
       <button class="brain-ctrl" id="brain-fast" title="倍速">⏩</button>
     </div>
@@ -107,7 +107,7 @@
       <div id="ranking"></div>
       <div id="speed-control">
         <button id="btn-pause" title="一時停止">⏸</button>
-        <button id="btn-slow" title="スロー (0.25x)">🐢</button>
+        <button id="btn-slow" title="スロー (0.25x)">⏭</button>
         <button id="btn-play" title="再生" class="active">▶</button>
         <button id="btn-fast" title="倍速">⏩</button>
         <button id="btn-skip" title="世代スキップ">⏭</button>
@@ -224,6 +224,18 @@
 
   <!-- ═══ Toast Container ═══ -->
   <div id="toast-container"></div>
+
+  <!-- ═══ Inline Confirm Dialog ═══ -->
+  <div id="modal-confirm" class="modal-panel hidden" style="max-width:320px">
+    <div class="modal-header">
+      <span id="modal-confirm-title">⚠️ 確認</span>
+    </div>
+    <div id="modal-confirm-text" class="modal-hint"></div>
+    <div class="modal-confirm-actions">
+      <button id="btn-confirm-cancel" class="modal-confirm-btn">キャンセル</button>
+      <button id="btn-confirm-ok" class="modal-confirm-ok-btn">移動する</button>
+    </div>
+  </div>
 
 </div>
 <script src="engine.js"></script>

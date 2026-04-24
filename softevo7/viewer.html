@@ -26,20 +26,25 @@
     <div id="viewer-slot-list"><!-- 動的生成 --></div>
   </div>
 
+  <!-- ═══ Control Bar ═══ -->
+  <div id="viewer-ctrl-bar">
+    <button id="btn-viewer-pause" title="一時停止/再生">⏸</button>
+    <button class="viewer-speed-btn" data-speed="0.25" title="スロー (0.25x)">⏭</button>
+    <button class="viewer-speed-btn active" data-speed="1" title="再生 (1x)">▶</button>
+    <button class="viewer-speed-btn" data-speed="3" title="倍速 (3x)">⏩</button>
+    <button id="btn-viewer-reset" title="リセット">🔄</button>
+    <div class="viewer-ctrl-sep"></div>
+    <button id="btn-restore-env" class="viewer-action-btn v-btn-env" title="環境を再現" disabled>🌎</button>
+    <button id="btn-relearn-seed" class="viewer-action-btn v-btn-seed" title="継続改善で再学習" disabled>📄</button>
+    <span id="viewer-distance" class="viewer-dist-label">距離: 0</span>
+  </div>
+
   <!-- ═══ Main Area ═══ -->
   <div id="viewer-main">
 
     <!-- Simulation Panel -->
     <div id="viewer-sim-panel">
       <canvas id="viewer-canvas"></canvas>
-      <div id="viewer-sim-controls">
-        <button class="viewer-speed-btn active" data-speed="1">▶ 1×</button>
-        <button class="viewer-speed-btn" data-speed="2">⏩ 2×</button>
-        <button class="viewer-speed-btn" data-speed="0.25">🐢</button>
-        <button id="btn-viewer-pause" title="一時停止/再生">⏸</button>
-        <button id="btn-viewer-reset" title="リセット">🔄</button>
-        <span id="viewer-distance" class="viewer-dist-label">距離: 0</span>
-      </div>
     </div>
 
     <!-- Info Panel -->
@@ -69,15 +74,6 @@
         </div>
       </div>
 
-    </div>
-  </div>
-
-  <!-- ═══ Action Bar ═══ -->
-  <div id="viewer-action-bar">
-    <div id="viewer-no-selection" class="viewer-action-hint">← スロットを選択してください</div>
-    <div id="viewer-relearn-buttons" class="hidden">
-      <button id="btn-restore-env"  class="viewer-action-btn v-btn-env">🌍 環境を再現</button>
-      <button id="btn-relearn-seed" class="viewer-action-btn v-btn-seed">✨ 継続改善で再学習</button>
     </div>
   </div>
 
