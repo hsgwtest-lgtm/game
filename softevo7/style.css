@@ -799,8 +799,8 @@ html, body {
 }
 
 /* ─── Tab Content ─── */
-.v-tab-content { display: none; flex: 1; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-.v-tab-content.active { display: flex; }
+.v-tab-content { display: none; }
+.v-tab-content.active { display: flex; flex: 1; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
 .viewer-section {
   flex-shrink: 0; padding: 8px 10px; border-bottom: 1px solid rgba(129,140,248,0.08);
