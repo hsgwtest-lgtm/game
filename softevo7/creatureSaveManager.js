@@ -93,6 +93,7 @@ export async function saveCreature(slot, creatureData) {
     score:      typeof creatureData.score      === 'number' ? creatureData.score      : 0,
     generation: typeof creatureData.generation === 'number' ? creatureData.generation : 0,
     name:       typeof creatureData.name       === 'string' ? creatureData.name       : `生物-${validSlot}`,
+    cof:        creatureData.cof ?? null,
     savedAt:    new Date(),
   };
 

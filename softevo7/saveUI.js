@@ -105,7 +105,12 @@ function renderSlots() {
   }
 
   grid.querySelectorAll('.s-view').forEach(b =>
-    b.addEventListener('click', () => { window.location.href = `viewer.html?slot=${b.dataset.slot}`; }));
+    b.addEventListener('click', () => {
+      if (api()?.isInSim()) {
+        if (!confirm('現在学習中の状態が失われます。生物閲覧画面に移動しますか？')) return;
+      }
+      window.location.href = `viewer.html?slot=${b.dataset.slot}`;
+    }));
   grid.querySelectorAll('.s-save').forEach(b =>
     b.addEventListener('click', () => handleSaveToSlot(+b.dataset.slot)));
   grid.querySelectorAll('.s-cancel').forEach(b =>

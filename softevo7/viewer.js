@@ -272,6 +272,9 @@ function selectSlot(slotNo) {
   renderStats(selectedData);
   document.getElementById('viewer-no-selection').classList.add('hidden');
   document.getElementById('viewer-relearn-buttons').classList.remove('hidden');
+  // 環境を再現ボタンの有効/無効
+  const restoreBtn = document.getElementById('btn-restore-env');
+  if (restoreBtn) restoreBtn.disabled = !savedCofRef;
 }
 
 function spawnCreature(data) {
@@ -984,6 +987,16 @@ function togglePause() {
   document.getElementById('btn-viewer-pause').textContent = isPaused ? '▶' : '⏸';
 }
 
+// ═══ Tab Switch ══════════════════════════════════════════════════════
+function switchTab(tabName) {
+  document.querySelectorAll('.v-tab-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tabName);
+  });
+  document.querySelectorAll('.v-tab-content').forEach(s => {
+    s.classList.toggle('active', s.id === `viewer-${tabName}-section`);
+  });
+}
+
 // ═══ Re-learn ════════════════════════════════════════════════════════
 function startRelearn(useSeed) {
   if (!selectedData?.blueprint) return;
@@ -1023,8 +1036,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ボタン
   document.getElementById('btn-viewer-pause').addEventListener('click', togglePause);
   document.getElementById('btn-viewer-reset').addEventListener('click', resetCreature);
-  document.getElementById('btn-relearn-fresh').addEventListener('click', () => startRelearn(false));
   document.getElementById('btn-relearn-seed').addEventListener('click',  () => startRelearn(true));
+  document.getElementById('btn-restore-env')?.addEventListener('click', () => {
+    if (!savedCofRef) return;
+    for (const def of PHYS_DEFS) {
+      if (savedCofRef[def.key] !== undefined) simCOF[def.key] = savedCofRef[def.key];
+    }
+    buildCofPanel(savedCofRef);
+    // 環境設定タブに切り替え
+    switchTab('cof');
+  });
 
   document.querySelectorAll('.viewer-speed-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1036,12 +1057,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // COF パネル開閉トグル
-  document.getElementById('viewer-cof-toggle')?.addEventListener('click', () => {
-    const panel  = document.getElementById('viewer-cof-panel');
-    const arrow  = document.getElementById('viewer-cof-arrow');
-    const hidden = panel.classList.toggle('v-cof-collapsed');
-    if (arrow) arrow.textContent = hidden ? '▸' : '▾';
+  // タブ切り替え
+  document.querySelectorAll('.v-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
 
   // URLパラメータで初期スロット指定
