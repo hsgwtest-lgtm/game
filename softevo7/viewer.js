@@ -270,11 +270,11 @@ function selectSlot(slotNo) {
 
   spawnCreature(selectedData);
   renderStats(selectedData);
-  document.getElementById('viewer-no-selection').classList.add('hidden');
-  document.getElementById('viewer-relearn-buttons').classList.remove('hidden');
   // 環境を再現ボタンの有効/無効
   const restoreBtn = document.getElementById('btn-restore-env');
   if (restoreBtn) restoreBtn.disabled = !savedCofRef;
+  const relearnBtn = document.getElementById('btn-relearn-seed');
+  if (relearnBtn) relearnBtn.disabled = false;
 }
 
 function spawnCreature(data) {
