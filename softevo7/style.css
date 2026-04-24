@@ -872,7 +872,6 @@ html, body {
 }
 .v-btn-seed:hover:not(:disabled) { background: rgba(52,211,153,0.22); border-color: rgba(52,211,153,0.58); box-shadow: 0 0 10px rgba(52,211,153,0.15); }
 .v-btn-seed:disabled { opacity: 0.35; cursor: not-allowed; }
-.v-btn-seed:hover { background: rgba(52,211,153,0.25); border-color: rgba(52,211,153,0.65); box-shadow: 0 0 12px rgba(52,211,153,0.2); }
 
 /* ─── Viewer: mobile layout ─── */
 @media (max-width: 680px) {
