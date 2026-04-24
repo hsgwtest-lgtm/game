@@ -2721,12 +2721,7 @@
   document.getElementById('btn-slow').addEventListener('click', () => setSpeed(0.25, false, 'btn-slow'));
   document.getElementById('btn-play').addEventListener('click', () => setSpeed(1, false, 'btn-play'));
   document.getElementById('btn-fast').addEventListener('click', () => setSpeed(3, false, 'btn-fast'));
-  document.getElementById('btn-skip').addEventListener('click', () => {
-    if (!isPaused && population.length > 0) evalTimer = COF.evalSeconds;
-  });
-  document.getElementById('btn-reset-gen').addEventListener('click', () => {
-    if (population.length > 0) { evalTimer = 0; createPopulation(null); addEventMsg('🔄 世代リセット — 全個体を再配置', '#63d2ff', false); }
-  });
+
 
   // Stage
   document.querySelectorAll('.stage-btn[data-stage]').forEach(btn => {
