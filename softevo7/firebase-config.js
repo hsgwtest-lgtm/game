@@ -17,16 +17,17 @@
 // ─────────────────────────────────────────────────────────────────────
 
 export const FIREBASE_CONFIG = {
-  apiKey:            'YOUR_API_KEY',
-  authDomain:        'YOUR_PROJECT_ID.firebaseapp.com',
-  databaseURL:       'https://YOUR_PROJECT_ID-default-rtdb.asia-southeast1.firebasedatabase.app',
-  projectId:         'YOUR_PROJECT_ID',
-  storageBucket:     'YOUR_PROJECT_ID.appspot.com',
-  messagingSenderId: 'YOUR_SENDER_ID',
-  appId:             'YOUR_APP_ID',
+  apiKey:            'AIzaSyAvMx8njrhoNd2gC3r5TPRWzvi7wElHPdw',
+  authDomain:        'softevo-leaderboard.firebaseapp.com',
+  databaseURL:       'https://softevo-leaderboard-default-rtdb.asia-southeast1.firebasedatabase.app/',
+  projectId:         'softevo-leaderboard',
+  storageBucket:     'softevo-leaderboard.firebasestorage.app',
+  messagingSenderId: '427957455927',
+  appId:             '1:427957455927:web:b41f7ed823d9fd89ae03b2',
 };
 
-// この値が true になると Firebase 機能が有効になる
+// この値が true になると Firebase 機能が有効になります
 export const IS_FIREBASE_CONFIGURED =
   FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY' &&
-  !FIREBASE_CONFIG.databaseURL.includes('YOUR_PROJECT_ID');
+  FIREBASE_CONFIG.databaseURL.indexOf('YOUR_PROJECT_ID') === -1;
+
