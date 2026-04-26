@@ -1,6 +1,6 @@
 {
-  "name": "SoftEvo — 軟体生物進化シミュレータ",
-  "short_name": "SoftEvo",
+  "name": "SoftEvoβ — 軟体生物進化シミュレータ",
+  "short_name": "SoftEvoβ",
   "description": "ニューラルネットワーク駆動の軟体生物進化シミュレータ",
   "start_url": "./index.html",
   "display": "standalone",
