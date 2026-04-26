@@ -60,9 +60,12 @@ html, body {
   text-align: center; padding: 6px 14px; background: rgba(6,10,20,0.7);
   border-radius: 8px; transition: opacity 0.3s;
 }
-.big-action-btn {
+#build-bottom-actions {
   pointer-events: auto; position: absolute; bottom: 20px; left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%); display: flex; gap: 12px; align-items: center;
+}
+.big-action-btn {
+  pointer-events: auto;
   background: linear-gradient(135deg, rgba(99,210,255,0.25), rgba(167,139,250,0.25));
   border: 2px solid rgba(99,210,255,0.4); color: #e2e8f0; font-size: 18px;
   font-weight: bold; padding: 14px 36px; border-radius: 12px; cursor: pointer;
@@ -73,6 +76,14 @@ html, body {
   border-color: rgba(99,210,255,0.7); box-shadow: 0 0 20px rgba(99,210,255,0.3);
 }
 .big-action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.big-action-btn-secondary {
+  background: linear-gradient(135deg, rgba(167,139,250,0.15), rgba(99,210,255,0.15));
+  border: 2px solid rgba(167,139,250,0.35); font-size: 15px; padding: 14px 24px;
+}
+.big-action-btn-secondary:hover {
+  background: linear-gradient(135deg, rgba(167,139,250,0.3), rgba(99,210,255,0.3));
+  border-color: rgba(167,139,250,0.6); box-shadow: 0 0 16px rgba(167,139,250,0.25);
+}
 
 /* ═══ SIM PHASE ═══ */
 #sim-overlay {
@@ -802,6 +813,12 @@ html, body {
   margin-left: auto; font-size: 11px; font-weight: bold;
   color: rgba(99,210,255,0.75); font-family: 'Menlo','Courier New',monospace;
 }
+.viewer-lap-times {
+  display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  font-size: 11px; font-family: 'Menlo','Courier New',monospace;
+}
+.lap-empty { color: rgba(167,139,250,0.35); }
+.lap-item  { color: rgba(167,139,250,0.8); white-space: nowrap; }
 
 /* ─── Info Panel ─── */
 #viewer-info-panel {

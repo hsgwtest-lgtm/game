@@ -36,7 +36,13 @@ let simSpeed     = 1;
 let camX         = 0;
 let groundY      = 400;
 let lastTs       = 0;
+let stepAccum    = 0;
 let savedScore   = 80;           // getColor() のスコア基準
+
+// ラップタイム追跡
+let lapTimes        = [];        // { milestone: number, elapsed: number }[]  直近3件
+let lapLastMilestone = 0;        // 最後に通過した 500m 境界 (m)
+let lapSegmentStart  = 0;        // そのセグメント開始時の simTime
 
 /** @type {HTMLCanvasElement} */ let canvas;
 /** @type {CanvasRenderingContext2D} */ let ctx;
@@ -282,6 +288,10 @@ function spawnCreature(data) {
   simTime  = 0;
   camX     = 0;
   isPaused = false;
+  stepAccum = 0;
+  lapTimes = [];
+  lapLastMilestone = 0;
+  lapSegmentStart  = 0;
   savedScore = Math.max(data.score ?? 80, 80);
   document.getElementById('btn-viewer-pause').textContent = '⏸';
 
@@ -298,6 +308,7 @@ function spawnCreature(data) {
   const h2 = data.cof?.hiddenSize2 ?? 8;
   creature = new SoftBody(spawnX, spawnY, data.blueprint, genome, h1, h2);
   document.getElementById('viewer-distance').textContent = '距離: 0';
+  renderLapTimes();
 }
 
 function resetCreature() {
@@ -944,6 +955,19 @@ function renderNeuralMonitor() {
   nCtx.fillStyle = 'rgba(255,255,255,0.4)'; nCtx.fillText('抑制', lx + 12, legendY - 1);
 }
 
+// ═══ Lap Times ════════════════════════════════════════════════════════
+function renderLapTimes() {
+  const el = document.getElementById('viewer-lap-times');
+  if (!el) return;
+  if (lapTimes.length === 0) {
+    el.innerHTML = '<span class="lap-empty">500m毎にタイム表示</span>';
+    return;
+  }
+  el.innerHTML = lapTimes.map(l =>
+    `<span class="lap-item">🏁 ${l.milestone}m <strong>${l.elapsed.toFixed(1)}s</strong></span>`
+  ).join('');
+}
+
 // ═══ Main Loop ═══════════════════════════════════════════════════════
 function loop(ts) {
   requestAnimationFrame(loop);
@@ -951,7 +975,9 @@ function loop(ts) {
   lastTs = ts;
 
   if (!isPaused && creature) {
-    const steps  = Math.max(1, Math.round(simSpeed * 60 * dt));
+    stepAccum += simSpeed * 60 * dt;
+    const steps  = Math.floor(stepAccum);
+    stepAccum -= steps;
     const stepDt = 1 / 60;
     for (let s = 0; s < steps; s++) {
       creature.update(simTime);
@@ -962,6 +988,22 @@ function loop(ts) {
     const tx = creature.getCenterX() - (canvas.width / (window.devicePixelRatio || 1)) / 2;
     camX += (tx - camX) * 0.08;
     if (camX < 0) camX = 0;
+
+    // 500m ラップタイム追跡
+    const distM = Math.floor(creature.getCenterX() - creature.startX);
+    const nextMilestone = lapLastMilestone + 500;
+    if (distM >= nextMilestone) {
+      const elapsed = simTime - lapSegmentStart;
+      lapTimes.push({ milestone: nextMilestone, elapsed });
+      if (lapTimes.length > 3) lapTimes.shift();
+      lapLastMilestone = nextMilestone;
+      lapSegmentStart  = simTime;
+      renderLapTimes();
+    }
+    // 5000m 到達で自動リセット
+    if (distM >= 5000) {
+      resetCreature();
+    }
   }
 
   render();
