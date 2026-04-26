@@ -1,10 +1,12 @@
-const CACHE_NAME = 'softevo-v2';
+const CACHE_NAME = 'softevo-v3';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
   './engine.js',
   './manifest.json',
+  './race.html',
+  './race.js',
   './icons/icon-192.png',
   './icons/icon-512.png'
 ];

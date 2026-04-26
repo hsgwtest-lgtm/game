@@ -317,16 +317,29 @@ function handleLbNewRace(idx) {
 async function refreshRaceSetup() {
   raceSelected.clear();
 
-  // スロットデータ読み込み
-  let slots = Array(10).fill(null);
-  try { slots = await loadAllCreatures(); } catch {}
+  // ローディング表示
+  const list = document.getElementById('race-setup-list');
+  if (list) list.innerHTML = '<div class="race-setup-empty">📡 読み込み中…</div>';
+
+  // スロットデータ + LB を並列取得
+  const [slots] = await Promise.all([
+    loadAllCreatures().catch(() => Array(10).fill(null)),
+    // LBデータが未取得のときだけ一度だけフェッチ
+    lbEntries.length === 0 ? new Promise(resolve => {
+      const unsub = subscribeTop((entries, err) => {
+        if (!err) lbEntries = entries;
+        unsub();
+        resolve();
+      }, 20);
+    }).catch(() => {}) : Promise.resolve(),
+  ]);
 
   // LB 事前選択をセット
   if (racePreselectedLb) {
     raceSelected.add(`lb-${racePreselectedLb.id}`);
   }
 
-  renderRaceSetup(slots);
+  renderRaceSetup(slots ?? Array(10).fill(null));
 }
 
 function renderRaceSetup(slots) {
@@ -371,7 +384,7 @@ function renderRaceSetup(slots) {
   }
 
   if (html === '') {
-    html = '<div class="race-setup-empty">保存された生物が見つかりません。<br>先に生物を進化させてスロットに保存するか、リーダーボードを読み込んでください。</div>';
+    html = '<div class="race-setup-empty">♻️ まだレースできる生物がありません。<br>まず生物を進化させてスロットに保存しましょう！</div>';
   }
 
   list.innerHTML = html;
