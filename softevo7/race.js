@@ -68,10 +68,12 @@ class SoftBody {
     for (const n of bp.nodes) { cx += n.x; cy += n.y; }
     cx /= nc; cy /= nc;
 
-    this.startX  = x;
-    this.maxX    = x;
-    this.fitness = 0;
-    this.trail   = [];
+    this.startX       = x;
+    this.maxX         = x;
+    this.fitness      = 0;
+    this.trail        = [];
+    this.speed        = 0;   // 瞬間速度 (px/s)
+    this.currentRank  = 0;   // 現在のランク
 
     this.nodes = bp.nodes.map(n => ({
       x: x + (n.x - cx), y: y + (n.y - cy),
@@ -182,9 +184,13 @@ let isCountdown   = true;
 let countdownVal  = 3;
 let countdownTimer = 0;
 let simSpeed      = 1;
+let stepAccum     = 0;    // スロー再生用アキュムレータ
 let camX          = 0;
+let camTargetIdx  = -1;   // -1 = リーダー追従, ≥ 0 = 特定レーサー追従
 let groundY       = 400;
 let lastTs        = 0;
+let prevRanks     = {};   // 追い抜き検出用
+let overtakeEvents = [];  // キャンバス上フローティング通知
 
 /** @type {HTMLCanvasElement} */ let canvas;
 /** @type {CanvasRenderingContext2D} */ let ctx;
@@ -233,27 +239,46 @@ function renderHUD() {
   const hud = document.getElementById('race-hud');
   if (!hud) return;
 
-  if (racers.length === 0) { hud.innerHTML = ''; return; }
+  const hintHtml = '<div id="race-hud-hint">📹 タップで視点切替</div>';
 
-  // ランク順に並べる
+  if (racers.length === 0) { hud.innerHTML = hintHtml; return; }
+
+  // ランク順に並べ、currentRank をセット
   const ranked = racers.slice().sort((a, b) => b.fitness - a.fitness);
+  ranked.forEach((r, i) => { r.currentRank = i; });
   const maxFit = Math.max(ranked[0].fitness, 1);
 
-  hud.innerHTML = ranked.map((r, rank) => {
-    const pct   = Math.min(100, Math.max(0, (r.fitness / maxFit) * 100));
-    const medal = MEDALS[rank] ?? `${rank + 1}.`;
-    const dist  = Math.round(r.fitness);
-    const c     = r.color;
+  const rowsHtml = ranked.map((r, rank) => {
+    const pct      = Math.min(100, Math.max(0, (r.fitness / maxFit) * 100));
+    const medal    = MEDALS[rank] ?? `${rank + 1}.`;
+    const dist     = Math.round(r.fitness);
+    const spd      = Math.round(Math.max(0, r.speed ?? 0));
+    const racerIdx = racers.indexOf(r);
+    const isCam    = (camTargetIdx === racerIdx) || (camTargetIdx === -1 && rank === 0);
+    const c        = r.color;
     return `
-      <div class="race-hud-row">
+      <div class="race-hud-row${isCam ? ' cam-active' : ''}" data-idx="${racerIdx}">
+        <span class="race-hud-cam-icon">${isCam ? '📹' : ''}</span>
         <span class="race-hud-medal">${medal}</span>
         <span class="race-hud-name" style="color:rgb(${c[0]},${c[1]},${c[2]})">${esc(r.racerName)}</span>
         <div class="race-hud-bar-wrap">
           <div class="race-hud-bar" style="width:${pct.toFixed(1)}%;background:rgba(${c[0]},${c[1]},${c[2]},0.7)"></div>
         </div>
-        <span class="race-hud-dist">${dist}</span>
+        <span class="race-hud-dist">${dist}px</span>
+        <span class="race-hud-spd">${spd > 0 ? spd : '—'}</span>
       </div>`;
   }).join('');
+
+  hud.innerHTML = rowsHtml + hintHtml;
+
+  // タップで視点切替
+  hud.querySelectorAll('.race-hud-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const idx = parseInt(row.dataset.idx);
+      camTargetIdx = (camTargetIdx === idx) ? -1 : idx;
+      renderHUD();
+    });
+  });
 }
 
 // ═══ ライブ順位 (ボトムバー) ════════════════════════════════════════
@@ -267,7 +292,26 @@ function renderStandings() {
       + `${MEDALS[rank] ?? (rank + 1) + '.'} ${esc(r.racerName)}</span>`;
   }).join('');
 }
-
+// ═══ 追い抜き検出 ════════════════════════════════════════════════════
+function detectOvertakes() {
+  if (racers.length < 2 || raceTime < 1.5) return;
+  const ranked = racers.slice().sort((a, b) => b.fitness - a.fitness);
+  for (let i = 0; i < ranked.length; i++) {
+    const r        = ranked[i];
+    const prevRank = prevRanks[r.racerName];
+    if (prevRank !== undefined && prevRank > i) {
+      overtakeEvents.push({
+        startTime: raceTime,
+        text:      `${r.racerName} 追い抜き!`,
+        color:     r.color,
+        worldX:    r.getCenterX(),
+        worldY:    r.getCenterY(),
+      });
+    }
+    prevRanks[r.racerName] = i;
+  }
+  overtakeEvents = overtakeEvents.filter(e => raceTime - e.startTime < 2.5);
+}
 // ═══ フィニッシュ画面 ════════════════════════════════════════════════
 function showFinish() {
   isFinished = true;
@@ -368,6 +412,21 @@ function render() {
   // 各レーサー描画
   for (const racer of racers) drawRacer(racer);
 
+  // 追い抜きイベント (ワールド座標空間)
+  for (const ev of overtakeEvents) {
+    const age   = raceTime - ev.startTime;
+    const alpha = Math.max(0, 1 - age / 2.5);
+    const yOff  = age * 22;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle   = `rgb(${ev.color[0]},${ev.color[1]},${ev.color[2]})`;
+    ctx.font        = 'bold 11px -apple-system,sans-serif';
+    ctx.textAlign   = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(ev.text, ev.worldX, ev.worldY - 38 - yOff);
+    ctx.textBaseline = 'alphabetic';
+    ctx.globalAlpha = 1;
+  }
+
   ctx.restore();
 
   // カウントダウン表示
@@ -459,6 +518,14 @@ function drawRacer(body) {
   ctx.beginPath(); ctx.arc(frontNode.x + perpX * 1.75 + Math.cos(eyeAngle) * 0.8, frontNode.y + perpY * 1.75 + Math.sin(eyeAngle) * 0.8, 1.2, 0, Math.PI * 2); ctx.fill();
   ctx.beginPath(); ctx.arc(frontNode.x - perpX * 1.75 + Math.cos(eyeAngle) * 0.8, frontNode.y - perpY * 1.75 + Math.sin(eyeAngle) * 0.8, 1.2, 0, Math.PI * 2); ctx.fill();
 
+  // メダルバッジ (ランク表示)
+  const rankMedal = MEDALS[body.currentRank ?? 0];
+  if (rankMedal) {
+    ctx.font = '12px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(rankMedal, cx + 15, cy - 22);
+    ctx.textBaseline = 'alphabetic';
+  }
+
   // 名前ラベル
   ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},0.9)`;
   ctx.font = 'bold 9px -apple-system,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
@@ -473,13 +540,15 @@ function drawRacer(body) {
   ctx.textBaseline = 'alphabetic';
 }
 
-// ═══ カメラ更新 ══════════════════════════════════════════════════════
+// ═══ カメラ更新 (ターゲット対応) ══════════════════════════════════════════════
 function updateCamera() {
   if (racers.length === 0) return;
-  const leader = racers.reduce((a, b) => (a.getCenterX() > b.getCenterX() ? a : b));
+  const target = (camTargetIdx >= 0 && camTargetIdx < racers.length)
+    ? racers[camTargetIdx]
+    : racers.reduce((a, b) => (a.getCenterX() > b.getCenterX() ? a : b));
   const dpr = window.devicePixelRatio || 1;
   const cw  = canvas.width / dpr;
-  const tx  = leader.getCenterX() - cw * 0.45;
+  const tx  = target.getCenterX() - cw * 0.45;
   camX += (tx - camX) * 0.06;
   if (camX < 0) camX = 0;
 }
@@ -520,24 +589,31 @@ function loop(ts) {
   }
 
   if (!isPaused && !isFinished) {
-    const steps   = Math.max(1, Math.round(simSpeed * 60 * dt));
-    const stepDt  = 1 / 60;
-    for (let s = 0; s < steps; s++) {
-      for (const racer of racers) {
-        racer.update(simTime);
-        racer.physics(groundY);
+    // スロー再生対応：アキュムレータ方式
+    stepAccum += simSpeed * 60 * dt;
+    const maxSteps = Math.min(Math.floor(stepAccum), simSpeed >= 1 ? 8 : 1);
+    if (maxSteps > 0) {
+      stepAccum -= maxSteps;
+      const stepDt = 1 / 60;
+      for (let s = 0; s < maxSteps; s++) {
+        for (const racer of racers) {
+          const preCX = racer.getCenterX();
+          racer.update(simTime);
+          racer.physics(groundY);
+          const postCX = racer.getCenterX();
+          racer.speed = racer.speed * 0.8 + (postCX - preCX) * 60 * 0.2;
+        }
+        simTime  += stepDt;
+        raceTime += stepDt;
       }
-      simTime  += stepDt;
-      raceTime += stepDt;
+      detectOvertakes();
+      updateTimerDisplay();
+      renderHUD();
+      renderStandings();
+      if (raceTime >= RACE_DURATION) showFinish();
     }
-    updateCamera();
-    updateTimerDisplay();
-    renderHUD();
-    renderStandings();
-
-    if (raceTime >= RACE_DURATION) showFinish();
   }
-
+  updateCamera();
   render();
 }
 
@@ -587,9 +663,15 @@ document.addEventListener('DOMContentLoaded', () => {
   renderHUD();
 
   // コントロール
-  document.getElementById('btn-race-pause').addEventListener('click', () => {
-    isPaused = !isPaused;
-    document.getElementById('btn-race-pause').textContent = isPaused ? '▶' : '⏸';
+  document.getElementById('btn-race-pause-ctrl')?.addEventListener('click', () => {
+    isPaused = true;
+    document.getElementById('btn-race-pause-ctrl')?.classList.add('active');
+    document.getElementById('btn-race-play-ctrl')?.classList.remove('active');
+  });
+  document.getElementById('btn-race-play-ctrl')?.addEventListener('click', () => {
+    isPaused = false;
+    document.getElementById('btn-race-play-ctrl')?.classList.add('active');
+    document.getElementById('btn-race-pause-ctrl')?.classList.remove('active');
   });
 
   document.getElementById('btn-race-again').addEventListener('click', () => {
@@ -601,11 +683,17 @@ document.addEventListener('DOMContentLoaded', () => {
     countdownVal = 3;
     countdownTimer = 0;
     camX         = 0;
+    stepAccum    = 0;
+    camTargetIdx = -1;
+    prevRanks    = {};
+    overtakeEvents = [];
     document.getElementById('race-finish-overlay').classList.add('hidden');
     document.getElementById('race-countdown-overlay').classList.remove('hidden');
     document.getElementById('race-countdown-num').textContent = '3';
     document.getElementById('race-countdown-sub').textContent = 'レースまで…';
     document.getElementById('race-timer-disp').classList.remove('race-timer-warn');
+    document.getElementById('btn-race-play-ctrl')?.classList.add('active');
+    document.getElementById('btn-race-pause-ctrl')?.classList.remove('active');
     spawnRacers();
     renderHUD();
   });
@@ -614,7 +702,8 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.race-spd-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      simSpeed = parseFloat(btn.dataset.speed);
+      simSpeed  = parseFloat(btn.dataset.speed);
+      stepAccum = 0;  // スロー切替時にアキュムレータリセット
     });
   });
 

@@ -24,7 +24,9 @@
   </div>
 
   <!-- ═══ Position HUD ═══ -->
-  <div id="race-hud"></div>
+  <div id="race-hud">
+    <div id="race-hud-hint">📹 タップで視点切替</div>
+  </div>
 
   <!-- ═══ Main Canvas ═══ -->
   <div id="race-canvas-wrap">
@@ -55,13 +57,19 @@
 
   <!-- ═══ Bottom Bar ═══ -->
   <div id="race-bottom-bar">
-    <button id="btn-race-pause" title="一時停止/再生">⏸</button>
+    <div class="race-ctrl-group">
+      <button id="btn-race-pause-ctrl" class="race-ctrl-btn" title="一時停止">⏸</button>
+      <button id="btn-race-play-ctrl" class="race-ctrl-btn active" title="再生">▶</button>
+    </div>
     <div id="race-live-standings"></div>
-    <div class="race-speed-btns">
+    <div class="race-ctrl-group">
+      <button class="race-spd-btn" data-speed="0.5">½×</button>
       <button class="race-spd-btn active" data-speed="1">1×</button>
       <button class="race-spd-btn" data-speed="2">2×</button>
-      <button class="race-spd-btn" data-speed="0.5">½×</button>
+      <button class="race-spd-btn" data-speed="4">4×</button>
     </div>
+    <button class="race-ctrl-btn race-home-btn" onclick="location.href='./'"
+      title="ホームへ戻る">🏠</button>
   </div>
 
 </div>
