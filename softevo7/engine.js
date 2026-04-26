@@ -566,7 +566,7 @@
         // blueprint が存在しかつノードを持つ場合は対戦相手固有のものを使用
         const bp = (def.blueprint && def.blueprint.nodes && def.blueprint.nodes.length > 0)
           ? def.blueprint : blueprint;
-        const startX = 200 + (COF.population + i) * spacing;
+        const startX = 200; // population と同じ開始位置
         const opp = new SoftBody(startX, sy, bp, genome);
         opp.isRaceOpponent = true;
         opp.raceName      = def.name  || '対戦相手';
@@ -3235,6 +3235,18 @@
   //  EXTERNAL API — save / leaderboard / race modules
   // ═══════════════════════════════════════════════════
   window.SoftEvoAPI = {
+    /** 現在の blueprint を返す */
+    getBlueprint() {
+      return {
+        nodes:   blueprint.nodes.map(n => ({ x: n.x, y: n.y, radius: n.radius })),
+        bones:   blueprint.bones.map(b => ({ a: b.a, b: b.b })),
+        muscles: blueprint.muscles.map(m => ({ a: m.a, b: m.b })),
+      };
+    },
+
+    /** 安全にフェーズを返す: 'build' | 'sim' */
+    getPhase() { return currentPhase === PHASE_SIM ? 'sim' : 'build'; },
+
     isInSim() { return currentPhase === PHASE_SIM; },
 
     getBestCreatureData() {

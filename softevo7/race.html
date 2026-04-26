@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#060a14">
+<title>SoftEvo — レース</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="race-app">
+
+  <!-- ═══ Header ═══ -->
+  <div id="race-header">
+    <button id="race-back-btn" onclick="history.back()">← 戻る</button>
+    <h1 id="race-title">🏎️ レース</h1>
+    <div id="race-header-right">
+      <span id="race-timer-disp" class="race-timer">30.0s</span>
+    </div>
+  </div>
+
+  <!-- ═══ Position HUD ═══ -->
+  <div id="race-hud"></div>
+
+  <!-- ═══ Main Canvas ═══ -->
+  <div id="race-canvas-wrap">
+    <canvas id="race-canvas"></canvas>
+
+    <!-- Countdown overlay -->
+    <div id="race-countdown-overlay">
+      <div id="race-countdown-num">3</div>
+      <div id="race-countdown-sub">レースまで…</div>
+    </div>
+
+    <!-- Finish overlay -->
+    <div id="race-finish-overlay" class="hidden">
+      <div id="race-finish-title">🏁 FINISH!</div>
+      <div id="race-podium"></div>
+      <div id="race-finish-actions">
+        <button id="btn-race-again">🔄 もう一度</button>
+        <button id="btn-race-back2" onclick="history.back()">← 戻る</button>
+      </div>
+    </div>
+
+    <!-- No participants -->
+    <div id="race-no-part" class="hidden">
+      <div class="race-no-part-msg">参加者が選択されていません</div>
+      <button onclick="history.back()">← 戻る</button>
+    </div>
+  </div>
+
+  <!-- ═══ Bottom Bar ═══ -->
+  <div id="race-bottom-bar">
+    <button id="btn-race-pause" title="一時停止/再生">⏸</button>
+    <div id="race-live-standings"></div>
+    <div class="race-speed-btns">
+      <button class="race-spd-btn active" data-speed="1">1×</button>
+      <button class="race-spd-btn" data-speed="2">2×</button>
+      <button class="race-spd-btn" data-speed="0.5">½×</button>
+    </div>
+  </div>
+
+</div>
+<script type="module" src="race.js"></script>
+</body>
+</html>

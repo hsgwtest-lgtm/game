@@ -12,7 +12,7 @@ const SDK_BASE = 'https://www.gstatic.com/firebasejs/10.12.2';
 
 // ─── Firebase シングルトン ───────────────────────────────────────────
 let _db = null;
-let _fbRef, _fbPush, _fbGet, _fbOnValue;
+let _fbRef, _fbPush, _fbGet, _fbOnValue, _fbRemove;
 
 async function ensureFirebase() {
   if (_db) return _db;
@@ -25,13 +25,13 @@ async function ensureFirebase() {
 
   const { initializeApp, getApps } = await import(`${SDK_BASE}/firebase-app.js`);
   const {
-    getDatabase, ref, push, get, onValue,
+    getDatabase, ref, push, get, onValue, remove,
   } = await import(`${SDK_BASE}/firebase-database.js`);
 
   const app = getApps().length > 0 ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
   _db = getDatabase(app);
   _fbRef = ref; _fbPush = push;
-  _fbGet = get; _fbOnValue = onValue;
+  _fbGet = get; _fbOnValue = onValue; _fbRemove = remove;
   return _db;
 }
 
@@ -69,6 +69,16 @@ export async function postEntry(data) {
 
   await _fbPush(_fbRef(db, 'leaderboard'), entry);
   return entry;
+}
+
+/**
+ * リーダーボードのエントリを削除する
+ * @param {string} id Firebase キー
+ */
+export async function deleteEntry(id) {
+  if (!id) throw new TypeError('id が必要です');
+  const db = await ensureFirebase();
+  await _fbRemove(_fbRef(db, `leaderboard/${id}`));
 }
 
 /**

@@ -5,13 +5,18 @@
  */
 
 import { saveCreature, loadCreature, loadAllCreatures, deleteCreature } from './creatureSaveManager.js';
-import { postEntry, subscribeTop } from './leaderboard.js';
+import { postEntry, subscribeTop, deleteEntry } from './leaderboard.js';
 
-// ─── State ────────────────────────────────────────────────────────────
-let currentModal = null;   // null | 'save' | 'leaderboard'
+// ─── State ────────────────────────────────────────────────────
+let currentModal = null;   // null | 'save' | 'leaderboard' | 'race-setup'
 let lbUnsubscribe  = null;
 let cachedSlots    = Array(10).fill(null);
-let lbEntries      = [];let pendingSlots   = new Set(); // 世代終了を待機中のスロット番号
+let lbEntries      = [];
+let pendingSlots   = new Set(); // 世代終了を待機中のスロット番号
+
+// レース設定モーダル状態
+let raceSelected      = new Set(); // slot番号 (1-10) or 'lb-<id>'
+let racePreselectedLb = null;      // 事前選択されたLBエントリー
 // ─── Engine API accessor ─────────────────────────────────────────────
 const api = () => window.SoftEvoAPI ?? null;
 
@@ -19,20 +24,25 @@ const api = () => window.SoftEvoAPI ?? null;
 function openModal(name) {
   closeModal();
   currentModal = name;
-  document.getElementById(`modal-${name}`)?.classList.remove('hidden');
+  if (name === 'race-setup') {
+    document.getElementById('modal-race-setup')?.classList.remove('hidden');
+  } else {
+    document.getElementById(`modal-${name}`)?.classList.remove('hidden');
+  }
   document.getElementById('modal-backdrop')?.classList.remove('hidden');
   if (name === 'save')        refreshSaveModal();
   if (name === 'leaderboard') refreshLeaderboard();
+  if (name === 'race-setup')  refreshRaceSetup();
 }
 
 function closeModal() {
-  if (currentModal) {
+  if (currentModal === 'race-setup') {
+    document.getElementById('modal-race-setup')?.classList.add('hidden');
+  } else if (currentModal) {
     document.getElementById(`modal-${currentModal}`)?.classList.add('hidden');
   }
   document.getElementById('modal-backdrop')?.classList.add('hidden');
   currentModal = null;
-
-  // リーダーボード購読を解除
   if (lbUnsubscribe) { lbUnsubscribe(); lbUnsubscribe = null; }
 }
 
@@ -237,12 +247,18 @@ function renderLeaderboard(entries) {
         <span class="lb-meta">🧬 Gen ${entry.generation ?? '?'} · ${entry.createdAt ? new Date(entry.createdAt).toLocaleDateString('ja-JP') : '—'}</span>
       </div>
       <span class="lb-score">🏆 ${entry.score}</span>
-      <button class="lb-race-btn" data-idx="${i}" title="この生物とレース対戦">🏎️</button>
+      <button class="lb-race-btn" data-idx="${i}" title="ゴーストレース">🏎️</button>
+      <button class="lb-newrace-btn" data-idx="${i}" title="専用レースページで対戦">🏁</button>
+      <button class="lb-del-btn" data-idx="${i}" title="削除">🗑️</button>
     </div>
   `).join('');
 
   list.querySelectorAll('.lb-race-btn').forEach(btn =>
     btn.addEventListener('click', () => handleStartRace(+btn.dataset.idx)));
+  list.querySelectorAll('.lb-newrace-btn').forEach(btn =>
+    btn.addEventListener('click', () => handleLbNewRace(+btn.dataset.idx)));
+  list.querySelectorAll('.lb-del-btn').forEach(btn =>
+    btn.addEventListener('click', () => handleDeleteLbEntry(+btn.dataset.idx)));
 }
 
 function handleStartRace(idx) {
@@ -263,7 +279,170 @@ function handleStartRace(idx) {
 
   closeModal();
   showRaceBar([{ name: entry.nickname, baseScore: entry.score }]);
-  showToast(`🏎️ ${entry.nickname} とのレース開始！`, 'success');
+  showToast(`🏎️ ${entry.nickname} とのゴーストレース開始！`, 'success');
+}
+
+async function handleDeleteLbEntry(idx) {
+  const entry = lbEntries[idx];
+  if (!entry?.id) { showToast('⚠️ エントリーIDが見つかりません', 'warn'); return; }
+
+  const ok = await showConfirm(
+    `「${entry.nickname}」 (スコア: ${entry.score}) をリーダーボードから削除しますか？
+この操作は取り消せません。`,
+    '削除する',
+    '⚠️ リーダーボードエントリー削除'
+  );
+  if (!ok) return;
+
+  try {
+    await deleteEntry(entry.id);
+    showToast(`🗑️ 「${entry.nickname}」を削除しました`, 'info');
+    // subscribeTop が自動更新する
+  } catch (e) {
+    showToast(`❌ 削除失敗: ${e.message}`, 'error');
+  }
+}
+
+function handleLbNewRace(idx) {
+  const entry = lbEntries[idx];
+  if (!entry?.genome) { showToast('⚠️ このエントリーにゲノムデータがありません', 'warn'); return; }
+  racePreselectedLb = entry;
+  openModal('race-setup');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  RACE SETUP MODAL
+// ═══════════════════════════════════════════════════════════════════════
+
+async function refreshRaceSetup() {
+  raceSelected.clear();
+
+  // スロットデータ読み込み
+  let slots = Array(10).fill(null);
+  try { slots = await loadAllCreatures(); } catch {}
+
+  // LB 事前選択をセット
+  if (racePreselectedLb) {
+    raceSelected.add(`lb-${racePreselectedLb.id}`);
+  }
+
+  renderRaceSetup(slots);
+}
+
+function renderRaceSetup(slots) {
+  const list = document.getElementById('race-setup-list');
+  if (!list) return;
+
+  let html = '';
+
+  // ─ ローカルスロット ─
+  const filledSlots = slots
+    .map((s, i) => s ? { ...s, slotIdx: i + 1 } : null)
+    .filter(Boolean);
+
+  if (filledSlots.length > 0) {
+    html += '<div class="race-setup-section-title">📁 ローカル保存データ</div>';
+    for (const s of filledSlots) {
+      const key     = `slot-${s.slot}`;
+      const checked = raceSelected.has(key);
+      html += `
+        <label class="race-setup-item${checked ? ' selected' : ''}" data-key="${key}">
+          <input type="checkbox" class="race-setup-check" data-key="${key}" ${checked ? 'checked' : ''}>
+          <span class="race-setup-name">${esc(s.name ?? `Slot ${s.slot}`)}</span>
+          <span class="race-setup-meta">Gen ${s.generation ?? '?'} · スコア ${s.score ?? '?'}</span>
+        </label>`;
+    }
+  }
+
+  // ─ LB エントリー ─
+  if (lbEntries.length > 0) {
+    html += '<div class="race-setup-section-title">☁️ リーダーボード</div>';
+    for (const e of lbEntries) {
+      if (!e.genome) continue;
+      const key     = `lb-${e.id}`;
+      const checked = raceSelected.has(key);
+      html += `
+        <label class="race-setup-item${checked ? ' selected' : ''}" data-key="${key}">
+          <input type="checkbox" class="race-setup-check" data-key="${key}" ${checked ? 'checked' : ''}>
+          <span class="race-setup-name">${esc(e.nickname)}</span>
+          <span class="race-setup-meta">Gen ${e.generation ?? '?'} · スコア ${e.score}</span>
+        </label>`;
+    }
+  }
+
+  if (html === '') {
+    html = '<div class="race-setup-empty">保存された生物が見つかりません。<br>先に生物を進化させてスロットに保存するか、リーダーボードを読み込んでください。</div>';
+  }
+
+  list.innerHTML = html;
+
+  list.querySelectorAll('.race-setup-check').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const key = cb.dataset.key;
+      if (cb.checked) {
+        if (raceSelected.size >= 6) { cb.checked = false; showToast('⚠️ 最大6体まで選択できます', 'warn'); return; }
+        raceSelected.add(key);
+        cb.closest('.race-setup-item')?.classList.add('selected');
+      } else {
+        raceSelected.delete(key);
+        cb.closest('.race-setup-item')?.classList.remove('selected');
+      }
+      updateLaunchBtn();
+    });
+  });
+
+  updateLaunchBtn();
+}
+
+function updateLaunchBtn() {
+  const btn = document.getElementById('btn-launch-race');
+  if (!btn) return;
+  const n = raceSelected.size;
+  btn.disabled = n < 2;
+  btn.textContent = n < 2 ? `🏎️ レーススタート（あと${2 - n}体選択）` : `🏎️ レーススタート (${n}体)`;
+}
+
+async function launchRace() {
+  if (raceSelected.size < 2) { showToast('⚠️ 2体以上選択してください', 'warn'); return; }
+
+  let slots = Array(10).fill(null);
+  try { slots = await loadAllCreatures(); } catch {}
+  const slotMap = {};
+  for (const s of slots) if (s) slotMap[s.slot] = s;
+
+  const participants = [];
+  for (const key of raceSelected) {
+    if (key.startsWith('slot-')) {
+      const slotNum = parseInt(key.replace('slot-', ''));
+      const s = slotMap[slotNum];
+      if (!s) continue;
+      participants.push({
+        name:      s.name ?? `Slot ${slotNum}`,
+        score:     s.score ?? 0,
+        genome:    { weights: s.genome.weights.map(w => Array.from(w)), biases: s.genome.biases.map(b => Array.from(b)) },
+        blueprint: s.blueprint ?? null,
+        cof:       s.cof ?? null,
+        source:    'local',
+      });
+    } else if (key.startsWith('lb-')) {
+      const id = key.replace('lb-', '');
+      const e  = lbEntries.find(x => x.id === id);
+      if (!e?.genome) continue;
+      participants.push({
+        name:      e.nickname,
+        score:     e.score,
+        genome:    e.genome,
+        blueprint: e.blueprint ?? null,
+        cof:       null,
+        source:    'leaderboard',
+      });
+    }
+  }
+
+  if (participants.length < 2) { showToast('⚠️ 参加可能なデータが2件未満です', 'warn'); return; }
+
+  localStorage.setItem('softevo7_race', JSON.stringify(participants));
+  location.href = 'race.html';
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -362,11 +541,19 @@ function setup() {
   // Open buttons
   document.getElementById('btn-save-modal')?.addEventListener('click', () => openModal('save'));
   document.getElementById('btn-leaderboard-modal')?.addEventListener('click', () => openModal('leaderboard'));
+  document.getElementById('btn-race-build')?.addEventListener('click', () => {
+    racePreselectedLb = null;
+    openModal('race-setup');
+  });
 
   // Backdrop / close buttons
   document.getElementById('modal-backdrop')?.addEventListener('click', closeModal);
   document.getElementById('close-save-modal')?.addEventListener('click', closeModal);
   document.getElementById('close-lb-modal')?.addEventListener('click', closeModal);
+  document.getElementById('close-race-modal')?.addEventListener('click', closeModal);
+
+  // Launch race
+  document.getElementById('btn-launch-race')?.addEventListener('click', launchRace);
 
   // Prevent modal panel clicks from bubbling to backdrop
   document.querySelectorAll('.modal-panel').forEach(el =>
