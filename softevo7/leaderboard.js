@@ -83,7 +83,7 @@ export async function fetchTop(limit = 20) {
   if (!snapshot.exists()) return [];
 
   const entries = [];
-  snapshot.forEach(child => entries.push({ id: child.key, ...child.val() }));
+  snapshot.forEach(child => { entries.push({ id: child.key, ...child.val() }); });
   return entries.sort((a, b) => b.score - a.score).slice(0, limit);
 }
 
@@ -103,7 +103,7 @@ export function subscribeTop(callback, limit = 20) {
         snapshot => {
           const entries = [];
           if (snapshot.exists()) {
-            snapshot.forEach(child => entries.push({ id: child.key, ...child.val() }));
+            snapshot.forEach(child => { entries.push({ id: child.key, ...child.val() }); });
           }
           callback(entries.sort((a, b) => b.score - a.score).slice(0, limit));
         },
