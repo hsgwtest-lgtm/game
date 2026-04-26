@@ -992,7 +992,7 @@ function loop(ts) {
     // 500m ラップタイム追跡
     const distM = Math.floor(creature.getCenterX() - creature.startX);
     const nextMilestone = lapLastMilestone + 500;
-    if (distM >= nextMilestone && nextMilestone > 0) {
+    if (distM >= nextMilestone) {
       const elapsed = simTime - lapSegmentStart;
       lapTimes.push({ milestone: nextMilestone, elapsed });
       if (lapTimes.length > 3) lapTimes.shift();
