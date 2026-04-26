@@ -2661,6 +2661,7 @@
   document.getElementById('btn-clear-build').addEventListener('click', clearBlueprint);
 
   document.getElementById('btn-start-sim').addEventListener('click', () => { if (isValidBlueprint()) switchToSim(); });
+  document.getElementById('btn-view-creatures').addEventListener('click', () => { window.location.href = 'viewer.html'; });
 
   function switchToSim() {
     currentPhase = PHASE_SIM;

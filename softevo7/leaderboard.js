@@ -12,7 +12,7 @@ const SDK_BASE = 'https://www.gstatic.com/firebasejs/10.12.2';
 
 // ─── Firebase シングルトン ───────────────────────────────────────────
 let _db = null;
-let _fbRef, _fbPush, _fbQuery, _fbGet, _fbOnValue, _fbOrderByChild, _fbLimitToLast;
+let _fbRef, _fbPush, _fbGet, _fbOnValue;
 
 async function ensureFirebase() {
   if (_db) return _db;
@@ -25,14 +25,13 @@ async function ensureFirebase() {
 
   const { initializeApp, getApps } = await import(`${SDK_BASE}/firebase-app.js`);
   const {
-    getDatabase, ref, push, query, get, onValue, orderByChild, limitToLast,
+    getDatabase, ref, push, get, onValue,
   } = await import(`${SDK_BASE}/firebase-database.js`);
 
   const app = getApps().length > 0 ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
   _db = getDatabase(app);
-  _fbRef = ref; _fbPush = push; _fbQuery = query;
+  _fbRef = ref; _fbPush = push;
   _fbGet = get; _fbOnValue = onValue;
-  _fbOrderByChild = orderByChild; _fbLimitToLast = limitToLast;
   return _db;
 }
 
@@ -80,17 +79,12 @@ export async function postEntry(data) {
 export async function fetchTop(limit = 20) {
   const db = await ensureFirebase();
 
-  const q = _fbQuery(
-    _fbRef(db, 'leaderboard'),
-    _fbOrderByChild('score'),
-    _fbLimitToLast(limit),
-  );
-  const snapshot = await _fbGet(q);
+  const snapshot = await _fbGet(_fbRef(db, 'leaderboard'));
   if (!snapshot.exists()) return [];
 
   const entries = [];
   snapshot.forEach(child => entries.push({ id: child.key, ...child.val() }));
-  return entries.sort((a, b) => b.score - a.score);
+  return entries.sort((a, b) => b.score - a.score).slice(0, limit);
 }
 
 /**
@@ -104,19 +98,14 @@ export function subscribeTop(callback, limit = 20) {
 
   ensureFirebase()
     .then(db => {
-      const q = _fbQuery(
-        _fbRef(db, 'leaderboard'),
-        _fbOrderByChild('score'),
-        _fbLimitToLast(limit),
-      );
       const unsub = _fbOnValue(
-        q,
+        _fbRef(db, 'leaderboard'),
         snapshot => {
           const entries = [];
           if (snapshot.exists()) {
             snapshot.forEach(child => entries.push({ id: child.key, ...child.val() }));
           }
-          callback(entries.sort((a, b) => b.score - a.score));
+          callback(entries.sort((a, b) => b.score - a.score).slice(0, limit));
         },
         err => callback([], err),
       );
