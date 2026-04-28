@@ -24,6 +24,16 @@ const DEFAULT_COF = {
   constraintIter: 5, boneStiffness: 0.6, muscleStiffness: 0.3,
 };
 
+const RACE_PHYS_DEFS = [
+  { key: 'gravity',         label: '重力',     min: 0,    max: 1.5,  step: 0.05  },
+  { key: 'airDrag',         label: '空気抵抗', min: 0.9,  max: 1.0,  step: 0.005 },
+  { key: 'groundFriction',  label: '地面摩擦', min: 0.1,  max: 1.0,  step: 0.05  },
+  { key: 'bounce',          label: '反発係数', min: 0,    max: 0.8,  step: 0.05  },
+  { key: 'constraintIter',  label: '制約反復', min: 1,    max: 12,   step: 1     },
+  { key: 'boneStiffness',   label: '骨剛性',   min: 0.1,  max: 1.0,  step: 0.05  },
+  { key: 'muscleStiffness', label: '筋肉剛性', min: 0.05, max: 0.8,  step: 0.05  },
+];
+
 // ═══ NeuralNet ═══════════════════════════════════════════════════════
 class NeuralNet {
   constructor(layerSizes) {
@@ -122,20 +132,20 @@ class SoftBody {
       const act = outputs[i] ?? 0.5;
       this.muscleAct[i] = act;
       this.muscles[i].currentTarget = this.muscles[i].restLength * (0.4 + 0.6 * act);
-      this.muscles[i].stiffness     = raceCOF.muscleStiffness;
+      this.muscles[i].stiffness     = this._cof.muscleStiffness;
     }
-    for (const b of this.bones) b.stiffness = raceCOF.boneStiffness;
+    for (const b of this.bones) b.stiffness = this._cof.boneStiffness;
   }
 
   physics(gY) {
     for (const n of this.nodes) {
-      const vx = (n.x - n.ox) * raceCOF.airDrag;
-      const vy = (n.y - n.oy) * raceCOF.airDrag;
+      const vx = (n.x - n.ox) * this._cof.airDrag;
+      const vy = (n.y - n.oy) * this._cof.airDrag;
       n.ox = n.x; n.oy = n.y;
-      n.x += vx; n.y += vy + raceCOF.gravity;
+      n.x += vx; n.y += vy + this._cof.gravity;
       n.grounded = false;
     }
-    for (let iter = 0; iter < raceCOF.constraintIter; iter++) {
+    for (let iter = 0; iter < this._cof.constraintIter; iter++) {
       for (const b of this.bones)
         solveConstraint(this.nodes[b.a], this.nodes[b.b], b.restLength, b.stiffness);
       for (const m of this.muscles)
@@ -145,8 +155,8 @@ class SoftBody {
       if (n.y + n.radius > gY) {
         n.y = gY - n.radius;
         const vy = n.y - n.oy, vx = n.x - n.ox;
-        n.oy = n.y + vy * raceCOF.bounce;
-        n.ox = n.x - vx * raceCOF.groundFriction;
+        n.oy = n.y + vy * this._cof.bounce;
+        n.ox = n.x - vx * this._cof.groundFriction;
         n.grounded = true;
       }
       if (n.x - n.radius < 0) { n.x = n.radius; n.ox = n.x; }
@@ -174,6 +184,7 @@ function solveConstraint(a, b, targetLen, stiffness) {
 
 // ═══ 状態 ════════════════════════════════════════════════════════════
 let raceCOF       = Object.assign({}, DEFAULT_COF);
+let useIndividualEnv = true; // 独自環境モード (デフォルト有効)
 let participants  = [];  // 読み込んだ参加者データ
 let racers        = [];  // SoftBody[] + { name, color, colorStr, raceScore }
 let simTime       = 0;
@@ -225,12 +236,20 @@ function spawnRacers() {
     const h1 = p.cof?.hiddenSize1 ?? 12;
     const h2 = p.cof?.hiddenSize2 ?? 8;
 
-    const body = new SoftBody(SPAWN_X, spawnY, bp, genome, h1, h2, raceCOF);
+    // 独自環境モード: 各参加者の保存 COF から perCOF を構築
+    const perCOF = useIndividualEnv && p.cof
+      ? Object.assign({}, DEFAULT_COF, p.cof)
+      : raceCOF;
+
+    const body = new SoftBody(SPAWN_X, spawnY, bp, genome, h1, h2, perCOF);
     body.racerName  = p.name  || `参加者${i + 1}`;
     body.raceScore  = p.score || 0;
     body.color      = color;
     body.colorStr   = `rgb(${color[0]},${color[1]},${color[2]})`;
     racers.push(body);
+
+    // デバッグログ: 各レーサーの適用 COF を出力
+    console.log(`[Race] racer=${body.racerName} cof=`, body._cof);
   }
 }
 
@@ -253,6 +272,7 @@ function renderHUD() {
     const medal    = MEDALS[rank] ?? `${rank + 1}.`;
     const dist     = Math.round(r.fitness);
     const spd      = Math.round(Math.max(0, r.speed ?? 0));
+    const grav     = r._cof ? r._cof.gravity.toFixed(2) : '—';
     const racerIdx = racers.indexOf(r);
     const isCam    = (camTargetIdx === racerIdx) || (camTargetIdx === -1 && rank === 0);
     const c        = r.color;
@@ -266,19 +286,11 @@ function renderHUD() {
         </div>
         <span class="race-hud-dist">${dist}px</span>
         <span class="race-hud-spd">${spd > 0 ? spd : '—'}</span>
+        <span class="race-hud-grav">G:${grav}</span>
       </div>`;
   }).join('');
 
   hud.innerHTML = rowsHtml + hintHtml;
-
-  // タップで視点切替
-  hud.querySelectorAll('.race-hud-row').forEach(row => {
-    row.addEventListener('click', () => {
-      const idx = parseInt(row.dataset.idx);
-      camTargetIdx = (camTargetIdx === idx) ? -1 : idx;
-      renderHUD();
-    });
-  });
 }
 
 // ═══ ライブ順位 (ボトムバー) ════════════════════════════════════════
@@ -369,8 +381,9 @@ function render() {
     if (sx < -10 || sx > cw + 10) continue;
     ctx.beginPath(); ctx.moveTo(sx, gY - 16); ctx.lineTo(sx, gY); ctx.stroke();
     if (mx % 500 === 0) {
+      const relDist = mx - SPAWN_X;
       ctx.fillStyle = 'rgba(167,139,250,0.4)';
-      ctx.fillText(`${mx}`, sx, gY - 19);
+      ctx.fillText(`${relDist}`, sx, gY - 19);
     }
   }
   ctx.setLineDash([]);
@@ -595,6 +608,12 @@ function loop(ts) {
     if (maxSteps > 0) {
       stepAccum -= maxSteps;
       const stepDt = 1 / 60;
+      // デバッグログ: 初回フレームで各レーサーの COF 値を出力
+      if (raceTime === 0 && simTime === 0) {
+        for (const racer of racers) {
+          console.log(`[Race] physics frame0 racer=${racer.racerName} cof=`, racer._cof);
+        }
+      }
       for (let s = 0; s < maxSteps; s++) {
         for (const racer of racers) {
           const preCX = racer.getCenterX();
@@ -635,6 +654,67 @@ function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// ═══ 環境モード切替 ══════════════════════════════════════════════════
+function toggleEnvMode() {
+  useIndividualEnv = !useIndividualEnv;
+  // 全レーサーの _cof を即時切り替え
+  for (let i = 0; i < racers.length; i++) {
+    const p = participants[i];
+    racers[i]._cof = (useIndividualEnv && p?.cof)
+      ? Object.assign({}, DEFAULT_COF, p.cof)
+      : raceCOF;
+  }
+  const btn = document.getElementById('btn-race-env-toggle');
+  if (btn) btn.textContent = `環境: ${useIndividualEnv ? '独自' : '同一'}`;
+  const settingsBtn = document.getElementById('btn-race-env-settings');
+  if (settingsBtn) settingsBtn.classList.toggle('hidden', useIndividualEnv);
+}
+
+function toggleEnvPanel(forceState) {
+  const panel = document.getElementById('race-env-panel');
+  if (!panel) return;
+  const show = forceState !== undefined ? forceState : panel.classList.contains('hidden');
+  panel.classList.toggle('hidden', !show);
+  if (show) buildRaceCofPanel();
+}
+
+function buildRaceCofPanel() {
+  const container = document.getElementById('race-env-sliders');
+  if (!container) return;
+  container.innerHTML = '';
+  for (const def of RACE_PHYS_DEFS) {
+    const row = document.createElement('div');
+    row.className = 'race-env-row';
+
+    const label = document.createElement('label');
+    label.textContent = def.label;
+    label.className = 'race-env-label';
+
+    const slider = document.createElement('input');
+    slider.type  = 'range';
+    slider.min   = def.min;
+    slider.max   = def.max;
+    slider.step  = def.step;
+    slider.value = raceCOF[def.key];
+    slider.className = 'race-env-slider';
+
+    const valSpan = document.createElement('span');
+    valSpan.className = 'race-env-val';
+    const decimals = def.step < 0.01 ? 3 : def.step < 0.1 ? 2 : def.step < 1 ? 1 : 0;
+    valSpan.textContent = Number(raceCOF[def.key]).toFixed(decimals);
+
+    slider.addEventListener('input', () => {
+      raceCOF[def.key] = parseFloat(slider.value);
+      valSpan.textContent = parseFloat(slider.value).toFixed(decimals);
+    });
+
+    row.appendChild(label);
+    row.appendChild(slider);
+    row.appendChild(valSpan);
+    container.appendChild(row);
+  }
+}
+
 // ═══ 初期化 ══════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
   canvas = document.getElementById('race-canvas');
@@ -661,6 +741,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   spawnRacers();
   renderHUD();
+
+  // HUD タップで視点切替 (event delegation — 1回だけ登録)
+  const hud = document.getElementById('race-hud');
+  if (hud) {
+    hud.addEventListener('click', e => {
+      const row = e.target.closest('.race-hud-row');
+      if (!row) return;
+      const idx = parseInt(row.dataset.idx);
+      camTargetIdx = (camTargetIdx === idx) ? -1 : idx;
+      renderHUD();
+    });
+  }
 
   // コントロール
   document.getElementById('btn-race-pause-ctrl')?.addEventListener('click', () => {
@@ -709,4 +801,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   lastTs = performance.now();
   requestAnimationFrame(loop);
+
+  // 環境モード切替ボタン
+  document.getElementById('btn-race-env-toggle')?.addEventListener('click', toggleEnvMode);
+  // 環境設定ボタン
+  document.getElementById('btn-race-env-settings')?.addEventListener('click', toggleEnvPanel);
+  // 環境設定パネル閉じるボタン
+  document.getElementById('btn-race-env-close')?.addEventListener('click', () => toggleEnvPanel(false));
 });

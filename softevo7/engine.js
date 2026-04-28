@@ -411,11 +411,12 @@
   let bodyIdCounter = 0;
 
   class SoftBody {
-    constructor(x, y, bp, genome) {
+    constructor(x, y, bp, genome, cof = null) {
       this.id = bodyIdCounter++;
       this.startX = x; this.startY = y;
       this.fitness = 0; this.alive = true;
       this.minY = y;
+      this._cof = cof; // null = use global COF; non-null = per-creature COF
       // Telemetry
       this.totalMuscleOutput = 0;
       this.prevFitness = 0;
@@ -434,11 +435,12 @@
         this.nodes.push({ x: x + (n.x - bpCx), y: y + (n.y - bpCy), ox: x + (n.x - bpCx), oy: y + (n.y - bpCy), radius: n.radius, mass: 1, grounded: false });
       }
 
+      const activeCof = this._cof ?? COF;
       this.bones = [];
       for (const b of bp.bones) {
         const na = this.nodes[b.a], nb = this.nodes[b.b];
         const dx = nb.x - na.x, dy = nb.y - na.y;
-        this.bones.push({ a: b.a, b: b.b, restLength: Math.sqrt(dx * dx + dy * dy), stiffness: COF.boneStiffness });
+        this.bones.push({ a: b.a, b: b.b, restLength: Math.sqrt(dx * dx + dy * dy), stiffness: activeCof.boneStiffness });
       }
 
       this.muscles = [];
@@ -447,7 +449,7 @@
         const na = this.nodes[m.a], nb = this.nodes[m.b];
         const dx = nb.x - na.x, dy = nb.y - na.y;
         const rl = Math.sqrt(dx * dx + dy * dy);
-        this.muscles.push({ a: m.a, b: m.b, restLength: rl, currentTarget: rl, stiffness: COF.muscleStiffness });
+        this.muscles.push({ a: m.a, b: m.b, restLength: rl, currentTarget: rl, stiffness: activeCof.muscleStiffness });
         this.muscleAct.push(0.5);
       }
 
@@ -475,19 +477,20 @@
     updateBrain(time) {
       const inputs = this.getInputs(time);
       const outputs = this.brain.predict(inputs);
+      const cof = this._cof ?? COF;
       let totalOut = 0;
       let muscleHash = 0;
       for (let i = 0; i < this.muscles.length; i++) {
         const act = outputs[i] !== undefined ? outputs[i] : 0.5;
         this.muscleAct[i] = act;
         this.muscles[i].currentTarget = this.muscles[i].restLength * (0.4 + 0.6 * act);
-        // LIVE stiffness from COF
-        this.muscles[i].stiffness = COF.muscleStiffness;
+        // LIVE stiffness from COF (per-creature or global)
+        this.muscles[i].stiffness = cof.muscleStiffness;
         totalOut += Math.abs(act - 0.5);
         muscleHash += (act > 0.6 ? 1 : 0) << (i % 16);
       }
       // LIVE bone stiffness
-      for (const b of this.bones) b.stiffness = COF.boneStiffness;
+      for (const b of this.bones) b.stiffness = cof.boneStiffness;
 
       this.totalMuscleOutput = totalOut / this.muscles.length;
 
@@ -545,7 +548,7 @@
   function clearPopulation() { population = []; }
 
   // ─── Race Mode ────────────────────────────────────
-  let raceOpponentDefs = []; // { genome, blueprint, name, score } — 世代を超えて保持
+  let raceOpponentDefs = []; // { genome, blueprint, name, score, cof } — 世代を超えて保持
   let raceOpponents    = []; // 現世代のアクティブ SoftBody インスタンス
 
   // ─── Pending Saves（世代末保存キュー）────────────────
@@ -567,7 +570,8 @@
         const bp = (def.blueprint && def.blueprint.nodes && def.blueprint.nodes.length > 0)
           ? def.blueprint : blueprint;
         const startX = 200; // population と同じ開始位置
-        const opp = new SoftBody(startX, sy, bp, genome);
+        const oppCof = def.cof ? Object.assign({}, COF, def.cof) : null;
+        const opp = new SoftBody(startX, sy, bp, genome, oppCof);
         opp.isRaceOpponent = true;
         opp.raceName      = def.name  || '対戦相手';
         opp.raceScore     = def.score || 0;
@@ -726,17 +730,18 @@
     if (needExpand) expandWorld();
 
     for (const body of allBodies) {
+      const cof = body._cof ?? COF;
       for (const n of body.nodes) {
-        const vx = (n.x - n.ox) * COF.airDrag;
-        const vy = (n.y - n.oy) * COF.airDrag;
+        const vx = (n.x - n.ox) * cof.airDrag;
+        const vy = (n.y - n.oy) * cof.airDrag;
         n.ox = n.x; n.oy = n.y;
-        n.x += vx; n.y += vy + COF.gravity;
+        n.x += vx; n.y += vy + cof.gravity;
         n.grounded = false;
       }
-      for (let iter = 0; iter < COF.constraintIter; iter++) {
+      for (let iter = 0; iter < cof.constraintIter; iter++) {
         for (const c of body.bones) solveConstraint(body.nodes[c.a], body.nodes[c.b], c.restLength, c.stiffness);
         for (const m of body.muscles) solveConstraint(body.nodes[m.a], body.nodes[m.b], m.currentTarget, m.stiffness);
-        for (const n of body.nodes) { collideWithTerrain(n); constrainToWorld(n); }
+        for (const n of body.nodes) { collideWithTerrain(n, cof); constrainToWorld(n); }
       }
       const cy = body.getCenterY();
       if (cy < body.minY) body.minY = cy;
@@ -757,7 +762,7 @@
     b.x += mx * rb; b.y += my * rb;
   }
 
-  function collideWithTerrain(node) {
+  function collideWithTerrain(node, cof = COF) {
     const r = node.radius;
     const minGx = Math.max(0, Math.floor((node.x - r) / COF.cellSize));
     const maxGx = Math.min(TERRAIN_W - 1, Math.floor((node.x + r) / COF.cellSize));
@@ -779,8 +784,8 @@
             const vx = node.x - node.ox, vy = node.y - node.oy;
             const vn = vx * nx + vy * ny;
             if (vn < 0) {
-              node.ox = node.x - (-(nx * vn) * COF.bounce + (vx - nx * vn) * COF.groundFriction);
-              node.oy = node.y - (-(ny * vn) * COF.bounce + (vy - ny * vn) * COF.groundFriction);
+              node.ox = node.x - (-(nx * vn) * cof.bounce + (vx - nx * vn) * cof.groundFriction);
+              node.oy = node.y - (-(ny * vn) * cof.bounce + (vy - ny * vn) * cof.groundFriction);
             }
             node.grounded = true;
           } else {
@@ -2676,7 +2681,13 @@
     addEventMsg('🚀 ライブ進化シミュレーション開始！', '#63d2ff', false);
   }
 
-  function switchToBuild() {
+  async function switchToBuild() {
+    if (currentPhase === PHASE_SIM) {
+      const ok = await (window.showConfirm
+        ? window.showConfirm('現在学習中の状態が失われます。設計画面に戻りますか？', '戻る', '⚠️ 確認')
+        : Promise.resolve(window.confirm('現在学習中の状態が失われます。設計画面に戻りますか？')));
+      if (!ok) return;
+    }
     currentPhase = PHASE_BUILD;
     document.getElementById('sim-overlay').classList.add('hidden');
     document.getElementById('build-overlay').classList.remove('hidden');
@@ -3276,6 +3287,7 @@
         blueprint: def.blueprint ?? null,
         name:      def.name  || '対戦相手',
         score:     def.score || 0,
+        cof:       def.cof   ?? null,
       });
       if (currentPhase === PHASE_SIM) spawnRaceOpponents();
     },
