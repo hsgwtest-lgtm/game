@@ -1,4 +1,4 @@
-const CACHE_NAME = 'softevo-v5';
+const CACHE_NAME = 'softevo-v6';
 const ASSETS = [
   './',
   './index.html',
@@ -12,7 +12,16 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS)));
+  e.waitUntil(
+    caches.open(CACHE_NAME).then(c =>
+      Promise.all(
+        ASSETS.map(url =>
+          fetch(new Request(url, { cache: 'reload' }))
+            .then(res => c.put(url, res))
+        )
+      )
+    )
+  );
   self.skipWaiting();
 });
 
@@ -26,7 +35,9 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
   e.respondWith(
-    fetch(e.request).catch(() => caches.match(e.request))
+    fetch(new Request(e.request, { cache: 'no-cache' }))
+      .catch(() => caches.match(e.request))
   );
 });
