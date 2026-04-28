@@ -201,6 +201,7 @@ async function handlePostSlot(slot) {
       generation: record.generation,
       genome,
       blueprint:  record.blueprint ?? null,
+      cof:        record.cof ?? null,
     });
     showToast(`☁️ 投稿成功！ ${nickname}: ${record.score}点`, 'success');
   } catch (e) {
@@ -321,17 +322,16 @@ async function refreshRaceSetup() {
   const list = document.getElementById('race-setup-list');
   if (list) list.innerHTML = '<div class="race-setup-empty">📡 読み込み中…</div>';
 
-  // スロットデータ + LB を並列取得
+  // スロットデータ + LB を並列取得（LBは常に最新をフェッチ）
   const [slots] = await Promise.all([
     loadAllCreatures().catch(() => Array(10).fill(null)),
-    // LBデータが未取得のときだけ一度だけフェッチ
-    lbEntries.length === 0 ? new Promise(resolve => {
+    new Promise(resolve => {
       const unsub = subscribeTop((entries, err) => {
         if (!err) lbEntries = entries;
         unsub();
         resolve();
       }, 20);
-    }).catch(() => {}) : Promise.resolve(),
+    }).catch(() => {}),
   ]);
 
   // LB 事前選択をセット
@@ -358,11 +358,13 @@ function renderRaceSetup(slots) {
     for (const s of filledSlots) {
       const key     = `slot-${s.slot}`;
       const checked = raceSelected.has(key);
+      const sGrav = s.cof ? `G:${(s.cof.gravity ?? 0.35).toFixed(2)}` : '';
       html += `
         <label class="race-setup-item${checked ? ' selected' : ''}" data-key="${key}">
           <input type="checkbox" class="race-setup-check" data-key="${key}" ${checked ? 'checked' : ''}>
           <span class="race-setup-name">${esc(s.name ?? `Slot ${s.slot}`)}</span>
           <span class="race-setup-meta">Gen ${s.generation ?? '?'} · スコア ${s.score ?? '?'}</span>
+          ${sGrav ? `<span class="race-setup-env" title="学習時の重力">${sGrav}</span>` : ''}
         </label>`;
     }
   }
@@ -374,11 +376,14 @@ function renderRaceSetup(slots) {
       if (!e.genome) continue;
       const key     = `lb-${e.id}`;
       const checked = raceSelected.has(key);
+      const eGrav = e.cof ? `G:${(e.cof.gravity ?? 0.35).toFixed(2)}` : 'G:?';
+      const eEnvCls = e.cof ? 'race-setup-env' : 'race-setup-env race-setup-env-unknown';
       html += `
         <label class="race-setup-item${checked ? ' selected' : ''}" data-key="${key}">
           <input type="checkbox" class="race-setup-check" data-key="${key}" ${checked ? 'checked' : ''}>
           <span class="race-setup-name">${esc(e.nickname)}</span>
           <span class="race-setup-meta">Gen ${e.generation ?? '?'} · スコア ${e.score}</span>
+          <span class="${eEnvCls}" title="学習時の重力${e.cof ? '' : '（保存なし）'}">${eGrav}</span>
         </label>`;
     }
   }
@@ -446,7 +451,7 @@ async function launchRace() {
         score:     e.score,
         genome:    e.genome,
         blueprint: e.blueprint ?? null,
-        cof:       null,
+        cof:       e.cof ?? null,
         source:    'leaderboard',
       });
     }
@@ -516,8 +521,6 @@ function showConfirm(message, okLabel = '移動する', title = '⚠️ 確認')
     cancelBtn.addEventListener('click', onCancel, { once: true });
   });
 }
-
-window.showConfirm = showConfirm;
 
 // ═══════════════════════════════════════════════════════════════════════
 //  TOAST

@@ -977,8 +977,8 @@ html, body {
 #race-header {
   display: flex; align-items: center; gap: 10px;
   padding: max(8px, env(safe-area-inset-top)) 14px 8px;
-  background: rgba(6,12,26,0.95);
-  border-bottom: 1px solid rgba(99,210,255,0.12);
+  background: rgba(6,10,20,0.92); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  border-bottom: 1px solid rgba(129,140,248,0.15);
   flex-shrink: 0; z-index: 20;
 }
 #race-back-btn {
@@ -987,7 +987,11 @@ html, body {
   font-weight: 600; min-height: 44px; white-space: nowrap;
 }
 #race-back-btn:hover { background: rgba(99,210,255,0.16); }
-#race-title { flex: 1; font-size: 15px; font-weight: bold; text-align: center; margin: 0; color: #e2e8f0; }
+#race-title {
+  flex: 1; font-size: 15px; font-weight: bold; text-align: center; margin: 0;
+  background: linear-gradient(135deg, #63d2ff, #a78bfa);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
 #race-header-right { min-width: 70px; text-align: right; }
 .race-timer { font-family: 'Menlo','Courier New',monospace; font-size: 18px; font-weight: bold; color: #fbbf24; }
 .race-timer-warn { color: #f87171; animation: timerFlash 0.4s ease-in-out infinite alternate; }
@@ -995,8 +999,8 @@ html, body {
 
 /* ─── HUD ─── */
 #race-hud {
-  padding: 5px 10px 2px; background: rgba(6,8,18,0.92);
-  border-bottom: 1px solid rgba(99,210,255,0.08); flex-shrink: 0;
+  padding: 5px 10px 2px; background: rgba(6,10,20,0.92);
+  border-bottom: 1px solid rgba(129,140,248,0.10); flex-shrink: 0;
 }
 .race-hud-row {
   display: flex; align-items: center; gap: 5px;
@@ -1012,6 +1016,7 @@ html, body {
 .race-hud-bar { height: 100%; border-radius: 3px; transition: width 0.25s ease; min-width: 2px; }
 .race-hud-dist { width: 38px; text-align: right; font-size: 9px; color: rgba(226,232,240,0.5); font-family: monospace; flex-shrink: 0; }
 .race-hud-spd  { width: 24px; text-align: right; font-size: 8px; color: rgba(52,211,153,0.65); font-family: monospace; flex-shrink: 0; }
+.race-hud-env  { width: 30px; text-align: right; font-size: 7px; color: rgba(167,139,250,0.6); font-family: monospace; flex-shrink: 0; }
 #race-hud-hint { font-size: 8px; color: rgba(226,232,240,0.18); text-align: right; padding: 1px 4px 3px; letter-spacing: 0.02em; }
 
 /* ─── Canvas Wrap ─── */
@@ -1069,22 +1074,22 @@ html, body {
 /* ─── Bottom Bar ─── */
 #race-bottom-bar {
   display: flex; align-items: center; gap: 6px;
-  padding: 5px 10px max(8px, env(safe-area-inset-bottom)); background: rgba(6,8,18,0.92);
-  border-top: 1px solid rgba(99,210,255,0.08); flex-shrink: 0;
+  padding: 5px 10px max(8px, env(safe-area-inset-bottom));
+  background: rgba(6,10,20,0.92); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  border-top: 1px solid rgba(129,140,248,0.15); flex-shrink: 0;
 }
 /* ── 再生・一時停止コントロール ── */
 .race-ctrl-group { display: flex; gap: 3px; flex-shrink: 0; }
 .race-ctrl-btn {
-  padding: 6px 10px; border-radius: 8px;
-  background: rgba(99,210,255,0.07); border: 1px solid rgba(99,210,255,0.18);
-  color: rgba(226,232,240,0.50); font-size: 13px; cursor: pointer;
-  transition: all 0.15s; min-height: 36px; font-weight: bold;
+  padding: 4px 10px; border-radius: 4px;
+  background: rgba(129,140,248,0.12); border: 1px solid rgba(129,140,248,0.25);
+  color: #e2e8f0; font-size: 14px; cursor: pointer; transition: all 0.15s;
 }
 .race-ctrl-btn.active {
-  background: rgba(99,210,255,0.18); border-color: rgba(99,210,255,0.45); color: #7dd3fc;
+  background: rgba(129,140,248,0.35); border-color: rgba(129,140,248,0.6);
 }
-.race-ctrl-btn:hover:not(.active) { background: rgba(99,210,255,0.12); color: #e2e8f0; }
-.race-home-btn { color: rgba(226,232,240,0.35); font-size: 14px; flex-shrink: 0; }
+.race-ctrl-btn:hover:not(.active) { background: rgba(129,140,248,0.25); }
+.race-home-btn { color: rgba(226,232,240,0.55); font-size: 14px; flex-shrink: 0; }
 #race-live-standings { flex: 1; display: flex; flex-wrap: wrap; gap: 4px; overflow: hidden; }
 .race-standing-tag {
   font-size: 10px; padding: 2px 7px; border-radius: 20px;
@@ -1093,15 +1098,14 @@ html, body {
 }
 .race-speed-btns { display: flex; gap: 4px; }
 .race-spd-btn {
-  padding: 4px 9px; border-radius: 6px; font-size: 11px; font-weight: bold;
-  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
-  color: rgba(226,232,240,0.55); cursor: pointer; transition: all 0.15s;
+  padding: 4px 10px; border-radius: 4px; font-size: 11px;
+  background: rgba(129,140,248,0.12); border: 1px solid rgba(129,140,248,0.25);
+  color: #e2e8f0; cursor: pointer; transition: all 0.15s;
 }
 .race-spd-btn.active {
-  background: rgba(251,191,36,0.15); border-color: rgba(251,191,36,0.35);
-  color: #fbbf24;
+  background: rgba(129,140,248,0.35); border-color: rgba(129,140,248,0.6);
 }
-.race-spd-btn:hover:not(.active) { background: rgba(255,255,255,0.10); color: #e2e8f0; }
+.race-spd-btn:hover:not(.active) { background: rgba(129,140,248,0.25); }
 
 /* ─── Hidden utility ─── */
 #race-countdown-overlay.hidden,
@@ -1134,6 +1138,8 @@ html, body {
 .race-setup-check { accent-color: #63d2ff; width: 15px; height: 15px; cursor: pointer; flex-shrink: 0; }
 .race-setup-name { flex: 1; font-size: 13px; font-weight: bold; color: #e2e8f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .race-setup-meta { font-size: 10px; color: rgba(226,232,240,0.45); white-space: nowrap; }
+.race-setup-env { font-size: 9px; color: rgba(167,139,250,0.75); font-family: monospace; white-space: nowrap; flex-shrink: 0; }
+.race-setup-env-unknown { color: rgba(251,191,36,0.65); }
 .race-setup-empty { padding: 30px 16px; text-align: center; color: rgba(226,232,240,0.4); font-size: 13px; line-height: 1.6; }
 
 .race-launch-btn {
@@ -1157,57 +1163,3 @@ html, body {
   color: #fca5a5; font-size: 14px; cursor: pointer; transition: all 0.15s;
 }
 .lb-del-btn:hover { background: rgba(248,113,113,0.20); border-color: rgba(248,113,113,0.45); }
-
-/* ═══════════════════════════════════════════════════════════
-   VIEWER CONFIRM MODAL
-═══════════════════════════════════════════════════════════ */
-#viewer-modal-backdrop {
-  position: fixed; inset: 0; background: rgba(2,4,12,0.78);
-  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-  z-index: 50; pointer-events: auto;
-  animation: backdropIn 0.18s ease-out;
-}
-#viewer-modal-backdrop.hidden { display: none; }
-
-/* ═══════════════════════════════════════════════════════════
-   VIEWER DELETE BUTTON
-═══════════════════════════════════════════════════════════ */
-.v-btn-del {
-  padding: 4px 8px; border-radius: 8px;
-  background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.30);
-  color: #fca5a5; font-size: 14px; cursor: pointer; transition: all 0.15s;
-}
-.v-btn-del:hover:not(:disabled) { background: rgba(248,113,113,0.24); border-color: rgba(248,113,113,0.55); box-shadow: 0 0 10px rgba(248,113,113,0.15); }
-.v-btn-del:disabled { opacity: 0.35; cursor: not-allowed; }
-
-/* ═══════════════════════════════════════════════════════════
-   RACE HUD GRAVITY LABEL
-═══════════════════════════════════════════════════════════ */
-.race-hud-grav { width: 36px; text-align: right; font-size: 8px; color: rgba(251,191,36,0.6); font-family: monospace; flex-shrink: 0; }
-
-/* ═══════════════════════════════════════════════════════════
-   RACE ENVIRONMENT PANEL
-═══════════════════════════════════════════════════════════ */
-#race-env-panel {
-  position: absolute; bottom: 56px; right: 8px; z-index: 20;
-  background: rgba(6,10,20,0.95); border: 1px solid rgba(129,140,248,0.25);
-  border-radius: 10px; padding: 0; min-width: 240px; max-width: 300px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-}
-#race-env-panel.hidden { display: none; }
-#race-env-panel-header {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 8px 12px; border-bottom: 1px solid rgba(129,140,248,0.15);
-  font-size: 11px; font-weight: bold; color: rgba(226,232,240,0.8);
-}
-#btn-race-env-close {
-  background: none; border: 1px solid rgba(255,255,255,0.15);
-  color: rgba(255,255,255,0.55); font-size: 12px; width: 22px; height: 22px;
-  border-radius: 5px; cursor: pointer; transition: all 0.15s;
-}
-#btn-race-env-close:hover { background: rgba(255,255,255,0.1); color: #fff; }
-#race-env-sliders { padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; }
-.race-env-row { display: flex; align-items: center; gap: 6px; }
-.race-env-label { width: 60px; font-size: 10px; color: rgba(226,232,240,0.65); flex-shrink: 0; }
-.race-env-slider { flex: 1; accent-color: #818cf8; }
-.race-env-val { width: 36px; text-align: right; font-size: 10px; color: rgba(226,232,240,0.7); font-family: monospace; flex-shrink: 0; }
