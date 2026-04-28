@@ -1,0 +1,97 @@
+# SoftEvo7 変更履歴
+
+## 変更概要
+
+以下の4つの主要機能を追加・修正しました。
+
+1. 個体別物理環境 (Per-creature COF) — 各生物が保存時の物理パラメータで走行可能に
+2. UI/UX 改善 — 速度ボタンアイコン、視点切り替え、確認ダイアログの統一
+3. 生物削除機能 — 生物閲覧画面から保存生物を削除可能に
+4. 距離表示修正 — スタート地点を基準0とした相対距離表示
+
+---
+
+## ファイル別 変更詳細
+
+### race.js
+
+1. SoftBody に cof パラメータ追加: コンストラクタで cof = DEFAULT_COF を受け取り this._cof に保存。個体別物理を実現
+2. update() の stiffness 参照変更: raceCOF.muscleStiffness → this._cof.muscleStiffness、raceCOF.boneStiffness → this._cof.boneStiffness
+3. physics() の物理パラメータ参照変更: raceCOF.airDrag/gravity/constraintIter/bounce/groundFriction → すべて this._cof 経由に変更
+4. useIndividualEnv 変数追加: let useIndividualEnv = true; — 独自環境モードをデフォルト有効で追加
+5. RACE_PHYS_DEFS 定数追加: レース環境設定パネル用の物理パラメータ定義配列 (7項目)
+6. spawnRacers() に per-racer COF 構築: 各参加者の保存 COF から perCOF を構築し、useIndividualEnv に応じて SoftBody に渡す
+7. HUD に重力値表示追加: 各レーサーの HUD 行に G:0.35 形式で現在適用中の重力値を表示
+8. 距離マーカー修正: mx → relDist = mx - SPAWN_X で SPAWN 地点からの相対距離を表示
+9. HUD クリックをイベント委譲に変更: renderHUD() 内の毎フレーム再登録 → #race-hud への event delegation (init 時に1回登録)。レース中の視点切り替えが確実に動作
+10. toggleEnvMode() 関数追加: 独自/同一環境モードをトグル。全レーサーの _cof を即時切り替え
+11. toggleEnvPanel() 関数追加: 環境設定パネルの表示/非表示トグル
+12. buildRaceCofPanel() 関数追加: raceCOF のスライダー UI を動的に生成
+13. デバッグログ追加: spawnRacers() と physics() 初回フレームで各レーサーの COF 値をコンソール出力
+
+### race.html
+
+1. 環境モード切替ボタン追加: #btn-race-env-toggle、「環境: 独自」ボタンをツールバーに追加
+2. 環境設定ボタン追加: #btn-race-env-settings、「設定」ボタン (独自モード時は非表示)
+3. 環境設定パネル追加: #race-env-panel オーバーレイ (閉じるボタン + スライダー領域) を canvas 内に追加
+4. 速度ボタンのアイコン変更: 1/2x → ⏮、1x → ▶、2x → ⏭、4x → ⏩
+
+### viewer.js
+
+1. deleteCreature インポート追加: creatureSaveManager.js から deleteCreature をインポート
+2. viewerConfirm() 関数追加: viewer 専用のスタイル付き確認ダイアログ (Promise ベース)。index.html の showConfirm と同一 UI
+3. 削除ボタンハンドラ追加: #btn-viewer-delete クリック → viewerConfirm() で確認 → deleteCreature() 実行 → UI リセット
+4. selectSlot() で削除ボタン有効化: スロット選択時に deleteBtn.disabled = false
+5. 距離マーカー修正: mx → relDist = mx - 300 (300=spawnX) で相対距離表示
+
+### viewer.html
+
+1. 削除ボタン追加: ゴミ箱アイコンボタンをコントロールバーに追加
+2. 確認ダイアログモーダル追加: #viewer-modal-backdrop (背景) + #viewer-modal-confirm (パネル) を追加
+
+### engine.js
+
+1. SoftBody コンストラクタに cof パラメータ追加: constructor(x, y, bp, genome, cof = null) — オプションの個体別 COF
+2. this._cof プロパティ追加: null の場合はグローバル COF を使用 (通常の学習個体)
+3. updateBrain() の per-creature COF: const cof = this._cof ?? COF; で個体別/グローバルを選択。muscleStiffness・boneStiffness に適用
+4. physicStep() の per-body COF: const cof = body._cof ?? COF; でボディごとに airDrag, gravity, constraintIter を使用
+5. collideWithTerrain() に cof パラメータ追加: bounce, groundFriction を個体別 COF から取得
+6. spawnRaceOpponents() で oppCof 構築: Object.assign({}, COF, def.cof) で対戦相手の個別 COF を構築して SoftBody に渡す
+7. addRaceOpponent() に cof フィールド追加: cof: def.cof ?? null を raceOpponentDefs に保存
+8. raceOpponentDefs コメント更新: { genome, blueprint, name, score, cof } — cof を含むコメントに更新
+9. switchToBuild() を async + 確認ダイアログ化: window.showConfirm() で「現在学習中の状態が失われます。設計画面に戻りますか？」と確認
+
+### saveUI.js
+
+1. showConfirm をグローバル公開: window.showConfirm = showConfirm; — engine.js の switchToBuild() から利用可能に
+
+### style.css
+
+1. #viewer-modal-backdrop 追加: viewer 用モーダル背景スタイル (fixed + backdrop-filter)
+2. .race-hud-grav 追加: HUD の重力表示ラベルスタイル
+3. #race-env-panel 関連スタイル追加: 環境設定パネル、ヘッダー、閉じるボタン、スライダー行のスタイル
+4. .v-btn-del 追加: viewer 削除ボタンの赤色スタイル
+
+### sw.js
+
+1. キャッシュバージョン更新: softevo-v3 → softevo-v4 — 変更後のコードが確実に読み込まれるようにキャッシュを無効化
+
+---
+
+## 動作の仕組み
+
+### 個体別物理環境 (Per-creature COF)
+
+- 保存時: engine.js の COF → creatureSaveManager に cof として保存
+- レース時: p.cof から perCOF を構築 → SoftBody._cof に設定
+- 物理計算: this._cof.gravity / airDrag / bounce 等を使用
+- 独自環境モード (デフォルト): 各生物が保存時の物理パラメータで走行
+- 同一環境モード: 全生物が共通の raceCOF で走行
+- ゴースト対戦 (engine.js): body._cof ?? COF で対戦相手の独自 COF、通常個体はグローバル COF を使用
+
+### 確認ダイアログの統一
+
+- index.html (saveUI.js) → showConfirm() → #modal-confirm
+- viewer.html (viewer.js) → viewerConfirm() → #viewer-modal-confirm
+- engine.js の switchToBuild() → window.showConfirm() → #modal-confirm
+- すべて同一の UI パターン (Promise ベース、キャンセル/OK ボタン) を使用。
