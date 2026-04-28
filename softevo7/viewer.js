@@ -3,7 +3,7 @@
  * engine.js と同一のレンダリング・物理コードを使用
  */
 
-import { loadAllCreatures } from './creatureSaveManager.js';
+import { loadAllCreatures, deleteCreature } from './creatureSaveManager.js';
 
 // ═══ 物理パラメータ定義 (engine.js COF_DEFS 物理セクション) ══════════
 const PHYS_DEFS = [
@@ -226,6 +226,37 @@ function esc(str) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+/**
+ * viewer 専用のスタイル付き確認ダイアログ (Promise ベース)
+ * index.html の showConfirm と同一 UI
+ */
+function viewerConfirm(message, okLabel = '削除', title = '⚠️ 確認') {
+  return new Promise(resolve => {
+    const backdrop  = document.getElementById('viewer-modal-backdrop');
+    const modal     = document.getElementById('viewer-modal-confirm');
+    const titleEl   = document.getElementById('viewer-modal-confirm-title');
+    const textEl    = document.getElementById('viewer-modal-confirm-text');
+    const okBtn     = document.getElementById('btn-viewer-confirm-ok');
+    const cancelBtn = document.getElementById('btn-viewer-confirm-cancel');
+    if (!modal || !backdrop) { resolve(window.confirm(message)); return; }
+
+    titleEl.textContent = title;
+    textEl.textContent  = message;
+    okBtn.textContent   = okLabel;
+
+    modal.classList.remove('hidden');
+    backdrop.classList.remove('hidden');
+
+    function cleanup(result) {
+      modal.classList.add('hidden');
+      backdrop.classList.add('hidden');
+      resolve(result);
+    }
+    okBtn.addEventListener('click', () => cleanup(true), { once: true });
+    cancelBtn.addEventListener('click', () => cleanup(false), { once: true });
+  });
+}
+
 // ═══ Slot UI ════════════════════════════════════════════════════════
 function renderSlotList() {
   const container = document.getElementById('viewer-slot-list');
@@ -281,6 +312,8 @@ function selectSlot(slotNo) {
   if (restoreBtn) restoreBtn.disabled = !savedCofRef;
   const relearnBtn = document.getElementById('btn-relearn-seed');
   if (relearnBtn) relearnBtn.disabled = false;
+  const deleteBtn = document.getElementById('btn-viewer-delete');
+  if (deleteBtn) deleteBtn.disabled = false;
 }
 
 function spawnCreature(data) {
@@ -444,9 +477,10 @@ function render() {
     if (sx < 0 || sx > cw) continue;
     ctx.beginPath(); ctx.moveTo(sx, gY - 16); ctx.lineTo(sx, gY); ctx.stroke();
     if (mx % 500 === 0) {
+      const relDist = mx - 300; // 300 = spawnX からの相対距離
       ctx.fillStyle = 'rgba(167,139,250,0.35)';
       ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText(`${mx}`, sx, gY - 19);
+      ctx.fillText(`${relDist}`, sx, gY - 19);
     }
   }
   ctx.setLineDash([]);
@@ -1087,6 +1121,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     buildCofPanel(savedCofRef);
     // 環境設定タブに切り替え
     switchTab('cof');
+  });
+
+  // 削除ボタン
+  document.getElementById('btn-viewer-delete')?.addEventListener('click', async () => {
+    if (selectedSlot === null || !slots[selectedSlot - 1]) return;
+    const ok = await viewerConfirm(
+      `Slot ${selectedSlot}「${slots[selectedSlot - 1].name}」を削除しますか？この操作は取り消せません。`,
+      '削除',
+      '🗑 生物を削除'
+    );
+    if (!ok) return;
+    try {
+      await deleteCreature(selectedSlot);
+      slots = await loadAllCreatures();
+      selectedSlot = null;
+      selectedData = null;
+      creature = null;
+      renderSlotList();
+      document.getElementById('btn-viewer-delete').disabled = true;
+      document.getElementById('btn-restore-env').disabled = true;
+      document.getElementById('btn-relearn-seed').disabled = true;
+    } catch (e) {
+      console.warn('[Viewer] deleteCreature error:', e);
+    }
   });
 
   document.querySelectorAll('.viewer-speed-btn').forEach(btn => {

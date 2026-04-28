@@ -36,6 +36,7 @@
     <div class="viewer-ctrl-sep"></div>
     <button id="btn-restore-env" class="viewer-action-btn v-btn-env" title="環境を再現" disabled>🌎</button>
     <button id="btn-relearn-seed" class="viewer-action-btn v-btn-seed" title="継続改善で再学習" disabled>📄</button>
+    <button id="btn-viewer-delete" class="viewer-action-btn v-btn-del" title="生物を削除" disabled>🗑</button>
     <span id="viewer-distance" class="viewer-dist-label">距離: 0</span>
     <div id="viewer-lap-times" class="viewer-lap-times"><span class="lap-empty">500m毎にタイム表示</span></div>
   </div>
@@ -79,6 +80,20 @@
   </div>
 
 </div>
+
+<!-- ═══ 確認ダイアログ ═══ -->
+<div id="viewer-modal-backdrop" class="hidden"></div>
+<div id="viewer-modal-confirm" class="modal-panel hidden">
+  <div class="modal-header">
+    <span id="viewer-modal-confirm-title">⚠️ 確認</span>
+  </div>
+  <div class="modal-hint" id="viewer-modal-confirm-text"></div>
+  <div class="modal-confirm-actions">
+    <button class="modal-confirm-btn" id="btn-viewer-confirm-cancel">キャンセル</button>
+    <button class="modal-confirm-ok-btn" id="btn-viewer-confirm-ok">削除</button>
+  </div>
+</div>
+
 <script type="module" src="viewer.js"></script>
 </body>
 </html>

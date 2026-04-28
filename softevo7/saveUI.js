@@ -517,11 +517,10 @@ function showConfirm(message, okLabel = '移動する', title = '⚠️ 確認')
   });
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-//  TOAST
-// ═══════════════════════════════════════════════════════════════════════
+window.showConfirm = showConfirm;
 
-function showToast(msg, type = 'info') {
+// ═══════════════════════════════════════════════════════════════════════
+//  TOAST(msg, type = 'info') {
   const container = document.getElementById('toast-container');
   if (!container) return;
 

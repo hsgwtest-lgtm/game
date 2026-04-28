@@ -63,13 +63,26 @@
     </div>
     <div id="race-live-standings"></div>
     <div class="race-ctrl-group">
-      <button class="race-spd-btn" data-speed="0.5">½×</button>
-      <button class="race-spd-btn active" data-speed="1">1×</button>
-      <button class="race-spd-btn" data-speed="2">2×</button>
-      <button class="race-spd-btn" data-speed="4">4×</button>
+      <button class="race-spd-btn" data-speed="0.5">⏮</button>
+      <button class="race-spd-btn active" data-speed="1">▶</button>
+      <button class="race-spd-btn" data-speed="2">⏭</button>
+      <button class="race-spd-btn" data-speed="4">⏩</button>
+    </div>
+    <div class="race-ctrl-group">
+      <button id="btn-race-env-toggle" class="race-ctrl-btn" title="環境モード切替">環境: 独自</button>
+      <button id="btn-race-env-settings" class="race-ctrl-btn hidden" title="環境設定">設定</button>
     </div>
     <button class="race-ctrl-btn race-home-btn" onclick="location.href='./'"
       title="ホームへ戻る">🏠</button>
+  </div>
+
+  <!-- ═══ 環境設定パネル ═══ -->
+  <div id="race-env-panel" class="hidden">
+    <div id="race-env-panel-header">
+      <span>🌍 レース環境設定 (同一環境モード)</span>
+      <button id="btn-race-env-close">✕</button>
+    </div>
+    <div id="race-env-sliders"></div>
   </div>
 
 </div>

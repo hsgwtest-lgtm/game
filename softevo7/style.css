@@ -1157,3 +1157,57 @@ html, body {
   color: #fca5a5; font-size: 14px; cursor: pointer; transition: all 0.15s;
 }
 .lb-del-btn:hover { background: rgba(248,113,113,0.20); border-color: rgba(248,113,113,0.45); }
+
+/* ═══════════════════════════════════════════════════════════
+   VIEWER CONFIRM MODAL
+═══════════════════════════════════════════════════════════ */
+#viewer-modal-backdrop {
+  position: fixed; inset: 0; background: rgba(2,4,12,0.78);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  z-index: 50; pointer-events: auto;
+  animation: backdropIn 0.18s ease-out;
+}
+#viewer-modal-backdrop.hidden { display: none; }
+
+/* ═══════════════════════════════════════════════════════════
+   VIEWER DELETE BUTTON
+═══════════════════════════════════════════════════════════ */
+.v-btn-del {
+  padding: 4px 8px; border-radius: 8px;
+  background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.30);
+  color: #fca5a5; font-size: 14px; cursor: pointer; transition: all 0.15s;
+}
+.v-btn-del:hover:not(:disabled) { background: rgba(248,113,113,0.24); border-color: rgba(248,113,113,0.55); box-shadow: 0 0 10px rgba(248,113,113,0.15); }
+.v-btn-del:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ═══════════════════════════════════════════════════════════
+   RACE HUD GRAVITY LABEL
+═══════════════════════════════════════════════════════════ */
+.race-hud-grav { width: 36px; text-align: right; font-size: 8px; color: rgba(251,191,36,0.6); font-family: monospace; flex-shrink: 0; }
+
+/* ═══════════════════════════════════════════════════════════
+   RACE ENVIRONMENT PANEL
+═══════════════════════════════════════════════════════════ */
+#race-env-panel {
+  position: absolute; bottom: 56px; right: 8px; z-index: 20;
+  background: rgba(6,10,20,0.95); border: 1px solid rgba(129,140,248,0.25);
+  border-radius: 10px; padding: 0; min-width: 240px; max-width: 300px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+#race-env-panel.hidden { display: none; }
+#race-env-panel-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; border-bottom: 1px solid rgba(129,140,248,0.15);
+  font-size: 11px; font-weight: bold; color: rgba(226,232,240,0.8);
+}
+#btn-race-env-close {
+  background: none; border: 1px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.55); font-size: 12px; width: 22px; height: 22px;
+  border-radius: 5px; cursor: pointer; transition: all 0.15s;
+}
+#btn-race-env-close:hover { background: rgba(255,255,255,0.1); color: #fff; }
+#race-env-sliders { padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; }
+.race-env-row { display: flex; align-items: center; gap: 6px; }
+.race-env-label { width: 60px; font-size: 10px; color: rgba(226,232,240,0.65); flex-shrink: 0; }
+.race-env-slider { flex: 1; accent-color: #818cf8; }
+.race-env-val { width: 36px; text-align: right; font-size: 10px; color: rgba(226,232,240,0.7); font-family: monospace; flex-shrink: 0; }
