@@ -645,7 +645,7 @@ function resize() {
   if (canvas.width !== nw || canvas.height !== nh) {
     canvas.width  = nw;
     canvas.height = nh;
-    groundY = rect.height * GROUND_FRAC;
+    // groundY はスポーン時のみ更新（リサイズ中は変更しない）
   }
 }
 
@@ -665,9 +665,13 @@ function toggleEnvMode() {
       : raceCOF;
   }
   const btn = document.getElementById('btn-race-env-toggle');
-  if (btn) btn.textContent = `環境: ${useIndividualEnv ? '独自' : '同一'}`;
-  const settingsBtn = document.getElementById('btn-race-env-settings');
-  if (settingsBtn) settingsBtn.classList.toggle('hidden', useIndividualEnv);
+  if (btn) {
+    btn.classList.toggle('race-env-ind', useIndividualEnv);
+    btn.classList.toggle('race-env-same', !useIndividualEnv);
+    btn.title = useIndividualEnv ? '環境モード切替 (独自)' : '環境モード切替 (同一)';
+  }
+  // 同一環境モードでは設定パネルを自動で開き、独自環境では閉じる
+  toggleEnvPanel(!useIndividualEnv);
 }
 
 function toggleEnvPanel(forceState) {
@@ -737,7 +741,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   resize();
-  window.addEventListener('resize', () => { resize(); spawnRacers(); });
+  window.addEventListener('resize', resize);
 
   spawnRacers();
   renderHUD();
@@ -754,16 +758,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // コントロール
+  // 一時停止ボタン
   document.getElementById('btn-race-pause-ctrl')?.addEventListener('click', () => {
-    isPaused = true;
-    document.getElementById('btn-race-pause-ctrl')?.classList.add('active');
-    document.getElementById('btn-race-play-ctrl')?.classList.remove('active');
-  });
-  document.getElementById('btn-race-play-ctrl')?.addEventListener('click', () => {
-    isPaused = false;
-    document.getElementById('btn-race-play-ctrl')?.classList.add('active');
-    document.getElementById('btn-race-pause-ctrl')?.classList.remove('active');
+    isPaused = !isPaused;
+    document.getElementById('btn-race-pause-ctrl')?.classList.toggle('active', isPaused);
+    if (!isPaused) {
+      // 再開時: アクティブな速度ボタンを復元
+      const activeSpd = document.querySelector('.race-spd-btn.active');
+      if (!activeSpd) document.querySelector('.race-spd-btn[data-speed="1"]')?.classList.add('active');
+    }
   });
 
   document.getElementById('btn-race-again').addEventListener('click', () => {
@@ -784,18 +787,23 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('race-countdown-num').textContent = '3';
     document.getElementById('race-countdown-sub').textContent = 'レースまで…';
     document.getElementById('race-timer-disp').classList.remove('race-timer-warn');
-    document.getElementById('btn-race-play-ctrl')?.classList.add('active');
     document.getElementById('btn-race-pause-ctrl')?.classList.remove('active');
+    document.querySelectorAll('.race-spd-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.race-spd-btn[data-speed="1"]')?.classList.add('active');
+    simSpeed = 1;
     spawnRacers();
     renderHUD();
   });
 
   document.querySelectorAll('.race-spd-btn').forEach(btn => {
     btn.addEventListener('click', () => {
+      // 速度ボタンをクリックすると再生状態に戻る
+      isPaused = false;
+      document.getElementById('btn-race-pause-ctrl')?.classList.remove('active');
       document.querySelectorAll('.race-spd-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       simSpeed  = parseFloat(btn.dataset.speed);
-      stepAccum = 0;  // スロー切替時にアキュムレータリセット
+      stepAccum = 0;
     });
   });
 
@@ -804,8 +812,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 環境モード切替ボタン
   document.getElementById('btn-race-env-toggle')?.addEventListener('click', toggleEnvMode);
-  // 環境設定ボタン
-  document.getElementById('btn-race-env-settings')?.addEventListener('click', toggleEnvPanel);
   // 環境設定パネル閉じるボタン
   document.getElementById('btn-race-env-close')?.addEventListener('click', () => toggleEnvPanel(false));
 });
