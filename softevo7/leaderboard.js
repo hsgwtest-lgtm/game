@@ -64,6 +64,7 @@ export async function postEntry(data) {
     generation: Number(data.generation) || 0,
     genome:     serializeGenomeForDB(data.genome),
     blueprint:  data.blueprint ?? null,
+    cof:        data.cof ?? null,
     createdAt:  Date.now(),
   };
 
