@@ -17,7 +17,10 @@ self.addEventListener('install', e => {
       Promise.all(
         ASSETS.map(url =>
           fetch(new Request(url, { cache: 'reload' }))
-            .then(res => c.put(url, res))
+            .then(res => {
+              if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status}`);
+              return c.put(url, res);
+            })
         )
       )
     )
