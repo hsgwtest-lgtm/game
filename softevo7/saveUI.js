@@ -520,7 +520,10 @@ function showConfirm(message, okLabel = '移動する', title = '⚠️ 確認')
 window.showConfirm = showConfirm;
 
 // ═══════════════════════════════════════════════════════════════════════
-//  TOAST(msg, type = 'info') {
+//  TOAST
+// ═══════════════════════════════════════════════════════════════════════
+
+function showToast(msg, type = 'info') {
   const container = document.getElementById('toast-container');
   if (!container) return;
 

@@ -22,6 +22,8 @@ const DEFAULT_COF = {
   constraintIter: 5, boneStiffness: 0.6, muscleStiffness: 0.3,
 };
 
+const SPAWN_X = 300; // スポーン X 座標 (距離マーカーの基準点)
+
 // ═══ 状態 ═══════════════════════════════════════════════════════════
 let simCOF      = Object.assign({}, DEFAULT_COF);
 let savedCofRef = null;          // 保存時の COF (リセット用)
@@ -477,7 +479,7 @@ function render() {
     if (sx < 0 || sx > cw) continue;
     ctx.beginPath(); ctx.moveTo(sx, gY - 16); ctx.lineTo(sx, gY); ctx.stroke();
     if (mx % 500 === 0) {
-      const relDist = mx - 300; // 300 = spawnX からの相対距離
+      const relDist = mx - SPAWN_X; // SPAWN_X からの相対距離
       ctx.fillStyle = 'rgba(167,139,250,0.35)';
       ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
       ctx.fillText(`${relDist}`, sx, gY - 19);
