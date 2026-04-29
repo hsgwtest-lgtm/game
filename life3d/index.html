@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000008">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>3D Life · GRID</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --cyan:    #00f5ff;
+  --magenta: #ff00aa;
+  --green:   #00ff88;
+  --yellow:  #ffe040;
+  --red:     #ff3333;
+  --bg:      #000008;
+  --panel:   rgba(0, 4, 18, 0.85);
+  --border:  rgba(0, 245, 255, 0.22);
+  --text:    #9de8ff;
+  --glow-c:  0 0 8px #00f5ff99, 0 0 28px #00f5ff33;
+  --glow-m:  0 0 8px #ff00aa99, 0 0 28px #ff00aa33;
+  --glow-g:  0 0 8px #00ff8899, 0 0 28px #00ff8833;
+  --glow-y:  0 0 8px #ffe04099, 0 0 20px #ffe04033;
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html, body {
+  background: var(--bg); color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  overflow: hidden; width: 100%; height: 100%;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none; user-select: none;
+}
+
+#canvas-container { position: fixed; inset: 0; }
+canvas { display: block; width: 100% !important; height: 100% !important; }
+
+/* scanlines */
+body::after {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 8;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px,
+    rgba(0,0,0,0.055) 2px, rgba(0,0,0,0.055) 4px);
+}
+/* vignette */
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 7;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,10,0.65) 100%);
+}
+
+/* ─── HUD top ─────────────────────────────────────────────── */
+#hud-top {
+  position: fixed; top: 0; left: 0; right: 0;
+  padding: calc(var(--safe-top) + 12px) 18px 14px;
+  display: flex; align-items: flex-start; justify-content: space-between;
+  background: linear-gradient(180deg, rgba(0,0,20,0.92) 0%, transparent 100%);
+  z-index: 20; pointer-events: none;
+}
+.title {
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(13px, 3.5vw, 20px); font-weight: 900;
+  letter-spacing: 0.3em; color: var(--cyan); text-shadow: var(--glow-c); line-height: 1.1;
+}
+.title-sub {
+  font-size: 0.5em; color: rgba(0,245,255,0.4); letter-spacing: 0.12em;
+  display: block; margin-top: 3px;
+}
+.stats-grid {
+  display: grid; grid-template-columns: repeat(3, auto);
+  gap: 4px 18px; text-align: right;
+}
+.stat { display: flex; flex-direction: column; }
+.stat-label { font-size: clamp(7px,1.5vw,9px); color: rgba(160,232,255,0.38); letter-spacing: 0.12em; margin-bottom: 1px; }
+.stat-value { font-size: clamp(10px,2.2vw,13px); color: var(--cyan); text-shadow: var(--glow-c); letter-spacing: 0.06em; }
+.stat-value.g { color: var(--green);  text-shadow: var(--glow-g); }
+.stat-value.y { color: var(--yellow); text-shadow: var(--glow-y); }
+
+/* ─── 2D slice indicator (centre, below title) ────────────── */
+#slice-hud {
+  position: fixed; left: 50%; top: calc(var(--safe-top) + 66px);
+  transform: translateX(-50%);
+  z-index: 25; pointer-events: none;
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(9px, 2.5vw, 12px); letter-spacing: 0.25em;
+  color: var(--yellow); text-shadow: var(--glow-y);
+  background: rgba(0,4,18,0.82);
+  border: 1px solid rgba(255,224,64,0.32);
+  border-radius: 3px; padding: 5px 14px;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  white-space: nowrap;
+}
+#slice-hud.visible { opacity: 1; }
+
+/* ─── Mode badge (top-right below stats) ──────────────────── */
+#mode-badge {
+  position: fixed; right: 18px; top: calc(var(--safe-top) + 66px);
+  z-index: 25; pointer-events: none;
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(8px,2vw,11px); letter-spacing: 0.22em; font-weight: 700;
+  padding: 4px 10px; border-radius: 3px;
+  border: 1px solid rgba(0,245,255,0.35);
+  color: var(--cyan); text-shadow: var(--glow-c);
+  background: rgba(0,4,18,0.82);
+  transition: border-color 0.4s, color 0.4s, text-shadow 0.4s;
+}
+#mode-badge.mode-2d {
+  color: var(--yellow); text-shadow: var(--glow-y);
+  border-color: rgba(255,224,64,0.45);
+}
+
+/* ─── Legends ─────────────────────────────────────────────── */
+#legend {
+  position: fixed; left: 12px; top: 50%; transform: translateY(-50%);
+  z-index: 20; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  transition: opacity 0.4s;
+}
+#legend.hide { opacity: 0; }
+.legend-title { font-size: 8px; color: rgba(160,232,255,0.38); letter-spacing: 0.15em;
+  writing-mode: vertical-rl; transform: rotate(180deg); margin-bottom: 4px; }
+.legend-bar { width: 8px; height: 90px; border-radius: 4px;
+  background: linear-gradient(to top,#0044ff 0%,#00aaff 20%,#00ff88 45%,#ffee00 68%,#ff8800 85%,#ff2200 100%);
+  box-shadow: 0 0 10px rgba(0,200,255,0.25); border: 1px solid rgba(255,255,255,0.1); }
+.legend-labels { display: flex; flex-direction: column; align-items: center; gap: 0; font-size: 7px; letter-spacing: 0.1em; }
+.lbl-new { color: #5599ff; } .lbl-mid { color: var(--green); } .lbl-ancient { color: var(--red); }
+.legend-sep { height: 28px; }
+
+#legend-density {
+  position: fixed; right: 12px; top: 50%; transform: translateY(-50%);
+  z-index: 20; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  transition: opacity 0.4s;
+}
+#legend-density.hide { opacity: 0; }
+.density-title { font-size: 8px; color: rgba(160,232,255,0.38); letter-spacing: 0.12em;
+  writing-mode: vertical-rl; transform: rotate(180deg); margin-bottom: 4px; }
+.density-bar { width: 8px; height: 70px; border-radius: 4px;
+  background: linear-gradient(to top, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0.95) 100%);
+  border: 1px solid rgba(255,255,255,0.1); }
+.density-labels { display: flex; flex-direction: column; align-items: center; gap: 0;
+  font-size: 7px; color: rgba(160,232,255,0.5); letter-spacing: 0.1em; }
+.density-sep { height: 22px; }
+
+/* ─── Controls bottom ─────────────────────────────────────── */
+#controls {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  padding: 12px 16px calc(var(--safe-bottom) + 14px);
+  display: flex; align-items: center; justify-content: center;
+  flex-wrap: wrap; gap: 8px 10px;
+  background: linear-gradient(0deg, rgba(0,0,20,0.96) 0%, transparent 100%);
+  z-index: 20;
+}
+.btn {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: clamp(9px,2.2vw,12px); letter-spacing: 0.1em;
+  padding: 8px 15px;
+  background: var(--panel); border: 1px solid var(--border);
+  color: var(--cyan); border-radius: 3px; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, color 0.12s;
+  outline: none; -webkit-tap-highlight-color: transparent;
+  min-width: 72px; text-align: center;
+}
+.btn:hover, .btn:active {
+  background: rgba(0,245,255,0.12); border-color: var(--cyan);
+  box-shadow: var(--glow-c); color: #fff;
+}
+.btn.active {
+  background: rgba(0,245,255,0.15); border-color: rgba(0,245,255,0.6);
+  box-shadow: var(--glow-c); color: #fff;
+}
+.btn.danger { color: var(--magenta); border-color: rgba(255,0,170,0.25); }
+.btn.danger:hover, .btn.danger:active {
+  background: rgba(255,0,170,0.12); border-color: var(--magenta); box-shadow: var(--glow-m); color: #fff;
+}
+.btn.success { color: var(--green); border-color: rgba(0,255,136,0.25); }
+.btn.success:hover, .btn.success:active {
+  background: rgba(0,255,136,0.1); border-color: var(--green); box-shadow: var(--glow-g); color: #fff;
+}
+/* 2D mode: the toggle button goes yellow */
+.btn.lit-2d {
+  color: var(--yellow); border-color: rgba(255,224,64,0.45);
+  background: rgba(20,14,0,0.88); box-shadow: var(--glow-y);
+}
+.btn.lit-2d:hover, .btn.lit-2d:active {
+  background: rgba(255,224,64,0.10); border-color: var(--yellow); box-shadow: var(--glow-y); color: #fff;
+}
+.speed-group { display: flex; align-items: center; gap: 6px; }
+.speed-label { font-size: clamp(8px,1.8vw,10px); color: rgba(160,232,255,0.45); letter-spacing: 0.1em; }
+#speed-display { color: var(--yellow); font-size: clamp(10px,2.2vw,13px); min-width: 20px; text-align: center; text-shadow: var(--glow-y); }
+.speed-btn { min-width: 30px; padding: 8px 8px; }
+
+/* ─── Corner accents ─────────────────────────────────────── */
+.corner { position: fixed; width: 34px; height: 34px; z-index: 6; pointer-events: none; opacity: 0.5; }
+.corner-tl { top:0; left:0;    border-top:1px solid var(--cyan);    border-left:1px solid var(--cyan); }
+.corner-tr { top:0; right:0;   border-top:1px solid var(--cyan);    border-right:1px solid var(--cyan); }
+.corner-bl { bottom:0; left:0; border-bottom:1px solid var(--magenta); border-left:1px solid var(--magenta); }
+.corner-br { bottom:0; right:0;border-bottom:1px solid var(--magenta); border-right:1px solid var(--magenta); }
+
+/* ─── Flash ──────────────────────────────────────────────── */
+#flash {
+  position: fixed; inset: 0; pointer-events: none; z-index: 15;
+  background: radial-gradient(ellipse at center, rgba(0,245,255,0.06) 0%, transparent 68%);
+  opacity: 0; transition: opacity 0.06s ease-out;
+}
+#flash.on { opacity: 1; }
+
+/* ─── Mode-switch transition veil ────────────────────────── */
+#veil {
+  position: fixed; inset: 0; pointer-events: none; z-index: 28;
+  opacity: 0; transition: opacity 0.18s ease;
+  background: #000010;
+}
+#veil.show { opacity: 1; }
+
+/* ─── Info panel ─────────────────────────────────────────── */
+#param-info {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  background: rgba(0,4,18,0.95); border: 1px solid rgba(0,245,255,0.30);
+  border-radius: 6px; padding: 18px 24px; max-width: 290px; width: 82vw;
+  z-index: 50; display: none; box-shadow: 0 0 40px rgba(0,245,255,0.10);
+}
+#param-info h3 { font-family: 'Orbitron', monospace; font-size: 11px; color: var(--cyan);
+  letter-spacing: 0.2em; margin-bottom: 12px; text-shadow: var(--glow-c); }
+#param-info p { font-size: 10px; line-height: 1.7; color: rgba(160,232,255,0.72);
+  margin-bottom: 9px; letter-spacing: 0.05em; }
+#param-info .close-btn { margin-top: 14px; width: 100%; }
+</style>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+<div id="flash"></div>
+<div id="veil"></div>
+
+<div class="corner corner-tl"></div>
+<div class="corner corner-tr"></div>
+<div class="corner corner-bl"></div>
+<div class="corner corner-br"></div>
+
+<!-- HUD top -->
+<div id="hud-top">
+  <div>
+    <div class="title">
+      3D<span style="color:var(--magenta);text-shadow:var(--glow-m)">LIFE</span><span style="color:rgba(0,245,255,0.35)"> ·</span> GRID
+      <span class="title-sub">15×15×15 · SURVIVE 5–7 · BORN 6</span>
+    </div>
+  </div>
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-label">GEN</div>   <div class="stat-value"  id="stat-gen">0</div></div>
+    <div class="stat"><div class="stat-label">ALIVE</div> <div class="stat-value g" id="stat-cells">0</div></div>
+    <div class="stat"><div class="stat-label">DENSITY</div><div class="stat-value y" id="stat-density">0.0%</div></div>
+    <div class="stat"><div class="stat-label">MAX AGE</div><div class="stat-value"  id="stat-maxage">0</div></div>
+    <div class="stat"><div class="stat-label">AVG AGE</div><div class="stat-value"  id="stat-avgage">0.0</div></div>
+    <div class="stat"><div class="stat-label">BORN/GEN</div><div class="stat-value g" id="stat-born">0</div></div>
+  </div>
+</div>
+
+<div id="slice-hud">SLICE · Z = 07 · LAYER 8 / 15</div>
+<div id="mode-badge">3D</div>
+
+<!-- Legends -->
+<div id="legend">
+  <div class="legend-title">AGE</div>
+  <div class="legend-labels">
+    <span class="lbl-ancient">ANCIENT</span><div class="legend-sep"></div>
+    <span class="lbl-mid">ACTIVE</span><div class="legend-sep"></div>
+    <span class="lbl-new">NEW</span>
+  </div>
+  <div class="legend-bar"></div>
+</div>
+<div id="legend-density">
+  <div class="density-title">DENSITY</div>
+  <div class="density-labels">
+    <span>HIGH</span><div class="density-sep"></div><span>LOW</span>
+  </div>
+  <div class="density-bar"></div>
+</div>
+
+<!-- Info panel -->
+<div id="param-info">
+  <h3>BIOLOGICAL PARAMETERS</h3>
+  <p><span style="color:var(--cyan)">● COLOR — AGE</span><br>
+     Blue → Cyan → Green → Yellow → Red<br>Maps 0–45 generations of survival.</p>
+  <p><span style="color:var(--green)">● SIZE + GLOW — DENSITY</span><br>
+     More live neighbors → larger, brighter cell.<br>Isolated cells appear small and dim.</p>
+  <p><span style="color:var(--magenta)">● BIRTH ANIMATION</span><br>
+     Newborns spring from scale 0 with elastic overshoot.</p>
+  <p><span style="color:var(--yellow)">● 2D SLICE MODE</span><br>
+     Shows only the central Z-layer (z=7).<br>
+     Simulation continues in full 3D space.</p>
+  <button class="btn close-btn" onclick="closeInfo()">✕ CLOSE</button>
+</div>
+
+<!-- Controls -->
+<div id="controls">
+  <button class="btn active"  id="btn-play" onclick="togglePlay()">⏸ PAUSE</button>
+  <button class="btn danger"               onclick="resetGrid()">⟳ RESET</button>
+  <button class="btn success"              onclick="randomize()">⚄ RANDOM</button>
+  <button class="btn"         id="btn-mode" onclick="toggleMode()">⊞ 2D</button>
+  <div class="speed-group">
+    <div class="speed-label">SPD</div>
+    <button class="btn speed-btn" onclick="changeSpeed(-1)">◀</button>
+    <div id="speed-display">3</div>
+    <button class="btn speed-btn" onclick="changeSpeed(1)">▶</button>
+  </div>
+  <button class="btn" onclick="showInfo()" style="min-width:36px;padding:8px 10px">?</button>
+</div>
+
+<!-- Three.js r128 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════
+   CONSTANTS
+═══════════════════════════════════════════════════════════════ */
+const GRID        = 15;
+const G2          = GRID * GRID;
+const TOTAL       = GRID * G2;
+const MID_Z       = (GRID - 1) >> 1;   // = 7  (central Z layer)
+const SURVIVE_MIN = 5, SURVIVE_MAX = 7, BORN_EXACT = 6;
+const BIRTH_DUR   = 380;   // ms – birth animation
+const BASE_SCALE  = 0.76;  // base cell scale (density adds ≤ 0.28)
+const MAX_AGE     = 45;    // gens for full red
+const SPEEDS      = [2000, 800, 400, 200, 100, 40]; // ms/step
+
+/* ═══════════════════════════════════════════════════════════════
+   SIMULATION STATE  (double-buffered)
+═══════════════════════════════════════════════════════════════ */
+let cells       = new Uint8Array(TOTAL);
+let nextCells   = new Uint8Array(TOTAL);
+let ages        = new Uint32Array(TOTAL);
+let nextAges    = new Uint32Array(TOTAL);
+let density     = new Uint8Array(TOTAL);
+let nextDensity = new Uint8Array(TOTAL);
+let birthMs     = new Float64Array(TOTAL).fill(-1);
+
+let generation   = 0;
+let playing      = true;
+let speedLevel   = 3;
+let lastStepTime = 0;
+let bornThisStep = 0;
+
+/* ═══════════════════════════════════════════════════════════════
+   VIEW MODE STATE
+═══════════════════════════════════════════════════════════════ */
+let is2D = false;
+
+// 3-D orbit spherical coordinates  { theta, phi, r }
+const sph = { theta: Math.PI / 4, phi: Math.PI / 3.5, r: 33 };
+// Saved snapshot of sph when user entered 2D (restored on exit)
+const sph3DSnapshot = { theta: Math.PI / 4, phi: Math.PI / 3.5, r: 33 };
+
+// Camera smooth-transition
+const trans = {
+  running:  false,
+  fromPos:  new THREE.Vector3(),
+  toPos:    new THREE.Vector3(),
+  elapsed:  0,
+  duration: 1000,   // ms
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   THREE.JS RENDERER + SCENE
+═══════════════════════════════════════════════════════════════ */
+const container = document.getElementById('canvas-container');
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping         = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.5;
+renderer.outputEncoding      = THREE.sRGBEncoding;
+container.appendChild(renderer.domElement);
+
+const scene  = new THREE.Scene();
+scene.background = new THREE.Color(0x000008);
+
+const camera = new THREE.PerspectiveCamera(
+  55, window.innerWidth / window.innerHeight, 0.1, 200);
+
+// Fog – enabled only in 3D
+const fog3D = new THREE.FogExp2(0x000012, 0.040);
+scene.fog = fog3D;
+
+/* ── Lights ───────────────────────────────────────────────── */
+scene.add(new THREE.AmbientLight(0x000c1e, 2.5));
+
+const keyLight    = new THREE.PointLight(0x00e8ff, 4.5, 75);
+keyLight.position.set(22, 26, 12);
+scene.add(keyLight);
+
+const fillLight   = new THREE.PointLight(0xff00bb, 3.2, 75);
+fillLight.position.set(-22, -12, -16);
+scene.add(fillLight);
+
+const accentLight = new THREE.PointLight(0x00ffaa, 2.4, 65);
+accentLight.position.set(2, -22, 22);
+scene.add(accentLight);
+
+/* ── 3-D bounding box ────────────────────────────────────── */
+{
+  const boxGeo = new THREE.BoxGeometry(GRID, GRID, GRID);
+  const edgesGeo = new THREE.EdgesGeometry(boxGeo);
+  scene.add(new THREE.LineSegments(edgesGeo,
+    new THREE.LineBasicMaterial({ color: 0x00f5ff, transparent: true, opacity: 0.09 })));
+  boxGeo.dispose();
+
+  const half   = GRID / 2;
+  const subMat = new THREE.LineBasicMaterial({ color: 0x00f5ff, transparent: true, opacity: 0.030 });
+  [-5, 0, 5].forEach(a => [-5, 0, 5].forEach(b => {
+    const g = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(a, -half, b), new THREE.Vector3(a, half, b)]);
+    scene.add(new THREE.Line(g, subMat));
+  }));
+}
+
+/* ── 2D slice grid (XY plane, z = 0 in world) ───────────── */
+const sliceGrid = (() => {
+  const verts = [];
+  const half  = (GRID - 1) / 2;   // = 7
+  const eps   = 0.01;
+  for (let i = 0; i < GRID; i++) {
+    const p = i - half;
+    verts.push(-half - 0.5, p, -eps,  half + 0.5, p, -eps);  // horizontal
+    verts.push(p, -half - 0.5, -eps,  p, half + 0.5, -eps);  // vertical
+  }
+  const geo  = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  const obj = new THREE.LineSegments(geo,
+    new THREE.LineBasicMaterial({ color: 0x002840, transparent: true, opacity: 0.65 }));
+  obj.visible = false;
+  scene.add(obj);
+  return obj;
+})();
+
+/* ── 2D slice border (yellow rectangle) ─────────────────── */
+const sliceBorder = (() => {
+  const h   = (GRID - 1) / 2 + 0.5;
+  const pts = [
+    new THREE.Vector3(-h, -h, 0), new THREE.Vector3( h, -h, 0),
+    new THREE.Vector3( h,  h, 0), new THREE.Vector3(-h,  h, 0),
+    new THREE.Vector3(-h, -h, 0),
+  ];
+  const line = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color: 0xffe040, transparent: true, opacity: 0.55 }));
+  line.visible = false;
+  scene.add(line);
+  return line;
+})();
+
+/* ── InstancedMesh ───────────────────────────────────────── */
+const cellGeo = new THREE.BoxGeometry(1, 1, 1);
+const cellMat = new THREE.MeshStandardMaterial({
+  roughness: 0.18, metalness: 0.80,
+  emissive: new THREE.Color(0x001a2a),
+  emissiveIntensity: 0.50,
+});
+
+const instancedMesh = new THREE.InstancedMesh(cellGeo, cellMat, TOTAL);
+instancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+instancedMesh.frustumCulled = false;
+instancedMesh.count = 0;
+scene.add(instancedMesh);
+
+const dummy = new THREE.Object3D();
+const _col  = new THREE.Color();
+
+/* ═══════════════════════════════════════════════════════════════
+   COLOUR: age hue × density brightness
+═══════════════════════════════════════════════════════════════ */
+const AGE_PALETTE = [
+  [0.02, 0.30, 1.00],   // blue   – newborn
+  [0.00, 0.85, 1.00],   // cyan
+  [0.04, 1.00, 0.28],   // green
+  [1.00, 0.88, 0.00],   // yellow
+  [1.00, 0.08, 0.02],   // red    – ancient
+];
+
+function computeColor(age, nbrs) {
+  const ageT = Math.min(1, age / MAX_AGE);
+  const seg  = ageT * (AGE_PALETTE.length - 1);
+  const si   = Math.min(AGE_PALETTE.length - 2, seg | 0);
+  const st   = seg - si;
+  const c0 = AGE_PALETTE[si], c1 = AGE_PALETTE[si + 1];
+  const r  = c0[0] + (c1[0] - c0[0]) * st;
+  const g  = c0[1] + (c1[1] - c0[1]) * st;
+  const b  = c0[2] + (c1[2] - c0[2]) * st;
+  const br = 0.30 + Math.min(1, nbrs / 13) * 1.60;
+  _col.setRGB(r * br, g * br, b * br);
+  return _col;
+}
+
+/* ── Easing functions ────────────────────────────────────── */
+function easeOutBack(t) {
+  const c1 = 1.70158, c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+}
+function easeInOutQuart(t) {
+  return t < 0.5 ? 8*t*t*t*t : 1 - Math.pow(-2*t + 2, 4) / 2;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   GRID HELPERS
+═══════════════════════════════════════════════════════════════ */
+function idx(x, y, z) { return x * G2 + y * GRID + z; }
+
+function countNeighbors(cx, cy, cz) {
+  let n = 0;
+  const x0 = Math.max(0, cx-1), x1 = Math.min(GRID-1, cx+1);
+  const y0 = Math.max(0, cy-1), y1 = Math.min(GRID-1, cy+1);
+  const z0 = Math.max(0, cz-1), z1 = Math.min(GRID-1, cz+1);
+  for (let x = x0; x <= x1; x++)
+  for (let y = y0; y <= y1; y++)
+  for (let z = z0; z <= z1; z++) {
+    if (x===cx && y===cy && z===cz) continue;
+    n += cells[idx(x,y,z)];
+  }
+  return n;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SIMULATION  — always computed in full 3D
+═══════════════════════════════════════════════════════════════ */
+function stepSimulation(now) {
+  bornThisStep = 0;
+  for (let x = 0; x < GRID; x++)
+  for (let y = 0; y < GRID; y++)
+  for (let z = 0; z < GRID; z++) {
+    const i = idx(x, y, z);
+    const alive = cells[i];
+    const n     = countNeighbors(x, y, z);
+    nextDensity[i] = n;
+
+    const next = alive
+      ? (n >= SURVIVE_MIN && n <= SURVIVE_MAX ? 1 : 0)
+      : (n === BORN_EXACT ? 1 : 0);
+    nextCells[i] = next;
+
+    if (next) {
+      nextAges[i] = alive ? ages[i] + 1 : 0;
+      if (!alive) { birthMs[i] = now; bornThisStep++; }
+    } else {
+      nextAges[i] = 0;
+      if (alive) birthMs[i] = -1;
+    }
+  }
+  let t;
+  t = cells;   cells   = nextCells;   nextCells   = t;
+  t = ages;    ages    = nextAges;    nextAges    = t;
+  t = density; density = nextDensity; nextDensity = t;
+  generation++;
+  updateHUD();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   INSTANCED MESH  — called every animation frame
+═══════════════════════════════════════════════════════════════ */
+function birthScale(i, now) {
+  const bms = birthMs[i];
+  if (bms < 0) return 1.0;
+  const t = Math.min(1.0, (now - bms) / BIRTH_DUR);
+  return Math.max(0.0, t >= 1.0 ? 1.0 : easeOutBack(t));
+}
+
+function updateInstancedMesh(now) {
+  let count = 0;
+  const half = (GRID - 1) * 0.5;   // 7.0
+
+  if (is2D) {
+    /* ── 2D: only z = MID_Z slice, placed at world z=0 ──── */
+    for (let x = 0; x < GRID; x++)
+    for (let y = 0; y < GRID; y++) {
+      const i = idx(x, y, MID_Z);
+      if (!cells[i]) continue;
+      const densT = Math.min(1, density[i] / 13);
+      const sc    = (BASE_SCALE + densT * 0.28) * birthScale(i, now);
+      dummy.position.set(x - half, y - half, 0);
+      dummy.scale.setScalar(Math.max(0, sc));
+      dummy.rotation.set(0, 0, 0);
+      dummy.updateMatrix();
+      instancedMesh.setMatrixAt(count, dummy.matrix);
+      instancedMesh.setColorAt(count, computeColor(ages[i], density[i]));
+      count++;
+    }
+  } else {
+    /* ── 3D: full volume ─────────────────────────────────── */
+    for (let x = 0; x < GRID; x++)
+    for (let y = 0; y < GRID; y++)
+    for (let z = 0; z < GRID; z++) {
+      const i = idx(x, y, z);
+      if (!cells[i]) continue;
+      const densT = Math.min(1, density[i] / 13);
+      const sc    = (BASE_SCALE + densT * 0.28) * birthScale(i, now);
+      dummy.position.set(x - half, y - half, z - half);
+      dummy.scale.setScalar(Math.max(0, sc));
+      dummy.rotation.set(0, 0, 0);
+      dummy.updateMatrix();
+      instancedMesh.setMatrixAt(count, dummy.matrix);
+      instancedMesh.setColorAt(count, computeColor(ages[i], density[i]));
+      count++;
+    }
+  }
+
+  instancedMesh.count = count;
+  instancedMesh.instanceMatrix.needsUpdate = true;
+  if (instancedMesh.instanceColor) instancedMesh.instanceColor.needsUpdate = true;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HUD UPDATE
+═══════════════════════════════════════════════════════════════ */
+function updateHUD() {
+  let alive = 0, maxAge = 0, totalAge = 0;
+  for (let i = 0; i < TOTAL; i++) {
+    if (!cells[i]) continue;
+    alive++;
+    if (ages[i] > maxAge) maxAge = ages[i];
+    totalAge += ages[i];
+  }
+  document.getElementById('stat-gen').textContent      = generation;
+  document.getElementById('stat-cells').textContent    = alive;
+  document.getElementById('stat-density').textContent  = ((alive / TOTAL) * 100).toFixed(1) + '%';
+  document.getElementById('stat-maxage').textContent   = maxAge;
+  document.getElementById('stat-avgage').textContent   = alive > 0 ? (totalAge / alive).toFixed(1) : '0.0';
+  document.getElementById('stat-born').textContent     = bornThisStep;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   INIT / RESET / RANDOMIZE
+═══════════════════════════════════════════════════════════════ */
+function randomize() {
+  const d = 0.09 + Math.random() * 0.11;
+  for (let i = 0; i < TOTAL; i++) {
+    cells[i]   = Math.random() < d ? 1 : 0;
+    ages[i]    = cells[i] ? (Math.random() * 6) | 0 : 0;
+    density[i] = 0; birthMs[i] = -1;
+  }
+  generation = 0; bornThisStep = 0;
+  updateHUD();
+}
+
+function resetGrid() {
+  cells.fill(0); nextCells.fill(0);
+  ages.fill(0);  nextAges.fill(0);
+  density.fill(0); nextDensity.fill(0);
+  birthMs.fill(-1);
+  generation = 0; bornThisStep = 0;
+  instancedMesh.count = 0;
+  instancedMesh.instanceMatrix.needsUpdate = true;
+  updateHUD();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CAMERA HELPERS
+═══════════════════════════════════════════════════════════════ */
+function sphericalPos() {
+  return new THREE.Vector3(
+    sph.r * Math.sin(sph.phi) * Math.sin(sph.theta),
+    sph.r * Math.cos(sph.phi),
+    sph.r * Math.sin(sph.phi) * Math.cos(sph.theta));
+}
+
+function compute2DCameraPos() {
+  /* Distance so the 15-unit slice fills the shorter viewport axis with ~20% margin */
+  const vFov = camera.fov * (Math.PI / 180);
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
+  const dist = (GRID * 0.5) / Math.tan(Math.min(vFov, hFov) / 2) * 1.22;
+  return new THREE.Vector3(0, 0, dist);
+}
+
+function snapCamera3D() {
+  camera.position.copy(sphericalPos());
+  camera.lookAt(0, 0, 0);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   2D ↔ 3D TOGGLE
+═══════════════════════════════════════════════════════════════ */
+const veilEl      = document.getElementById('veil');
+const sliceHudEl  = document.getElementById('slice-hud');
+const modeBadgeEl = document.getElementById('mode-badge');
+const btnModeEl   = document.getElementById('btn-mode');
+const legendEl    = document.getElementById('legend');
+const legendDensEl= document.getElementById('legend-density');
+
+function toggleMode() {
+  if (trans.running) return;   // ignore taps during animation
+  is2D ? switchTo3D() : switchTo2D();
+}
+
+function _startTransition(toPos) {
+  trans.fromPos.copy(camera.position);
+  trans.toPos.copy(toPos);
+  trans.elapsed = 0;
+  trans.running = true;
+}
+
+function switchTo2D() {
+  is2D = true;
+  autoRotate = false;
+  // Save current 3D orbit
+  Object.assign(sph3DSnapshot, sph);
+
+  _startTransition(compute2DCameraPos());
+
+  // Scene tweaks
+  scene.fog        = null;
+  sliceGrid.visible   = true;
+  sliceBorder.visible = true;
+
+  // UI
+  sliceHudEl.classList.add('visible');
+  modeBadgeEl.textContent = '2D';
+  modeBadgeEl.classList.add('mode-2d');
+  btnModeEl.textContent = '⊞ 3D';
+  btnModeEl.classList.add('lit-2d');
+  legendEl.classList.add('hide');
+  legendDensEl.classList.add('hide');
+}
+
+function switchTo3D() {
+  is2D = false;
+  // Restore saved 3D orbit
+  Object.assign(sph, sph3DSnapshot);
+
+  _startTransition(sphericalPos());
+
+  // Scene tweaks
+  scene.fog        = fog3D;
+  sliceGrid.visible   = false;
+  sliceBorder.visible = false;
+
+  // UI
+  sliceHudEl.classList.remove('visible');
+  modeBadgeEl.textContent = '3D';
+  modeBadgeEl.classList.remove('mode-2d');
+  btnModeEl.textContent = '⊞ 2D';
+  btnModeEl.classList.remove('lit-2d');
+  legendEl.classList.remove('hide');
+  legendDensEl.classList.remove('hide');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ORBIT CONTROLS  (disabled in 2D mode / during transition)
+═══════════════════════════════════════════════════════════════ */
+let isDragging = false, prevX = 0, prevY = 0;
+let autoRotate = true;
+let lastPinchDist = 0;
+
+const domEl = renderer.domElement;
+
+domEl.addEventListener('mousedown', e => {
+  if (is2D || trans.running) return;
+  isDragging = true; autoRotate = false;
+  prevX = e.clientX; prevY = e.clientY;
+});
+window.addEventListener('mouseup',  () => { isDragging = false; });
+window.addEventListener('mousemove', e => {
+  if (!isDragging || is2D) return;
+  sph.theta -= (e.clientX - prevX) * 0.008;
+  sph.phi    = Math.max(0.08, Math.min(Math.PI - 0.08, sph.phi + (e.clientY - prevY) * 0.008));
+  prevX = e.clientX; prevY = e.clientY;
+});
+domEl.addEventListener('wheel', e => {
+  if (is2D || trans.running) return;
+  sph.r = Math.max(14, Math.min(65, sph.r + e.deltaY * 0.05));
+  e.preventDefault();
+}, { passive: false });
+
+domEl.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    if (!is2D && !trans.running) { isDragging = true; autoRotate = false; }
+    prevX = e.touches[0].clientX; prevY = e.touches[0].clientY;
+  } else if (e.touches.length === 2) {
+    isDragging = false;
+    lastPinchDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY);
+  }
+  e.preventDefault();
+}, { passive: false });
+
+domEl.addEventListener('touchmove', e => {
+  if (e.touches.length === 1 && isDragging && !is2D) {
+    sph.theta -= (e.touches[0].clientX - prevX) * 0.010;
+    sph.phi    = Math.max(0.08, Math.min(Math.PI - 0.08,
+      sph.phi + (e.touches[0].clientY - prevY) * 0.010));
+    prevX = e.touches[0].clientX; prevY = e.touches[0].clientY;
+  } else if (e.touches.length === 2) {
+    const d = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY);
+    if (!is2D) sph.r = Math.max(14, Math.min(65, sph.r - (d - lastPinchDist) * 0.08));
+    lastPinchDist = d;
+  }
+  e.preventDefault();
+}, { passive: false });
+domEl.addEventListener('touchend', () => { isDragging = false; });
+
+/* ═══════════════════════════════════════════════════════════════
+   CONTROL FUNCTIONS
+═══════════════════════════════════════════════════════════════ */
+function togglePlay() {
+  playing = !playing;
+  const b = document.getElementById('btn-play');
+  b.textContent = playing ? '⏸ PAUSE' : '▶ PLAY';
+  b.classList.toggle('active', playing);
+}
+function changeSpeed(d) {
+  speedLevel = Math.max(1, Math.min(6, speedLevel + d));
+  document.getElementById('speed-display').textContent = speedLevel;
+}
+function showInfo()  { document.getElementById('param-info').style.display = 'block'; }
+function closeInfo() { document.getElementById('param-info').style.display = 'none'; }
+
+/* ═══════════════════════════════════════════════════════════════
+   RENDER LOOP
+═══════════════════════════════════════════════════════════════ */
+const flashEl = document.getElementById('flash');
+function triggerFlash() {
+  flashEl.classList.add('on');
+  setTimeout(() => flashEl.classList.remove('on'), 75);
+}
+
+let prevTime = 0;
+
+function animate(now) {
+  requestAnimationFrame(animate);
+  const dt = Math.min(now - prevTime, 50);
+  prevTime = now;
+
+  /* ── Camera ─────────────────────────────────────────────── */
+  if (trans.running) {
+    trans.elapsed += dt;
+    const t  = Math.min(1, trans.elapsed / trans.duration);
+    const et = easeInOutQuart(t);
+    camera.position.lerpVectors(trans.fromPos, trans.toPos, et);
+    camera.lookAt(0, 0, 0);
+
+    if (t >= 1) {
+      trans.running = false;
+      if (is2D) {
+        // pin exactly
+        camera.position.copy(trans.toPos);
+        camera.lookAt(0, 0, 0);
+      } else {
+        snapCamera3D();
+      }
+    }
+  } else if (!is2D) {
+    if (autoRotate && !isDragging) sph.theta += 0.0025;
+    snapCamera3D();
+  }
+  // In 2D non-transitioning: camera stays pinned, no update needed
+
+  /* ── Lighting pulse ─────────────────────────────────────── */
+  keyLight.intensity    = 4.5 + Math.sin(now * 0.0014) * 0.70;
+  fillLight.intensity   = 3.2 + Math.cos(now * 0.0011) * 0.50;
+  accentLight.intensity = 2.4 + Math.sin(now * 0.0018 + 1.2) * 0.40;
+  cellMat.emissiveIntensity = 0.42 + Math.sin(now * 0.0020) * 0.14;
+
+  /* ── Simulation step ────────────────────────────────────── */
+  if (playing && (now - lastStepTime) >= SPEEDS[speedLevel - 1]) {
+    stepSimulation(now);
+    triggerFlash();
+    lastStepTime = now;
+  }
+
+  /* ── Mesh update (every frame – smooth birth anim) ──────── */
+  updateInstancedMesh(now);
+
+  renderer.render(scene, camera);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESIZE
+═══════════════════════════════════════════════════════════════ */
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  if (is2D && !trans.running) {
+    camera.position.copy(compute2DCameraPos());
+    camera.lookAt(0, 0, 0);
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   SERVICE WORKER (GitHub Pages PWA)
+═══════════════════════════════════════════════════════════════ */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => {
+        reg.addEventListener('updatefound', () => {
+          const w = reg.installing;
+          w.addEventListener('statechange', () => {
+            if (w.state === 'installed' && navigator.serviceWorker.controller)
+              w.postMessage('SKIP_WAITING');
+          });
+        });
+      })
+      .catch(e => console.warn('[SW]', e));
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BOOT
+═══════════════════════════════════════════════════════════════ */
+snapCamera3D();
+randomize();
+animate(0);
+</script>
+</body>
+</html>
