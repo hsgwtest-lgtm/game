@@ -138,9 +138,12 @@ class SoftBody {
   }
 
   physics(gY) {
+    const MAX_NODE_VEL = 15;
     for (const n of this.nodes) {
-      const vx = (n.x - n.ox) * this._cof.airDrag;
-      const vy = (n.y - n.oy) * this._cof.airDrag;
+      const rawVx = (n.x - n.ox) * this._cof.airDrag;
+      const rawVy = (n.y - n.oy) * this._cof.airDrag;
+      const vx = Math.max(-MAX_NODE_VEL, Math.min(MAX_NODE_VEL, rawVx));
+      const vy = Math.max(-MAX_NODE_VEL, Math.min(MAX_NODE_VEL, rawVy));
       n.ox = n.x; n.oy = n.y;
       n.x += vx; n.y += vy + this._cof.gravity;
       n.grounded = false;
@@ -160,6 +163,12 @@ class SoftBody {
         n.grounded = true;
       }
       if (n.x - n.radius < 0) { n.x = n.radius; n.ox = n.x; }
+    }
+    // If the creature has sunk more than 100 px below the ground, teleport it back
+    const cy = this.getCenterY();
+    if (cy > gY + 100) {
+      const dy = (gY - 50) - cy;
+      for (const n of this.nodes) { n.y += dy; n.oy = n.y; }
     }
     const cx = this.getCenterX();
     this.maxX    = Math.max(this.maxX, cx);
