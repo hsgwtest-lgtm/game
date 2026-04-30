@@ -164,9 +164,9 @@ class SoftBody {
       }
       if (n.x - n.radius < 0) { n.x = n.radius; n.ox = n.x; }
     }
-    // If the creature has sunk more than 100 px below the ground, teleport it back
+    // If the creature has sunk below the flat ground surface it is stuck — reset immediately
     const cy = this.getCenterY();
-    if (cy > gY + 100) {
+    if (cy > gY) {
       const dy = (gY - 50) - cy;
       for (const n of this.nodes) { n.y += dy; n.oy = n.y; }
     }
