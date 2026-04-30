@@ -1019,6 +1019,8 @@ function loop(ts) {
       creature.update(simTime);
       creature.physics(groundY);
       simTime += stepDt;
+      // If the creature has sunk below the flat ground surface it is stuck — reset immediately
+      if (creature.getCenterY() > groundY) { resetCreature(); break; }
     }
     // カメラ追従
     const tx = creature.getCenterX() - (canvas.width / (window.devicePixelRatio || 1)) / 2;

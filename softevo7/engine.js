@@ -750,10 +750,19 @@
         for (const m of body.muscles) solveConstraint(body.nodes[m.a], body.nodes[m.b], m.currentTarget, m.stiffness);
         for (const n of body.nodes) { collideWithTerrain(n, cof); constrainToWorld(n); }
       }
-      // If the creature has sunk more than 100 px below the ground surface, teleport it
-      // back to spawn height to prevent it staying stuck underground
-      const centerY = body.getCenterY();
-      if (centerY > groundY + 100) {
+      // If any node center is inside a solid terrain cell the creature is stuck underground
+      // (works for any terrain shape) — reset it to spawn immediately
+      let stuckInTerrain = false;
+      for (const n of body.nodes) {
+        const cellX = (n.x / COF.cellSize) | 0;
+        const cellY = (n.y / COF.cellSize) | 0;
+        if (cellX >= 0 && cellX < TERRAIN_W && cellY >= 0 && cellY < TERRAIN_H && terrain[cellY * TERRAIN_W + cellX] === TERRAIN_SOLID) {
+          stuckInTerrain = true;
+          break;
+        }
+      }
+      if (stuckInTerrain) {
+        const centerY = body.getCenterY();
         const dy = getSpawnY() - centerY;
         for (const n of body.nodes) {
           n.y += dy;
