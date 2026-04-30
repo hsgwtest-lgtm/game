@@ -729,11 +729,18 @@
     }
     if (needExpand) expandWorld();
 
+    const groundY = Math.floor(TERRAIN_H * COF.groundLevel) * COF.cellSize;
+    // Maximum velocity per step — prevents high-speed tunnelling through terrain
+    const MAX_NODE_VEL = 15;
+
     for (const body of allBodies) {
       const cof = body._cof ?? COF;
       for (const n of body.nodes) {
-        const vx = (n.x - n.ox) * cof.airDrag;
-        const vy = (n.y - n.oy) * cof.airDrag;
+        const rawVx = (n.x - n.ox) * cof.airDrag;
+        const rawVy = (n.y - n.oy) * cof.airDrag;
+        // Clamp velocity to prevent tunnelling and runaway high-speed behaviour
+        const vx = Math.max(-MAX_NODE_VEL, Math.min(MAX_NODE_VEL, rawVx));
+        const vy = Math.max(-MAX_NODE_VEL, Math.min(MAX_NODE_VEL, rawVy));
         n.ox = n.x; n.oy = n.y;
         n.x += vx; n.y += vy + cof.gravity;
         n.grounded = false;
@@ -742,6 +749,16 @@
         for (const c of body.bones) solveConstraint(body.nodes[c.a], body.nodes[c.b], c.restLength, c.stiffness);
         for (const m of body.muscles) solveConstraint(body.nodes[m.a], body.nodes[m.b], m.currentTarget, m.stiffness);
         for (const n of body.nodes) { collideWithTerrain(n, cof); constrainToWorld(n); }
+      }
+      // If the creature has sunk more than 100 px below the ground surface, teleport it
+      // back to spawn height to prevent it staying stuck underground
+      const centerY = body.getCenterY();
+      if (centerY > groundY + 100) {
+        const dy = getSpawnY() - centerY;
+        for (const n of body.nodes) {
+          n.y += dy;
+          n.oy = n.y; // zero out accumulated vertical velocity
+        }
       }
       const cy = body.getCenterY();
       if (cy < body.minY) body.minY = cy;

@@ -48,11 +48,11 @@ html, body {
 .build-action { border-color: rgba(251,191,36,0.2) !important; }
 .build-sep { width: 1px; background: rgba(99,210,255,0.15); margin: 0 4px; }
 #build-info {
-  pointer-events: auto; position: absolute; right: 14px; top: 70px;
+  pointer-events: auto;
   display: flex; gap: 12px; font-size: 12px;
   font-family: 'Menlo','Courier New',monospace; color: rgba(99,210,255,0.7);
-  background: rgba(6,10,20,0.85); padding: 6px 12px; border-radius: 6px;
-  border: 1px solid rgba(99,210,255,0.1);
+  background: rgba(6,10,20,0.85); padding: 4px 14px;
+  border-bottom: 1px solid rgba(99,210,255,0.1);
 }
 #build-hint {
   pointer-events: none; position: absolute; bottom: 130px; left: 50%;
@@ -398,7 +398,7 @@ html, body {
 @keyframes livePulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
 
 /* ═══ EVENT LOG & FLASH ═══ */
-#event-log { position: absolute; right: 60px; top: 60px; width: 260px; pointer-events: none; z-index: 5; }
+#event-log { position: absolute; right: 64px; top: 52px; width: 240px; pointer-events: none; z-index: 5; }
 .event-msg {
   font-size: 11px; padding: 4px 8px; margin-bottom: 3px; border-radius: 4px;
   background: rgba(6,10,20,0.88); border-left: 3px solid;
@@ -446,7 +446,7 @@ html, body {
   .brain-cam { padding: 2px 5px; font-size: 10px; }
   #brain-bar-stats { font-size: 9px; }
   #config-panel { width: 280px; }
-  #event-log { width: 180px; }
+  #event-log { right: auto; left: 50%; transform: translateX(-50%); top: auto; bottom: 148px; width: 200px; }
   .event-msg { font-size: 10px; }
   #gen-flash .gen-title { font-size: 22px; }
   #gen-flash .gen-sub { font-size: 13px; }
