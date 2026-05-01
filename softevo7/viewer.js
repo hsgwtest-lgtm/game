@@ -98,6 +98,7 @@ class SoftBody {
     cx /= nc; cy /= nc;
 
     this.startX = x;
+    this.startY = y;
     this.maxX   = x;
     this.fitness = 0;
     this.totalMuscleOutput = 0;
@@ -1019,8 +1020,10 @@ function loop(ts) {
       creature.update(simTime);
       creature.physics(groundY);
       simTime += stepDt;
-      // If the creature has sunk below the flat ground surface it is stuck — reset immediately
-      if (creature.getCenterY() > groundY) { resetCreature(); break; }
+      // If any node has sunk below the flat ground surface, reset immediately
+      let nodeUnderGround = false;
+      for (const n of creature.nodes) { if (n.y > groundY) { nodeUnderGround = true; break; } }
+      if (nodeUnderGround) { resetCreature(); break; }
     }
     // カメラ追従
     const tx = creature.getCenterX() - (canvas.width / (window.devicePixelRatio || 1)) / 2;
