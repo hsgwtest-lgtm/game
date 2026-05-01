@@ -12,10 +12,21 @@ const ASSETS = [
 
 const TILE_CACHE = 'taiwan-tiles-v1';
 
+// Exact hostnames for map tile providers
+const MAP_TILE_HOSTS = new Set([
+  'tile.openstreetmap.org',
+  'a.tile.openstreetmap.org',
+  'b.tile.openstreetmap.org',
+  'c.tile.openstreetmap.org',
+  'tiles.stadiamaps.com',
+]);
+
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS).catch(() => {});
+      return cache.addAll(ASSETS).catch((err) => {
+        console.warn('Cache install failed:', err);
+      });
     })
   );
   self.skipWaiting();
@@ -38,15 +49,16 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
 
   // Cache map tiles with network-first strategy (fallback to cache)
-  if (url.hostname.includes('tile.openstreetmap.org') || url.hostname.includes('tiles.stadiamaps.com')) {
+  if (MAP_TILE_HOSTS.has(url.hostname)) {
     e.respondWith(
       caches.open(TILE_CACHE).then(async (cache) => {
         try {
           const res = await fetch(e.request);
           cache.put(e.request, res.clone());
           return res;
-        } catch {
-          return cache.match(e.request);
+        } catch (err) {
+          const cached = await cache.match(e.request);
+          return cached || new Response('Tile unavailable offline', { status: 503 });
         }
       })
     );
@@ -63,7 +75,7 @@ self.addEventListener('fetch', (e) => {
           caches.open(CACHE_NAME).then((c) => c.put(e.request, clone));
         }
         return res;
-      }).catch(() => cached);
+      }).catch(() => cached || new Response('Offline', { status: 503 }));
     })
   );
 });
