@@ -79,6 +79,7 @@ class SoftBody {
     cx /= nc; cy /= nc;
 
     this.startX       = x;
+    this.startY       = y;
     this.maxX         = x;
     this.fitness      = 0;
     this.trail        = [];
@@ -164,11 +165,14 @@ class SoftBody {
       }
       if (n.x - n.radius < 0) { n.x = n.radius; n.ox = n.x; }
     }
-    // If the creature has sunk below the flat ground surface it is stuck — reset immediately
-    const cy = this.getCenterY();
-    if (cy > gY) {
-      const dy = (gY - 50) - cy;
-      for (const n of this.nodes) { n.y += dy; n.oy = n.y; }
+    // If any node has sunk below the flat ground surface, reset immediately
+    let underGround = false;
+    for (const n of this.nodes) { if (n.y > gY) { underGround = true; break; } }
+    if (underGround) {
+      const cx = this.getCenterX(), cy = this.getCenterY();
+      const dx = this.startX - cx, dy = this.startY - cy;
+      for (const n of this.nodes) { n.x += dx; n.ox = n.x; n.y += dy; n.oy = n.y; n.grounded = false; }
+      this.trail = [];
     }
     const cx = this.getCenterX();
     this.maxX    = Math.max(this.maxX, cx);

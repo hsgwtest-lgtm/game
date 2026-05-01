@@ -762,12 +762,16 @@
         }
       }
       if (stuckInTerrain) {
+        const centerX = body.getCenterX();
         const centerY = body.getCenterY();
-        const dy = getSpawnY() - centerY;
+        const dx = body.startX - centerX;
+        const dy = body.startY - centerY;
         for (const n of body.nodes) {
-          n.y += dy;
-          n.oy = n.y; // zero out accumulated vertical velocity
+          n.x += dx; n.ox = n.x;
+          n.y += dy; n.oy = n.y;
+          n.grounded = false;
         }
+        body.trail = [];
       }
       const cy = body.getCenterY();
       if (cy < body.minY) body.minY = cy;
