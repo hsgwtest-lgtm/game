@@ -827,9 +827,12 @@ function applySettingsToUI() {
   // Home quick info: rate
   document.getElementById('home-rate-display').textContent = `≒ ${TWD_TO_JPY} JPY`;
 
-  // Home quick info: hotel
-  document.getElementById('home-hotel-display').innerHTML =
-    escapeHtml(userHotelName) + '<br>' + escapeHtml(userHotelArea);
+  // Home quick info: hotel (use DOM manipulation to avoid innerHTML with mixed content)
+  const hotelDisplayEl = document.getElementById('home-hotel-display');
+  hotelDisplayEl.textContent = '';
+  hotelDisplayEl.appendChild(document.createTextNode(userHotelName));
+  hotelDisplayEl.appendChild(document.createElement('br'));
+  hotelDisplayEl.appendChild(document.createTextNode(userHotelArea));
 
   // Taxi card: hotel
   document.getElementById('taxi-hotel-name').textContent = userHotelName;
@@ -1193,19 +1196,30 @@ function closeModal() {
 // COPY TO CLIPBOARD
 // ============================================================
 function copyText(text) {
-  navigator.clipboard.writeText(text).then(() => {
-    showToast('✓ コピーしました');
-  }).catch(() => {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('✓ コピーしました');
+    }).catch(() => legacyCopy(text));
+  } else {
+    legacyCopy(text);
+  }
+}
+
+function legacyCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try {
     document.execCommand('copy');
-    document.body.removeChild(ta);
     showToast('✓ コピーしました');
-  });
+  } catch (e) {
+    showToast('⚠️ コピーできませんでした', true);
+  } finally {
+    document.body.removeChild(ta);
+  }
 }
 
 function copyHotelAddr() {
