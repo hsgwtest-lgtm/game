@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="ja" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>台湾 Ultimate Guide 2026</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#4f46e5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        colors: {
+          brand: '#4f46e5',
+        }
+      }
+    }
+  }
+</script>
+<style>
+  * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+  body { overscroll-behavior: none; }
+  #map { height: 100%; width: 100%; }
+  .leaflet-container { background: #1e293b; }
+  .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.35s ease; }
+  .accordion-content.open { max-height: 2000px; }
+  .nav-btn.active { color: #818cf8; }
+  .nav-btn.active svg { stroke: #818cf8; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: flex; flex-direction: column; }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: #1e293b; }
+  ::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 2px; }
+  .now-badge { animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+  .copy-btn:active { transform: scale(0.95); }
+  .phrase-btn:active { transform: scale(0.97); }
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+</style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans select-none">
+
+<div id="app" class="flex flex-col h-screen max-w-lg mx-auto relative">
+
+  <!-- Header -->
+  <header class="bg-slate-900/95 backdrop-blur border-b border-slate-700/50 px-4 py-3 flex items-center justify-between z-10 flex-shrink-0">
+    <div class="flex items-center gap-2">
+      <span class="text-2xl">🇹🇼</span>
+      <div>
+        <h1 class="text-base font-bold text-indigo-400 leading-none">Taiwan Ultimate Guide</h1>
+        <p class="text-xs text-slate-400 leading-none mt-0.5">2026 / 5月の旅</p>
+      </div>
+    </div>
+    <div id="clock" class="text-right">
+      <div id="clock-time" class="text-sm font-mono text-indigo-300"></div>
+      <div id="clock-tz" class="text-xs text-slate-500">JST</div>
+    </div>
+  </header>
+
+  <!-- Tab Panels -->
+  <main class="flex-1 overflow-hidden relative">
+
+    <!-- HOME TAB -->
+    <div id="tab-home" class="tab-panel active absolute inset-0 overflow-y-auto pb-20 px-4 pt-3 gap-3">
+
+      <!-- Next Step Card -->
+      <div class="bg-indigo-900/40 border border-indigo-600/40 rounded-2xl p-4 mb-3">
+        <div class="text-xs text-indigo-300 font-semibold mb-1 uppercase tracking-wider">⚡ Next Step</div>
+        <div id="next-step-title" class="text-xl font-bold text-white leading-tight"></div>
+        <div id="next-step-detail" class="text-sm text-slate-300 mt-1"></div>
+        <div id="next-step-time" class="text-xs text-indigo-400 mt-2 font-mono"></div>
+      </div>
+
+      <!-- Weather Card -->
+      <div class="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 mb-3">
+        <div class="text-xs text-slate-400 font-semibold mb-2 uppercase tracking-wider">🌤 台北 5月の天候傾向</div>
+        <div id="weather-display" class="flex items-center gap-4">
+          <div class="text-4xl" id="weather-icon">⛅</div>
+          <div>
+            <div class="text-2xl font-bold text-white" id="weather-temp">26°C</div>
+            <div class="text-sm text-slate-300" id="weather-desc">曇り時々雨、蒸し暑い</div>
+            <div class="text-xs text-slate-400 mt-1" id="weather-sub">湿度75% · 降水確率40%</div>
+          </div>
+        </div>
+        <div class="mt-3 grid grid-cols-4 gap-2 text-center text-xs">
+          <div class="bg-slate-700/50 rounded-xl p-2">
+            <div class="text-base">☂️</div>
+            <div class="text-slate-300">折りたたみ傘必携</div>
+          </div>
+          <div class="bg-slate-700/50 rounded-xl p-2">
+            <div class="text-base">💧</div>
+            <div class="text-slate-300">水分補給こまめに</div>
+          </div>
+          <div class="bg-slate-700/50 rounded-xl p-2">
+            <div class="text-base">👕</div>
+            <div class="text-slate-300">薄手・速乾素材</div>
+          </div>
+          <div class="bg-slate-700/50 rounded-xl p-2">
+            <div class="text-base">🕶️</div>
+            <div class="text-slate-300">UV対策必須</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Transit Links -->
+      <div class="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 mb-3">
+        <div class="text-xs text-slate-400 font-semibold mb-3 uppercase tracking-wider">🚇 リアルタイム運行情報</div>
+        <div class="flex flex-col gap-2">
+          <a href="https://www.metro.taipei/cp.aspx?n=BB849D96B8A4FEB7" target="_blank" rel="noopener"
+             class="flex items-center justify-between bg-indigo-600/20 border border-indigo-500/30 rounded-xl px-4 py-3 active:bg-indigo-600/40 transition-colors">
+            <div class="flex items-center gap-3">
+              <span class="text-xl">🚇</span>
+              <div>
+                <div class="text-sm font-semibold text-white">台北MRT</div>
+                <div class="text-xs text-slate-400">リアルタイム運行状況</div>
+              </div>
+            </div>
+            <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          </a>
+          <a href="https://tip.railway.gov.tw/tra-tip-web/tip/tip001/tip112/gobytime" target="_blank" rel="noopener"
+             class="flex items-center justify-between bg-green-600/20 border border-green-500/30 rounded-xl px-4 py-3 active:bg-green-600/40 transition-colors">
+            <div class="flex items-center gap-3">
+              <span class="text-xl">🚂</span>
+              <div>
+                <div class="text-sm font-semibold text-white">台鉄 (TRA)</div>
+                <div class="text-xs text-slate-400">時刻表検索</div>
+              </div>
+            </div>
+            <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          </a>
+          <a href="https://www.tymetro.com.tw/tymetro-new/tw/_pages/travel-info/operational-info.html" target="_blank" rel="noopener"
+             class="flex items-center justify-between bg-purple-600/20 border border-purple-500/30 rounded-xl px-4 py-3 active:bg-purple-600/40 transition-colors">
+            <div class="flex items-center gap-3">
+              <span class="text-xl">🛤️</span>
+              <div>
+                <div class="text-sm font-semibold text-white">桃園メトロ</div>
+                <div class="text-xs text-slate-400">運行情報</div>
+              </div>
+            </div>
+            <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <!-- Quick Info -->
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div class="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-3 text-center">
+          <div class="text-2xl mb-1">💴</div>
+          <div class="text-xs text-slate-400">1 TWD</div>
+          <div class="text-lg font-bold text-yellow-400">≒ 4.7 JPY</div>
+        </div>
+        <div class="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-3 text-center">
+          <div class="text-2xl mb-1">📍</div>
+          <div class="text-xs text-slate-400">ホテル</div>
+          <div class="text-sm font-bold text-indigo-300 leading-tight">Link World<br>中山区</div>
+        </div>
+      </div>
+
+      <!-- Emergency Contacts -->
+      <div class="bg-red-900/20 border border-red-700/30 rounded-2xl p-4 mb-3">
+        <div class="text-xs text-red-400 font-semibold mb-2 uppercase tracking-wider">🆘 緊急連絡先</div>
+        <div class="grid grid-cols-3 gap-2 text-center text-xs">
+          <div class="bg-slate-800/50 rounded-xl p-2">
+            <div class="text-base">🚨</div>
+            <div class="text-slate-300">警察</div>
+            <div class="text-red-400 font-mono font-bold text-sm">110</div>
+          </div>
+          <div class="bg-slate-800/50 rounded-xl p-2">
+            <div class="text-base">🚑</div>
+            <div class="text-slate-300">救急</div>
+            <div class="text-red-400 font-mono font-bold text-sm">119</div>
+          </div>
+          <div class="bg-slate-800/50 rounded-xl p-2">
+            <div class="text-base">🗣️</div>
+            <div class="text-slate-300">観光警察</div>
+            <div class="text-red-400 font-mono font-bold text-sm">0800-024-111</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TIMELINE TAB -->
+    <div id="tab-timeline" class="tab-panel absolute inset-0 overflow-y-auto pb-20 px-4 pt-3">
+
+      <div id="timeline-container"></div>
+
+    </div>
+
+    <!-- MAP TAB -->
+    <div id="tab-map" class="tab-panel absolute inset-0 pb-16">
+      <div id="map"></div>
+    </div>
+
+    <!-- TOOLS TAB -->
+    <div id="tab-tools" class="tab-panel absolute inset-0 overflow-y-auto pb-20 px-4 pt-3 gap-3">
+
+      <!-- Currency Calculator -->
+      <div class="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 mb-3">
+        <div class="text-xs text-slate-400 font-semibold mb-3 uppercase tracking-wider">💱 通貨計算機 (1 TWD = 4.7 JPY)</div>
+        <div class="space-y-3">
+          <div>
+            <label class="text-xs text-slate-400 mb-1 block">TWD → JPY</label>
+            <div class="flex items-center gap-2">
+              <div class="relative flex-1">
+                <input id="twd-input" type="number" inputmode="decimal" placeholder="0"
+                  class="w-full bg-slate-700/50 border border-slate-600 rounded-xl px-4 py-3 text-xl font-mono text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50">
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">TWD</span>
+              </div>
+              <span class="text-slate-400 text-lg">=</span>
+              <div class="flex-1 bg-indigo-900/30 border border-indigo-600/30 rounded-xl px-4 py-3">
+                <span id="jpy-output" class="text-xl font-mono text-indigo-300">0</span>
+                <span class="text-slate-400 text-sm ml-1">JPY</span>
+              </div>
+            </div>
+          </div>
+          <div>
+            <label class="text-xs text-slate-400 mb-1 block">JPY → TWD</label>
+            <div class="flex items-center gap-2">
+              <div class="relative flex-1">
+                <input id="jpy-input" type="number" inputmode="decimal" placeholder="0"
+                  class="w-full bg-slate-700/50 border border-slate-600 rounded-xl px-4 py-3 text-xl font-mono text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50">
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">JPY</span>
+              </div>
+              <span class="text-slate-400 text-lg">=</span>
+              <div class="flex-1 bg-green-900/30 border border-green-600/30 rounded-xl px-4 py-3">
+                <span id="twd-output" class="text-xl font-mono text-green-300">0</span>
+                <span class="text-slate-400 text-sm ml-1">TWD</span>
+              </div>
+            </div>
+          </div>
+          <!-- Quick reference table -->
+          <div class="grid grid-cols-4 gap-1 mt-2 text-xs text-center">
+            <div class="bg-slate-700/40 rounded-lg p-2"><div class="text-slate-400">100 TWD</div><div class="text-yellow-400 font-mono">¥470</div></div>
+            <div class="bg-slate-700/40 rounded-lg p-2"><div class="text-slate-400">500 TWD</div><div class="text-yellow-400 font-mono">¥2,350</div></div>
+            <div class="bg-slate-700/40 rounded-lg p-2"><div class="text-slate-400">1,000 TWD</div><div class="text-yellow-400 font-mono">¥4,700</div></div>
+            <div class="bg-slate-700/40 rounded-lg p-2"><div class="text-slate-400">3,000 TWD</div><div class="text-yellow-400 font-mono">¥14,100</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Taxi Addresses -->
+      <div class="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 mb-3">
+        <div class="text-xs text-slate-400 font-semibold mb-3 uppercase tracking-wider">🚖 タクシー用住所カード</div>
+        <div class="space-y-3">
+
+          <div class="bg-indigo-900/30 border border-indigo-600/30 rounded-xl p-4">
+            <div class="text-xs text-indigo-400 mb-2 font-semibold">🏨 ホテル（宿泊先）</div>
+            <div class="text-3xl font-bold text-white leading-tight mb-2 tracking-wide">
+              臺北市中山區<br>松江路90巷5號
+            </div>
+            <div class="text-lg text-indigo-300 font-semibold mb-1">Link World Hotel</div>
+            <div class="text-sm text-slate-400">〒10491</div>
+            <button onclick="copyText('臺北市中山區松江路90巷5號')" class="copy-btn mt-3 w-full bg-indigo-600/40 border border-indigo-500/50 rounded-lg py-2 text-sm text-indigo-200 active:bg-indigo-600/70 transition-colors">
+              📋 住所をコピー
+            </button>
+          </div>
+
+          <div class="bg-purple-900/30 border border-purple-600/30 rounded-xl p-4">
+            <div class="text-xs text-purple-400 mb-2 font-semibold">✈️ 桃園国際空港</div>
+            <div class="text-3xl font-bold text-white leading-tight mb-2 tracking-wide">
+              桃園國際機場<br>第二航廈
+            </div>
+            <div class="text-sm text-slate-400">Terminal 2 (EVA Air等)</div>
+            <button onclick="copyText('桃園國際機場第二航廈')" class="copy-btn mt-3 w-full bg-purple-600/40 border border-purple-500/50 rounded-lg py-2 text-sm text-purple-200 active:bg-purple-600/70 transition-colors">
+              📋 住所をコピー
+            </button>
+          </div>
+
+          <div class="bg-green-900/30 border border-green-600/30 rounded-xl p-4">
+            <div class="text-xs text-green-400 mb-2 font-semibold">🚉 台北駅</div>
+            <div class="text-3xl font-bold text-white leading-tight mb-2 tracking-wide">
+              台北車站
+            </div>
+            <div class="text-sm text-slate-400">台北市中正區北平西路3號</div>
+            <button onclick="copyText('台北車站')" class="copy-btn mt-3 w-full bg-green-600/40 border border-green-500/50 rounded-lg py-2 text-sm text-green-200 active:bg-green-600/70 transition-colors">
+              📋 住所をコピー
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Pointing Chinese -->
+      <div class="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 mb-3">
+        <div class="text-xs text-slate-400 font-semibold mb-3 uppercase tracking-wider">👆 指差し中国語</div>
+        <div class="grid grid-cols-1 gap-2">
+
+          <button onclick="showPhrase('不要香菜', 'パクチーなし', 'Bú yào xiāngcài')" class="phrase-btn bg-slate-700/50 border border-slate-600/50 rounded-xl p-3 text-left active:bg-slate-600/60 transition-colors">
+            <div class="text-2xl font-bold text-white">不要香菜</div>
+            <div class="flex justify-between items-center mt-1">
+              <span class="text-sm text-slate-300">パクチーなし</span>
+              <span class="text-xs text-slate-500 font-mono">Bú yào xiāngcài</span>
+            </div>
+          </button>
+
+          <button onclick="showPhrase('買單', '会計・お会計をお願いします', 'Mǎi dān')" class="phrase-btn bg-slate-700/50 border border-slate-600/50 rounded-xl p-3 text-left active:bg-slate-600/60 transition-colors">
+            <div class="text-2xl font-bold text-white">買單</div>
+            <div class="flex justify-between items-center mt-1">
+              <span class="text-sm text-slate-300">お会計をお願いします</span>
+              <span class="text-xs text-slate-500 font-mono">Mǎi dān</span>
+            </div>
+          </button>
+
+          <button onclick="showPhrase('統編不要', 'レシートの統一編號不要', 'Tǒng biān bú yào')" class="phrase-btn bg-slate-700/50 border border-slate-600/50 rounded-xl p-3 text-left active:bg-slate-600/60 transition-colors">
+            <div class="text-2xl font-bold text-white">統編不要</div>
+            <div class="flex justify-between items-center mt-1">
+              <span class="text-sm text-slate-300">レシートの番号不要</span>
+              <span class="text-xs text-slate-500 font-mono">Tǒng biān bú yào</span>
+            </div>
+          </button>
+
+          <button onclick="showPhrase('這個多少錢？', 'これはいくらですか？', 'Zhège duōshǎo qián?')" class="phrase-btn bg-slate-700/50 border border-slate-600/50 rounded-xl p-3 text-left active:bg-slate-600/60 transition-colors">
+            <div class="text-2xl font-bold text-white">這個多少錢？</div>
+            <div class="flex justify-between items-center mt-1">
+              <span class="text-sm text-slate-300">これはいくらですか？</span>
+              <span class="text-xs text-slate-500 font-mono">Zhège duōshǎo qián?</span>
+            </div>
+          </button>
+
+          <button onclick="showPhrase('可以刷卡嗎？', 'カード払いできますか？', 'Kěyǐ shuā kǎ ma?')" class="phrase-btn bg-slate-700/50 border border-slate-600/50 rounded-xl p-3 text-left active:bg-slate-600/60 transition-colors">
+            <div class="text-2xl font-bold text-white">可以刷卡嗎？</div>
+            <div class="flex justify-between items-center mt-1">
+              <span class="text-sm text-slate-300">カード払いできますか？</span>
+              <span class="text-xs text-slate-500 font-mono">Kěyǐ shuā kǎ ma?</span>
+            </div>
+          </button>
+
+          <button onclick="showPhrase('不辣', '辛くしないでください', 'Bú là')" class="phrase-btn bg-slate-700/50 border border-slate-600/50 rounded-xl p-3 text-left active:bg-slate-600/60 transition-colors">
+            <div class="text-2xl font-bold text-white">不辣</div>
+            <div class="flex justify-between items-center mt-1">
+              <span class="text-sm text-slate-300">辛くしないでください</span>
+              <span class="text-xs text-slate-500 font-mono">Bú là</span>
+            </div>
+          </button>
+
+          <button onclick="showPhrase('去這個地址', 'この住所に行ってください（タクシー用）', 'Qù zhège dìzhǐ')" class="phrase-btn bg-slate-700/50 border border-slate-600/50 rounded-xl p-3 text-left active:bg-slate-600/60 transition-colors">
+            <div class="text-2xl font-bold text-white">去這個地址</div>
+            <div class="flex justify-between items-center mt-1">
+              <span class="text-sm text-slate-300">この住所に行ってください</span>
+              <span class="text-xs text-slate-500 font-mono">Qù zhège dìzhǐ</span>
+            </div>
+          </button>
+
+          <button onclick="showPhrase('謝謝', 'ありがとう', 'Xiè xiè')" class="phrase-btn bg-slate-700/50 border border-slate-600/50 rounded-xl p-3 text-left active:bg-slate-600/60 transition-colors">
+            <div class="text-2xl font-bold text-white">謝謝</div>
+            <div class="flex justify-between items-center mt-1">
+              <span class="text-sm text-slate-300">ありがとう</span>
+              <span class="text-xs text-slate-500 font-mono">Xiè xiè</span>
+            </div>
+          </button>
+
+        </div>
+      </div>
+
+      <!-- Shopping Memo -->
+      <div class="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 mb-3">
+        <div class="text-xs text-slate-400 font-semibold mb-3 uppercase tracking-wider">🛍️ 買い物メモ</div>
+        <div class="flex gap-2 mb-3">
+          <input id="memo-input" type="text" placeholder="買いたいものを入力..."
+            class="flex-1 bg-slate-700/50 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50"
+            onkeydown="if(event.key==='Enter')addMemo()">
+          <button onclick="addMemo()" class="bg-indigo-600 hover:bg-indigo-500 rounded-xl px-4 py-2.5 text-sm font-medium active:bg-indigo-700 transition-colors">追加</button>
+        </div>
+        <div id="memo-list" class="space-y-2"></div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Bottom Navigation -->
+  <nav class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-slate-900/95 backdrop-blur border-t border-slate-700/50 flex z-50">
+    <button onclick="switchTab('home')" id="nav-home" class="nav-btn active flex-1 flex flex-col items-center gap-1 py-3 text-slate-400 transition-colors">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+      <span class="text-xs">Home</span>
+    </button>
+    <button onclick="switchTab('timeline')" id="nav-timeline" class="nav-btn flex-1 flex flex-col items-center gap-1 py-3 text-slate-400 transition-colors">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+      <span class="text-xs">Timeline</span>
+    </button>
+    <button onclick="switchTab('map')" id="nav-map" class="nav-btn flex-1 flex flex-col items-center gap-1 py-3 text-slate-400 transition-colors">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+      <span class="text-xs">Map</span>
+    </button>
+    <button onclick="switchTab('tools')" id="nav-tools" class="nav-btn flex-1 flex flex-col items-center gap-1 py-3 text-slate-400 transition-colors">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+      <span class="text-xs">Tools</span>
+    </button>
+  </nav>
+
+  <!-- Phrase Modal -->
+  <div id="phrase-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center px-6" onclick="closeModal()">
+    <div class="bg-slate-800 border border-slate-600 rounded-3xl p-8 w-full max-w-sm text-center" onclick="event.stopPropagation()">
+      <div id="modal-chinese" class="text-6xl font-bold text-white mb-4 leading-tight"></div>
+      <div id="modal-japanese" class="text-lg text-slate-300 mb-2"></div>
+      <div id="modal-pinyin" class="text-sm text-slate-500 font-mono mb-6"></div>
+      <button onclick="closeModal()" class="w-full bg-indigo-600 hover:bg-indigo-500 rounded-2xl py-3 text-white font-semibold active:bg-indigo-700 transition-colors">閉じる</button>
+    </div>
+  </div>
+
+  <!-- Copy Toast -->
+  <div id="copy-toast" class="hidden fixed top-20 left-1/2 -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded-full text-sm font-medium z-50 shadow-lg">
+    ✓ コピーしました
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// CONSTANTS
+// ============================================================
+const TWD_TO_JPY = 4.7;
+
+// ============================================================
+// TRIP DATA
+// ============================================================
+const TRIP_DAYS = [
+  {
+    date: '2026-05-02',
+    label: '5月2日 (土)',
+    emoji: '✈️',
+    title: '帰国フライト・到着',
+    color: 'indigo',
+    sections: [
+      {
+        time: '深夜',
+        icon: '🌙',
+        label: '深夜〜早朝',
+        items: [
+          {
+            time: '01:00',
+            title: '桃園国際空港 到着',
+            detail: '第1or2航廈に到着。入国審査へ進む。',
+            tips: [
+              '📋 入国カードは機内で配布。未記入の場合は到着ロビーにも用意あり',
+              '💴 入国後すぐ18番出口付近のATMで台湾ドルを引き出す（手数料: 約100元）',
+              '📶 SIMカード or Wifi Router は到着ロビーの電信会社カウンターで購入可',
+              '🚗 Uber アプリで ホテルへ（目安: 約1,100元 / 55分〜90分）',
+            ]
+          },
+          {
+            time: '02:30頃',
+            title: 'Link World Hotel チェックイン',
+            detail: '臺北市中山區松江路90巷5號',
+            tips: [
+              '🏨 24時間フロント対応',
+              '🔑 早朝到着の場合、前日予約で事前チェックイン手続き要確認',
+            ]
+          }
+        ]
+      },
+      {
+        time: '午後',
+        icon: '☀️',
+        label: '午後',
+        items: [
+          {
+            time: '12:00',
+            title: '中正紀念堂',
+            detail: 'MRT淡水信義線・松山新店線「中正紀念堂」駅 出口5直結',
+            tips: [
+              '💂 衛兵交代式は毎時0分（所要時間約10分）。人気なので5分前には到着を',
+              '🏛️ 入場無料・周辺の自由広場も散歩におすすめ',
+              '🕐 営業時間：09:00〜21:00',
+            ]
+          },
+          {
+            time: '14:00',
+            title: '周辺の食事・探索',
+            detail: '永康街エリアが徒歩圏内。有名な鼎泰豊本店（行列必至）',
+            tips: [
+              '🥟 鼎泰豊 101本店 or 永康街本店（どちらも行列必至・整理券制）',
+              '🧋 春水堂（タピオカミルクティー発祥の店）も近く',
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    date: '2026-05-03',
+    label: '5月3日 (日)',
+    emoji: '🏛️',
+    title: '故宮博物院・迪化街・西門町',
+    color: 'violet',
+    sections: [
+      {
+        time: '午前',
+        icon: '🌅',
+        label: '午前',
+        items: [
+          {
+            time: '09:00',
+            title: '国立故宮博物院',
+            detail: 'MRT淡水信義線「士林」駅からバスで約15分',
+            tips: [
+              '🚌 乗車バス: 255番・304番・紅30番（士林駅・正門方向）',
+              '🎫 入場料: 350元（常設展）/ オンライン事前予約推奨',
+              '⏰ 開館時間: 08:30〜17:30（金土は〜21:00）',
+              '🏺 必見: 翠玉白菜・肉形石・毛公鼎 は人だかりに注意',
+              '📱 無料音声ガイドアプリあり（日本語対応）',
+            ]
+          }
+        ]
+      },
+      {
+        time: '午後',
+        icon: '☀️',
+        label: '午後',
+        items: [
+          {
+            time: '13:00',
+            title: '迪化街',
+            detail: 'MRT中和新蘆線「大橋頭」駅 or 淡水信義線「雙連」駅から徒歩',
+            tips: [
+              '🧵 永楽市場（布問屋・手芸材料の宝庫）は2Fが布市場',
+              '🍵 茶器・茶葉の専門店が多数。試飲対応のお店もあり',
+              '🫚 乾物・漢方薬材・乾燥フルーツなどのお土産探しに最適',
+              '📸 日本統治時代の建築が多く、フォトスポット多数',
+            ]
+          }
+        ]
+      },
+      {
+        time: '夜',
+        icon: '🌃',
+        label: '夜',
+        items: [
+          {
+            time: '18:30',
+            title: '西門町',
+            detail: 'MRT板南線・松山新店線「西門」駅 出口6',
+            tips: [
+              '🍜 阿宗麺線（西門站6号出口から徒歩2分）行列必至の大腸麺線',
+              '🛍️ 若者文化・ストリートファッションの中心地',
+              '🎭 誠品書店（西門店）・各種カフェ・映画館あり',
+              '🌃 夜20時以降でも賑わっている',
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    date: '2026-05-04',
+    label: '5月4日 (月)',
+    emoji: '🚂',
+    title: '十分・九份・饒河街夜市',
+    color: 'sky',
+    sections: [
+      {
+        time: '午前',
+        icon: '🌅',
+        label: '午前',
+        items: [
+          {
+            time: '10:20',
+            title: '台北駅 (TRA) 出発',
+            detail: '台鉄（TRA）4番ホームから平渓線方面へ',
+            tips: [
+              '🚉 4番ホームから「瑞芳」行きに乗車（約50分）',
+              '🎫 切符は窓口 or 自動券売機（日本語対応あり）',
+              '💡 悠遊カード（EasyCard）使用可能',
+              '⚠️ IC乗車 or 紙切符で乗車（指定席は必要なし）',
+            ]
+          },
+          {
+            time: '11:40',
+            title: '十分（シーフン）到着',
+            detail: '瑞芳駅で平渓線に乗り換え、十分駅下車',
+            tips: [
+              '🪔 天燈（ランタン）飛ばし体験（1セット150〜200元）',
+              '🍢 十分老街の屋台・食べ歩きグルメを楽しむ',
+              '💦 十分大瀑布は徒歩約20分（往復）',
+              '⏰ 13:00頃まで滞在を推奨',
+            ]
+          }
+        ]
+      },
+      {
+        time: '午後',
+        icon: '☀️',
+        label: '午後',
+        items: [
+          {
+            time: '15:30',
+            title: '九份（ジウフェン）へ移動',
+            detail: '十分 or 瑞芳駅からタクシー（定額料金制）',
+            tips: [
+              '🚕 タクシー料金: 十分→九份 約400〜500元（定額）/ 瑞芳→九份 約150〜200元',
+              '🚌 バスも利用可（788番・965番・825番）ただし混雑あり',
+              '⚠️ 九份は週末・夕暮れ時が最も混雑。人混みに注意',
+            ]
+          },
+          {
+            time: '17:30',
+            title: '阿妹茶樓',
+            detail: '九份の象徴的な茶芸館。千と千尋の神隠しのモデルとも',
+            tips: [
+              '🫖 入場料に飲み物1杯+茶菓子セット含む（要席料）',
+              '📸 夕暮れ〜夜のライトアップが最高の撮影チャンス',
+              '⏰ 混雑時は1〜2時間待ちも。早め到着推奨',
+              '🌆 九份老街の石段散策も忘れずに',
+            ]
+          }
+        ]
+      },
+      {
+        time: '夜',
+        icon: '🌃',
+        label: '夜',
+        items: [
+          {
+            time: '20:00',
+            title: '饒河街観光夜市',
+            detail: 'MRT松山新店線「松山」駅すぐ。松山車站から徒歩5分',
+            tips: [
+              '🍢 必食: 福州胡椒餅（行列の店）・薬膳排骨湯',
+              '🌙 夜市は17:00〜24:00頃まで営業',
+              '🛍️ 全長約600mのアーケード。雨天でも快適',
+              '💡 週末は特に混雑するので荷物管理に注意',
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    date: '2026-05-05',
+    label: '5月5日 (火)',
+    emoji: '♨️',
+    title: '誠品生活・北投温泉・淡水',
+    color: 'emerald',
+    sections: [
+      {
+        time: '午前',
+        icon: '🌅',
+        label: '午前',
+        items: [
+          {
+            time: '10:00',
+            title: '誠品生活 中山',
+            detail: 'MRT淡水信義線「中山」駅直結',
+            tips: [
+              '📚 台湾最大手の書店・複合文化施設',
+              '🛍️ 台湾デザインの雑貨・お土産に最適',
+              '☕ 地下フードコートでのんびりブランチも◎',
+              '⏰ 営業時間: 11:00〜22:00',
+            ]
+          }
+        ]
+      },
+      {
+        time: '午後',
+        icon: '☀️',
+        label: '午後',
+        items: [
+          {
+            time: '13:00',
+            title: '北投温泉',
+            detail: 'MRT淡水信義線「北投」駅→新北投線「新北投」駅下車（乗り換え無料）',
+            tips: [
+              '♨️ 温泉街は駅から徒歩5〜10分圏内',
+              '🏊 北投温泉親水公園の無料足湯あり',
+              '🏛️ 北投温泉博物館（日本統治時代の建物）入場無料',
+              '💡 硫磺泉・碳酸氫鈉泉の2種類あり。公衆浴場は100〜150元と手頃',
+              '🧴 タオル・着替えを持参推奨',
+            ]
+          },
+          {
+            time: '16:30',
+            title: '淡水の夕陽',
+            detail: 'MRT淡水信義線「淡水」駅（終点）',
+            tips: [
+              '🌅 淡水老街からの夕陽と淡水河の景色は絶景',
+              '🚶 駅から淡水老街まで徒歩5分',
+              '🍢 阿給（揚げ豆腐詰め物）・魚丸湯が名物',
+              '⛵ 渡し舟で対岸の八里へも行ける（15元）',
+              '📸 17:30前後が黄金時間帯。マジックアワーを狙って',
+            ]
+          }
+        ]
+      },
+      {
+        time: '夜',
+        icon: '🌃',
+        label: '夜',
+        items: [
+          {
+            time: '19:00',
+            title: '最終夜・お土産まとめ',
+            detail: 'ホテル周辺での夕食・翌日帰国準備',
+            tips: [
+              '🛍️ 近くのコンビニ（全家/7-11）で最終的なお土産購入',
+              '✈️ 翌日の帰国便の時間を再確認',
+              '🧳 スーツケースの重量確認（手荷物制限: 7kg / 受託: 23kg等）',
+              '💴 残った台湾ドルは空港でも両替可（レート不利）',
+            ]
+          }
+        ]
+      }
+    ]
+  }
+];
+
+// ============================================================
+// MAP SPOTS
+// ============================================================
+const MAP_SPOTS = [
+  { name: 'Link World Hotel（宿泊先）', lat: 25.0498, lng: 121.5332, emoji: '🏨', color: '#4f46e5', day: '' },
+  { name: '桃園国際空港', lat: 25.0776, lng: 121.2324, emoji: '✈️', color: '#6366f1', day: '5/2' },
+  { name: '中正紀念堂', lat: 25.0360, lng: 121.5200, emoji: '🏛️', color: '#4f46e5', day: '5/2' },
+  { name: '国立故宮博物院', lat: 25.1022, lng: 121.5484, emoji: '🏺', color: '#7c3aed', day: '5/3' },
+  { name: '迪化街', lat: 25.0553, lng: 121.5088, emoji: '🛕', color: '#7c3aed', day: '5/3' },
+  { name: '西門町', lat: 25.0424, lng: 121.5076, emoji: '🎭', color: '#7c3aed', day: '5/3' },
+  { name: '台北駅 (TRA)', lat: 25.0478, lng: 121.5169, emoji: '🚂', color: '#0284c7', day: '5/4' },
+  { name: '十分（天燈）', lat: 24.9931, lng: 121.7871, emoji: '🪔', color: '#0284c7', day: '5/4' },
+  { name: '九份', lat: 25.1078, lng: 121.8441, emoji: '🏮', color: '#0284c7', day: '5/4' },
+  { name: '饒河街夜市', lat: 25.0500, lng: 121.5775, emoji: '🍢', color: '#0284c7', day: '5/4' },
+  { name: '誠品生活 中山', lat: 25.0591, lng: 121.5224, emoji: '📚', color: '#059669', day: '5/5' },
+  { name: '北投温泉', lat: 25.1374, lng: 121.5070, emoji: '♨️', color: '#059669', day: '5/5' },
+  { name: '淡水老街', lat: 25.1690, lng: 121.4409, emoji: '🌅', color: '#059669', day: '5/5' },
+];
+
+// ============================================================
+// SCHEDULED EVENTS (for Next Step calculation)
+// ============================================================
+const SCHEDULE = [
+  { date: '2026-05-02', hour: 1,  min: 0,  title: '桃園空港 到着', detail: '入国審査・ATM両替・Uber手配' },
+  { date: '2026-05-02', hour: 12, min: 0,  title: '中正紀念堂', detail: '出口5直結・衛兵交代式（毎時0分）' },
+  { date: '2026-05-03', hour: 9,  min: 0,  title: '故宮博物院', detail: '士林駅からバス255/304/紅30番' },
+  { date: '2026-05-03', hour: 13, min: 0,  title: '迪化街', detail: '永楽市場・布問屋・茶器探し' },
+  { date: '2026-05-03', hour: 18, min: 30, title: '西門町', detail: '阿宗麺線・ショッピング' },
+  { date: '2026-05-04', hour: 10, min: 20, title: '台北駅 出発 (TRA)', detail: '4番ホームから瑞芳行き' },
+  { date: '2026-05-04', hour: 11, min: 40, title: '十分 到着', detail: '天燈・十分大瀑布・食べ歩き' },
+  { date: '2026-05-04', hour: 15, min: 30, title: '九份へ移動', detail: 'タクシー（定額）400〜500元' },
+  { date: '2026-05-04', hour: 17, min: 30, title: '阿妹茶樓', detail: '夕暮れのライトアップを堪能' },
+  { date: '2026-05-04', hour: 20, min: 0,  title: '饒河街夜市', detail: '松山駅すぐ・福州胡椒餅必食' },
+  { date: '2026-05-05', hour: 10, min: 0,  title: '誠品生活 中山', detail: '台湾デザイン雑貨・お土産' },
+  { date: '2026-05-05', hour: 13, min: 0,  title: '北投温泉', detail: 'MRT新北投駅・公衆浴場100〜150元' },
+  { date: '2026-05-05', hour: 16, min: 30, title: '淡水の夕陽', detail: '淡水老街・淡水河の絶景' },
+];
+
+// ============================================================
+// CLOCK
+// ============================================================
+function updateClock() {
+  const now = new Date();
+  const jst = new Date(now.toLocaleString('en-US', {timeZone: 'Asia/Tokyo'}));
+  const h = String(jst.getHours()).padStart(2,'0');
+  const m = String(jst.getMinutes()).padStart(2,'0');
+  const s = String(jst.getSeconds()).padStart(2,'0');
+  document.getElementById('clock-time').textContent = `${h}:${m}:${s}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ============================================================
+// NEXT STEP CALCULATION
+// ============================================================
+function calcNextStep() {
+  const now = new Date();
+  const jst = new Date(now.toLocaleString('en-US', {timeZone: 'Asia/Tokyo'}));
+  const todayStr = jst.toISOString().slice(0,10);
+
+  // find next event
+  let next = null;
+  let nextDt = null;
+  for (const ev of SCHEDULE) {
+    const dt = new Date(`${ev.date}T${String(ev.hour).padStart(2,'0')}:${String(ev.min).padStart(2,'0')}:00+09:00`);
+    if (dt > jst) {
+      if (!nextDt || dt < nextDt) {
+        nextDt = dt;
+        next = ev;
+      }
+    }
+  }
+
+  const titleEl = document.getElementById('next-step-title');
+  const detailEl = document.getElementById('next-step-detail');
+  const timeEl = document.getElementById('next-step-time');
+
+  if (!next) {
+    titleEl.textContent = '🎉 旅行お疲れ様でした！';
+    detailEl.textContent = 'すべての予定が完了しました。台湾、また来たいですね！';
+    timeEl.textContent = '';
+    return;
+  }
+
+  const diffMs = nextDt - jst;
+  const diffH = Math.floor(diffMs / 3600000);
+  const diffM = Math.floor((diffMs % 3600000) / 60000);
+
+  const dateLabel = next.date === todayStr ? '今日' : next.date.slice(5).replace('-','/');
+  const timeLabel = `${String(next.hour).padStart(2,'0')}:${String(next.min).padStart(2,'0')}`;
+
+  titleEl.textContent = next.title;
+  detailEl.textContent = next.detail;
+
+  let countdown = '';
+  if (diffH < 24) {
+    countdown = `${dateLabel} ${timeLabel} まで あと ${diffH > 0 ? diffH+'時間 ' : ''}${diffM}分`;
+  } else {
+    const diffD = Math.floor(diffH / 24);
+    countdown = `${dateLabel} ${timeLabel} まで あと ${diffD}日`;
+  }
+  timeEl.textContent = countdown;
+}
+calcNextStep();
+setInterval(calcNextStep, 60000);
+
+// ============================================================
+// WEATHER SIMULATION (5月台北の傾向ベース)
+// ============================================================
+function updateWeather() {
+  const now = new Date();
+  const jst = new Date(now.toLocaleString('en-US', {timeZone: 'Asia/Tokyo'}));
+  const hour = jst.getHours();
+  const day = jst.getDate();
+
+  // 5月台北の気候パターンをシミュレート
+  const patterns = [
+    { icon: '⛅', temp: '26°C', desc: '曇り時々晴れ', sub: '湿度72% · 降水確率35%' },
+    { icon: '🌤️', temp: '27°C', desc: '晴れ間あり、蒸し暑い', sub: '湿度68% · 降水確率25%' },
+    { icon: '🌧️', temp: '24°C', desc: 'にわか雨の可能性あり', sub: '湿度82% · 降水確率60%' },
+    { icon: '☀️', temp: '28°C', desc: '晴れ、紫外線強め', sub: '湿度65% · 降水確率15%' },
+    { icon: '⛈️', temp: '23°C', desc: '雷雨注意、短時間で回復', sub: '湿度88% · 降水確率75%' },
+  ];
+
+  const p = patterns[day % patterns.length];
+  document.getElementById('weather-icon').textContent = p.icon;
+  document.getElementById('weather-temp').textContent = p.temp;
+  document.getElementById('weather-desc').textContent = p.desc;
+  document.getElementById('weather-sub').textContent = p.sub;
+}
+updateWeather();
+
+// ============================================================
+// TIMELINE RENDERING
+// ============================================================
+function renderTimeline() {
+  const container = document.getElementById('timeline-container');
+  const now = new Date();
+  const jst = new Date(now.toLocaleString('en-US', {timeZone: 'Asia/Tokyo'}));
+  const todayStr = jst.toISOString().slice(0,10);
+
+  const colorMap = {
+    indigo: { bg: 'bg-indigo-900/30', border: 'border-indigo-600/40', hdr: 'bg-indigo-600/20', badge: 'bg-indigo-500', text: 'text-indigo-300', dot: 'bg-indigo-500' },
+    violet: { bg: 'bg-violet-900/30', border: 'border-violet-600/40', hdr: 'bg-violet-600/20', badge: 'bg-violet-500', text: 'text-violet-300', dot: 'bg-violet-500' },
+    sky:    { bg: 'bg-sky-900/30',    border: 'border-sky-600/40',    hdr: 'bg-sky-600/20',    badge: 'bg-sky-500',    text: 'text-sky-300',    dot: 'bg-sky-500' },
+    emerald:{ bg: 'bg-emerald-900/30', border: 'border-emerald-600/40', hdr: 'bg-emerald-600/20', badge: 'bg-emerald-500', text: 'text-emerald-300', dot: 'bg-emerald-500' },
+  };
+
+  // Sort: today first, then future, then past
+  const sorted = [...TRIP_DAYS].sort((a, b) => {
+    const aIsToday = a.date === todayStr;
+    const bIsToday = b.date === todayStr;
+    if (aIsToday !== bIsToday) return aIsToday ? -1 : 1;
+    const aFuture = a.date > todayStr;
+    const bFuture = b.date > todayStr;
+    if (aFuture !== bFuture) return aFuture ? -1 : 1;
+    return a.date.localeCompare(b.date);
+  });
+
+  let html = '';
+  for (const day of sorted) {
+    const c = colorMap[day.color] || colorMap.indigo;
+    const isToday = day.date === todayStr;
+    const isPast = day.date < todayStr;
+
+    html += `
+    <div class="mb-4 rounded-2xl border ${c.border} ${c.bg} overflow-hidden ${isPast ? 'opacity-60' : ''}">
+      <button onclick="toggleDay('${day.date}')" class="w-full flex items-center justify-between px-4 py-3.5 ${c.hdr}">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">${day.emoji}</span>
+          <div class="text-left">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-white text-base">${day.label}</span>
+              ${isToday ? `<span class="now-badge ${c.badge} text-white text-xs px-2 py-0.5 rounded-full font-bold">NOW</span>` : ''}
+              ${isPast ? '<span class="bg-slate-600 text-slate-300 text-xs px-2 py-0.5 rounded-full">終了</span>' : ''}
+            </div>
+            <span class="${c.text} text-xs">${day.title}</span>
+          </div>
+        </div>
+        <svg id="chevron-${day.date}" class="w-5 h-5 text-slate-400 transition-transform ${isToday ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
+      <div id="day-${day.date}" class="accordion-content ${isToday ? 'open' : ''}">
+        <div class="px-4 py-3 space-y-4">
+          ${day.sections.map(sec => `
+            <div>
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-base">${sec.icon}</span>
+                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">${sec.label}</span>
+              </div>
+              <div class="space-y-3">
+                ${sec.items.map(item => `
+                  <div class="pl-3 border-l-2 ${c.dot.replace('bg-', 'border-')}">
+                    <div class="flex items-start gap-2">
+                      <span class="text-xs font-mono ${c.text} whitespace-nowrap mt-0.5">${item.time}</span>
+                      <div>
+                        <div class="text-sm font-semibold text-white">${item.title}</div>
+                        <div class="text-xs text-slate-400 mt-0.5">${item.detail}</div>
+                        <ul class="mt-2 space-y-1">
+                          ${item.tips.map(t => `<li class="text-xs text-slate-300">${t}</li>`).join('')}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+function toggleDay(date) {
+  const content = document.getElementById(`day-${date}`);
+  const chevron = document.getElementById(`chevron-${date}`);
+  content.classList.toggle('open');
+  chevron.classList.toggle('rotate-180');
+}
+
+renderTimeline();
+
+// ============================================================
+// MAP
+// ============================================================
+let mapInitialized = false;
+
+function initMap() {
+  if (mapInitialized) return;
+  mapInitialized = true;
+
+  const map = L.map('map', {
+    center: [25.05, 121.53],
+    zoom: 12,
+    zoomControl: true,
+  });
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 19,
+  }).addTo(map);
+
+  const dayColors = { '': '#4f46e5', '5/2': '#4f46e5', '5/3': '#7c3aed', '5/4': '#0284c7', '5/5': '#059669' };
+
+  MAP_SPOTS.forEach(spot => {
+    const color = dayColors[spot.day] || '#4f46e5';
+    const icon = L.divIcon({
+      html: `<div style="background:${color};width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;border:2px solid rgba(255,255,255,0.4);box-shadow:0 2px 8px rgba(0,0,0,0.5)">${spot.emoji}</div>`,
+      className: '',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+    });
+
+    const marker = L.marker([spot.lat, spot.lng], { icon }).addTo(map);
+    const gmUrl = `https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lng}`;
+    marker.bindPopup(`
+      <div style="font-family:sans-serif;min-width:160px">
+        <div style="font-size:20px;text-align:center;margin-bottom:4px">${spot.emoji}</div>
+        <div style="font-weight:bold;font-size:13px;margin-bottom:4px">${spot.name}</div>
+        ${spot.day ? `<div style="font-size:11px;color:#888;margin-bottom:6px">${spot.day}</div>` : ''}
+        <a href="${gmUrl}" target="_blank" rel="noopener"
+          style="display:block;background:${color};color:white;text-align:center;padding:6px 12px;border-radius:8px;text-decoration:none;font-size:12px;font-weight:bold">
+          Google Mapsで開く 🗺️
+        </a>
+      </div>
+    `);
+  });
+
+  // Fit bounds to all spots (excluding airport)
+  const mainSpots = MAP_SPOTS.filter(s => s.name !== '桃園国際空港' && s.name !== '十分（天燈）' && s.name !== '九份');
+  const bounds = L.latLngBounds(mainSpots.map(s => [s.lat, s.lng]));
+  map.fitBounds(bounds, { padding: [40, 40] });
+}
+
+// ============================================================
+// TAB SWITCHING
+// ============================================================
+function switchTab(tab) {
+  document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+
+  document.getElementById(`tab-${tab}`).classList.add('active');
+  document.getElementById(`nav-${tab}`).classList.add('active');
+
+  if (tab === 'map') {
+    setTimeout(initMap, 100);
+  }
+}
+
+// ============================================================
+// CURRENCY CALCULATOR
+// ============================================================
+document.getElementById('twd-input').addEventListener('input', function() {
+  const val = parseFloat(this.value) || 0;
+  const jpy = Math.round(val * TWD_TO_JPY);
+  document.getElementById('jpy-output').textContent = jpy.toLocaleString('ja-JP');
+});
+
+document.getElementById('jpy-input').addEventListener('input', function() {
+  const val = parseFloat(this.value) || 0;
+  const twd = Math.round(val / TWD_TO_JPY);
+  document.getElementById('twd-output').textContent = twd.toLocaleString('zh-TW');
+});
+
+// ============================================================
+// PHRASE MODAL
+// ============================================================
+function showPhrase(chinese, japanese, pinyin) {
+  document.getElementById('modal-chinese').textContent = chinese;
+  document.getElementById('modal-japanese').textContent = japanese;
+  document.getElementById('modal-pinyin').textContent = pinyin;
+  document.getElementById('phrase-modal').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('phrase-modal').classList.add('hidden');
+}
+
+// ============================================================
+// COPY TO CLIPBOARD
+// ============================================================
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    const toast = document.getElementById('copy-toast');
+    toast.classList.remove('hidden');
+    setTimeout(() => toast.classList.add('hidden'), 2000);
+  }).catch(() => {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    const toast = document.getElementById('copy-toast');
+    toast.classList.remove('hidden');
+    setTimeout(() => toast.classList.add('hidden'), 2000);
+  });
+}
+
+// ============================================================
+// SHOPPING MEMO (localStorage)
+// ============================================================
+let memos = JSON.parse(localStorage.getItem('taiwan-memos') || '[]');
+
+function saveMemos() {
+  localStorage.setItem('taiwan-memos', JSON.stringify(memos));
+}
+
+function renderMemos() {
+  const list = document.getElementById('memo-list');
+  if (memos.length === 0) {
+    list.innerHTML = '<p class="text-xs text-slate-500 text-center py-2">まだメモがありません</p>';
+    return;
+  }
+  list.innerHTML = memos.map((m, i) => `
+    <div class="flex items-center gap-3 bg-slate-700/40 rounded-xl px-3 py-2.5">
+      <button onclick="toggleMemo(${i})" class="flex-shrink-0 w-5 h-5 rounded-full border-2 ${m.done ? 'bg-green-500 border-green-500' : 'border-slate-500'} flex items-center justify-center">
+        ${m.done ? '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>' : ''}
+      </button>
+      <span class="flex-1 text-sm ${m.done ? 'line-through text-slate-500' : 'text-white'}">${escapeHtml(m.text)}</span>
+      <button onclick="deleteMemo(${i})" class="flex-shrink-0 text-slate-500 hover:text-red-400 active:text-red-500 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+  `).join('');
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function addMemo() {
+  const input = document.getElementById('memo-input');
+  const text = input.value.trim();
+  if (!text) return;
+  memos.push({ text, done: false });
+  saveMemos();
+  renderMemos();
+  input.value = '';
+}
+
+function toggleMemo(i) {
+  memos[i].done = !memos[i].done;
+  saveMemos();
+  renderMemos();
+}
+
+function deleteMemo(i) {
+  memos.splice(i, 1);
+  saveMemos();
+  renderMemos();
+}
+
+renderMemos();
+
+// ============================================================
+// SERVICE WORKER
+// ============================================================
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
