@@ -160,7 +160,7 @@
 
   // --- PWA Service Worker registration ---
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    navigator.serviceWorker.register('./sw.js').catch(err => console.error('SW registration failed:', err));
   }
 
   // --- Elements ---
@@ -257,7 +257,7 @@
     if (vid.readyState < vid.HAVE_ENOUGH_DATA) return;
 
     const fsize  = Math.max(4, fontSize);
-    const charW  = fsize * 0.6;  // monospace width ≈ 0.6× height
+    const charW  = fsize * 0.6;  // monospace width ≈ 0.6× height (approximation; varies by browser/OS)
     const charH  = fsize;
     const cols   = Math.floor(W / charW);
     const rows   = Math.floor(H / charH);
@@ -284,7 +284,7 @@
         const g  = imgData[i + 1];
         const b  = imgData[i + 2];
 
-        // brightness 0-1
+        // brightness 0-1 using ITU-R BT.601 luminance coefficients
         const bright = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
         const charIdx = Math.min(Math.floor(bright * clen), clen - 1);
         const ch = chars[charIdx];
