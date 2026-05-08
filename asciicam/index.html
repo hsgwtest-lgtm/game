@@ -10,14 +10,19 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="apple-touch-icon" href="./icons/icon-192.png">
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  *, *::before, *::after {
+    box-sizing: border-box; margin: 0; padding: 0;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    user-select: none;
+  }
 
   html, body {
     width: 100%; height: 100%;
     background: #000;
     overflow: hidden;
-    font-family: monospace;
-    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #e8e8e8;
   }
 
   #app {
@@ -49,13 +54,15 @@
 
   #controls {
     flex: 0 0 auto;
-    background: rgba(0,0,0,0.85);
+    background: rgba(0, 0, 0, 0.88);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     padding: 8px 12px;
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
     align-items: center;
-    border-top: 1px solid #333;
+    border-top: 1px solid rgba(0, 255, 0, 0.18);
   }
 
   .ctrl-group {
@@ -68,7 +75,7 @@
 
   label {
     font-size: 11px;
-    color: #aaa;
+    color: #8a8;
     white-space: nowrap;
     flex-shrink: 0;
   }
@@ -76,17 +83,17 @@
   #chars-input {
     flex: 1 1 0;
     min-width: 0;
-    background: #111;
+    background: rgba(0, 255, 0, 0.07);
     color: #0f0;
-    border: 1px solid #333;
-    border-radius: 4px;
+    border: 1px solid rgba(0, 255, 0, 0.25);
+    border-radius: 5px;
     padding: 4px 6px;
     font-size: 13px;
     font-family: monospace;
     outline: none;
   }
 
-  #chars-input:focus { border-color: #0f0; }
+  #chars-input:focus { border-color: rgba(0, 255, 0, 0.7); }
 
   #size-slider, #colors-slider {
     flex: 1 1 0;
@@ -100,6 +107,7 @@
     flex-shrink: 0;
     width: 22px;
     text-align: right;
+    font-family: monospace;
   }
 
   #colors-val {
@@ -108,21 +116,22 @@
     flex-shrink: 0;
     width: 28px;
     text-align: right;
+    font-family: monospace;
   }
 
-  #btn-flip, #btn-file {
-    background: #111;
-    color: #fff;
-    border: 1px solid #444;
+  .icon-btn {
+    background: rgba(0, 255, 0, 0.1);
+    color: #e8e8e8;
+    border: 1px solid rgba(0, 255, 0, 0.25);
     border-radius: 6px;
     padding: 5px 10px;
     font-size: 18px;
     cursor: pointer;
     flex-shrink: 0;
     line-height: 1;
-    -webkit-tap-highlight-color: transparent;
+    transition: background 0.1s;
   }
-  #btn-flip:active, #btn-file:active { background: #222; }
+  .icon-btn:active { background: rgba(0, 255, 0, 0.28); }
 
   #file-input { display: none; }
 
@@ -139,6 +148,17 @@
     padding: 20px;
     white-space: pre-line;
   }
+
+  /* flash overlay for capture feedback */
+  #flash {
+    position: absolute;
+    inset: 0;
+    background: #fff;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.05s;
+  }
+  #flash.active { opacity: 0.55; }
 </style>
 </head>
 <body>
@@ -146,6 +166,7 @@
   <div id="canvas-wrap">
     <canvas id="output"></canvas>
     <canvas id="offscreen"></canvas>
+    <div id="flash"></div>
     <div id="msg">カメラを起動中…</div>
   </div>
 
@@ -165,8 +186,9 @@
       <span id="colors-val">16</span>
     </div>
     <input id="file-input" type="file" accept="image/*,video/*">
-    <button id="btn-file" title="画像・動画を開く">📁</button>
-    <button id="btn-flip" title="カメラ切替">🔄</button>
+    <button id="btn-capture" class="icon-btn" title="撮影・保存">📷</button>
+    <button id="btn-file" class="icon-btn" title="画像・動画を開く">📁</button>
+    <button id="btn-flip" class="icon-btn" title="カメラ切替">🔄</button>
   </div>
 </div>
 
@@ -186,6 +208,7 @@
   const output       = document.getElementById('output');
   const offscreen    = document.getElementById('offscreen');
   const msg          = document.getElementById('msg');
+  const flash        = document.getElementById('flash');
   const charsInput   = document.getElementById('chars-input');
   const sizeSlider   = document.getElementById('size-slider');
   const sizeVal      = document.getElementById('size-val');
@@ -193,6 +216,7 @@
   const colorsVal    = document.getElementById('colors-val');
   const btnFlip      = document.getElementById('btn-flip');
   const btnFile      = document.getElementById('btn-file');
+  const btnCapture   = document.getElementById('btn-capture');
   const fileInput    = document.getElementById('file-input');
 
   const ctx  = output.getContext('2d');
@@ -253,6 +277,26 @@
     if (file) loadFile(file);
     fileInput.value = ''; // reset so the same file can be selected again
   });
+
+  // --- Capture / save current ASCII frame ---
+  btnCapture.addEventListener('click', captureFrame);
+
+  function captureFrame() {
+    if (output.width === 0 || output.height === 0) return;
+    flash.classList.add('active');
+    setTimeout(() => flash.classList.remove('active'), 120);
+    output.toBlob(blob => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const now = new Date();
+      const pad = num => String(num).padStart(2, '0');
+      a.download = `ascii-${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.png`;
+      a.href = url;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10000); // revoke after 10 s to allow download to start
+    }, 'image/png');
+  }
 
   // --- Camera flip / return to camera ---
   btnFlip.addEventListener('click', () => {
@@ -402,10 +446,30 @@
     const rows   = Math.floor(H / charH);
     if (cols < 1 || rows < 1) return;
 
-    // Downscale source into offscreen canvas
+    // Downscale source into offscreen canvas, preserving aspect ratio (cover crop)
     offscreen.width  = cols;
     offscreen.height = rows;
-    octx.drawImage(source, 0, 0, cols, rows);
+
+    const srcW = source.videoWidth  || source.naturalWidth  || source.width  || cols;
+    const srcH = source.videoHeight || source.naturalHeight || source.height || rows;
+    if (srcW > 0 && srcH > 0) {
+      // Effective pixel aspect ratio of the output canvas
+      const outAR = (cols * charW) / (rows * charH);
+      const srcAR = srcW / srcH;
+      let sx = 0, sy = 0, sw = srcW, sh = srcH;
+      if (srcAR > outAR) {
+        // Source is wider → crop horizontally (keep vertical, center crop)
+        sw = srcH * outAR;
+        sx = (srcW - sw) / 2;
+      } else if (srcAR < outAR) {
+        // Source is taller → crop vertically
+        sh = srcW / outAR;
+        sy = (srcH - sh) / 2;
+      }
+      octx.drawImage(source, sx, sy, sw, sh, 0, 0, cols, rows);
+    } else {
+      octx.drawImage(source, 0, 0, cols, rows);
+    }
     const imgData = octx.getImageData(0, 0, cols, rows).data;
 
     // Render ASCII to main canvas
