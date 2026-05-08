@@ -1,4 +1,4 @@
-const CACHE_NAME = 'asciicam-v1';
+const CACHE_NAME = 'asciicam-v2';
 const ASSETS = [
   './',
   './index.html',
