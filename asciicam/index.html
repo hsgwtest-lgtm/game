@@ -88,7 +88,7 @@
 
   #chars-input:focus { border-color: #0f0; }
 
-  #size-slider {
+  #size-slider, #colors-slider {
     flex: 1 1 0;
     min-width: 60px;
     accent-color: #0f0;
@@ -102,7 +102,15 @@
     text-align: right;
   }
 
-  #btn-flip {
+  #colors-val {
+    font-size: 12px;
+    color: #0f0;
+    flex-shrink: 0;
+    width: 28px;
+    text-align: right;
+  }
+
+  #btn-flip, #btn-file {
     background: #111;
     color: #fff;
     border: 1px solid #444;
@@ -114,7 +122,9 @@
     line-height: 1;
     -webkit-tap-highlight-color: transparent;
   }
-  #btn-flip:active { background: #222; }
+  #btn-flip:active, #btn-file:active { background: #222; }
+
+  #file-input { display: none; }
 
   #msg {
     position: absolute;
@@ -127,6 +137,7 @@
     pointer-events: none;
     text-align: center;
     padding: 20px;
+    white-space: pre-line;
   }
 </style>
 </head>
@@ -148,11 +159,18 @@
       <input id="size-slider" type="range" min="4" max="24" value="10" step="1">
       <span id="size-val">10</span>
     </div>
+    <div class="ctrl-group">
+      <label>色数</label>
+      <input id="colors-slider" type="range" min="2" max="16" value="16" step="1">
+      <span id="colors-val">16</span>
+    </div>
+    <input id="file-input" type="file" accept="image/*,video/*">
+    <button id="btn-file" title="画像・動画を開く">📁</button>
     <button id="btn-flip" title="カメラ切替">🔄</button>
   </div>
 </div>
 
-<video id="vid" playsinline muted autoplay style="display:none"></video>
+<video id="vid" playsinline muted autoplay loop style="display:none"></video>
 
 <script>
 (function () {
@@ -164,25 +182,49 @@
   }
 
   // --- Elements ---
-  const vid       = document.getElementById('vid');
-  const output    = document.getElementById('output');
-  const offscreen = document.getElementById('offscreen');
-  const msg       = document.getElementById('msg');
-  const charsInput= document.getElementById('chars-input');
-  const sizeSlider= document.getElementById('size-slider');
-  const sizeVal   = document.getElementById('size-val');
-  const btnFlip   = document.getElementById('btn-flip');
+  const vid          = document.getElementById('vid');
+  const output       = document.getElementById('output');
+  const offscreen    = document.getElementById('offscreen');
+  const msg          = document.getElementById('msg');
+  const charsInput   = document.getElementById('chars-input');
+  const sizeSlider   = document.getElementById('size-slider');
+  const sizeVal      = document.getElementById('size-val');
+  const colorsSlider = document.getElementById('colors-slider');
+  const colorsVal    = document.getElementById('colors-val');
+  const btnFlip      = document.getElementById('btn-flip');
+  const btnFile      = document.getElementById('btn-file');
+  const fileInput    = document.getElementById('file-input');
 
   const ctx  = output.getContext('2d');
   const octx = offscreen.getContext('2d', { willReadFrequently: true });
 
   // --- State ---
-  let chars     = '@#S%?*+;:,. ';
-  let fontSize  = 10;
-  let facingMode= 'environment'; // back camera
-  let stream    = null;
-  let rafId     = null;
-  let running   = false;
+  let chars       = '@#S%?*+;:,. ';
+  let fontSize    = 10;
+  let colorLevels = 16;
+  let facingMode  = 'environment'; // back camera
+  let stream      = null;
+  let rafId       = null;
+  let drawRunning = false;
+  let sourceMode  = 'camera'; // 'camera' | 'file-image' | 'file-video'
+  let staticImage = null;
+  let fileUrl     = null;
+
+  // --- Color quantization ---
+  // At colorLevels=2: true black-and-white (grayscale snapped to 0 or 255)
+  // At colorLevels=3..16: each RGB channel quantized to N levels
+  function quantizeColor(r, g, b) {
+    if (colorLevels === 2) {
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      const q = gray >= 128 ? 255 : 0;
+      return [q, q, q];
+    }
+    const step = 255 / (colorLevels - 1);
+    const qr = Math.round(Math.round(r / step) * step);
+    const qg = Math.round(Math.round(g / step) * step);
+    const qb = Math.round(Math.round(b / step) * step);
+    return [qr, qg, qb];
+  }
 
   // --- Init controls ---
   charsInput.value = chars;
@@ -197,9 +239,31 @@
     sizeVal.textContent = fontSize;
   });
 
+  colorsSlider.value = colorLevels;
+  colorsVal.textContent = colorLevels === 2 ? 'B&W' : colorLevels;
+  colorsSlider.addEventListener('input', () => {
+    colorLevels = parseInt(colorsSlider.value, 10);
+    colorsVal.textContent = colorLevels === 2 ? 'B&W' : colorLevels;
+  });
+
+  // --- File import ---
+  btnFile.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files[0];
+    if (file) loadFile(file);
+    fileInput.value = ''; // reset so the same file can be selected again
+  });
+
+  // --- Camera flip / return to camera ---
   btnFlip.addEventListener('click', () => {
-    facingMode = facingMode === 'environment' ? 'user' : 'environment';
-    startCamera();
+    if (sourceMode !== 'camera') {
+      // Return from file mode to live camera
+      cleanupFile();
+      startCamera();
+    } else {
+      facingMode = facingMode === 'environment' ? 'user' : 'environment';
+      startCamera();
+    }
   });
 
   // --- Canvas resize ---
@@ -213,14 +277,36 @@
   resizeObserver.observe(output.parentElement);
   resizeCanvas();
 
+  // --- Draw loop control ---
+  function startDrawLoop() {
+    if (drawRunning) return;
+    drawRunning = true;
+    rafId = requestAnimationFrame(draw);
+  }
+
+  function stopDrawLoop() {
+    drawRunning = false;
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  }
+
+  // --- File cleanup ---
+  function cleanupFile() {
+    stopDrawLoop();
+    staticImage = null;
+    if (fileUrl) { URL.revokeObjectURL(fileUrl); fileUrl = null; }
+    vid.pause();
+    vid.srcObject = null;
+    vid.src = '';
+  }
+
   // --- Camera ---
   async function startCamera() {
-    if (stream) {
-      stream.getTracks().forEach(t => t.stop());
-      stream = null;
-    }
-    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
-    running = false;
+    stopDrawLoop();
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    vid.pause();
+    vid.srcObject = null;
+    vid.src = '';
+    sourceMode = 'camera';
     msg.textContent = 'カメラを起動中…';
     msg.style.display = 'flex';
 
@@ -238,38 +324,91 @@
       vid.srcObject = stream;
       await vid.play();
       msg.style.display = 'none';
-      running = true;
-      rafId = requestAnimationFrame(draw);
+      startDrawLoop();
     } catch (err) {
       msg.textContent = 'カメラへのアクセスが拒否されました。\nブラウザの設定でカメラを許可してください。\n(' + err.message + ')';
       msg.style.display = 'flex';
     }
   }
 
+  // --- File loading (image or video from device) ---
+  function loadFile(file) {
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    cleanupFile();
+
+    fileUrl = URL.createObjectURL(file);
+    msg.textContent = '読み込み中…';
+    msg.style.display = 'flex';
+
+    if (file.type.startsWith('image/')) {
+      const img = new Image();
+      img.onload = () => {
+        staticImage = img;
+        sourceMode = 'file-image';
+        msg.style.display = 'none';
+        startDrawLoop();
+      };
+      img.onerror = () => {
+        msg.textContent = '画像を読み込めませんでした。';
+      };
+      img.src = fileUrl;
+
+    } else if (file.type.startsWith('video/')) {
+      sourceMode = 'file-video';
+      vid.src = fileUrl;
+      vid.loop = true;
+      vid.muted = true;
+      vid.oncanplay = () => {
+        vid.oncanplay = null;
+        msg.style.display = 'none';
+        vid.play().catch(err => {
+          msg.textContent = '動画を再生できませんでした。\n(' + err.message + ')';
+          msg.style.display = 'flex';
+        });
+        startDrawLoop();
+      };
+      vid.onerror = () => {
+        msg.textContent = '動画を読み込めませんでした。';
+      };
+
+    } else {
+      msg.textContent = 'このファイル形式には対応していません。';
+    }
+  }
+
   // --- ASCII render ---
   function draw() {
-    if (!running) return;
+    if (!drawRunning) return;
     rafId = requestAnimationFrame(draw);
 
     const W = output.width;
     const H = output.height;
     if (W === 0 || H === 0) return;
-    if (vid.readyState < vid.HAVE_ENOUGH_DATA) return;
+
+    // Determine render source
+    let source;
+    if (sourceMode === 'file-image') {
+      source = staticImage;
+      if (!source || !source.complete || source.naturalWidth === 0) return;
+    } else {
+      source = vid;
+      if (vid.readyState < vid.HAVE_ENOUGH_DATA) return;
+    }
 
     const fsize  = Math.max(4, fontSize);
-    const charW  = fsize * 0.6;  // monospace width ≈ 0.6× height (approximation; varies by browser/OS)
+    const charW  = fsize * 0.6;  // monospace width ≈ 0.6× height
     const charH  = fsize;
     const cols   = Math.floor(W / charW);
     const rows   = Math.floor(H / charH);
     if (cols < 1 || rows < 1) return;
 
-    // --- Downscale video into offscreen canvas ---
+    // Downscale source into offscreen canvas
     offscreen.width  = cols;
     offscreen.height = rows;
-    octx.drawImage(vid, 0, 0, cols, rows);
+    octx.drawImage(source, 0, 0, cols, rows);
     const imgData = octx.getImageData(0, 0, cols, rows).data;
 
-    // --- Render ASCII to main canvas ---
+    // Render ASCII to main canvas
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, W, H);
     ctx.font = `${fsize}px monospace`;
@@ -291,7 +430,10 @@
 
         if (ch === ' ') continue; // skip spaces for performance
 
-        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        const [qr, qg, qb] = quantizeColor(r, g, b);
+        if (qr === 0 && qg === 0 && qb === 0) continue; // invisible on black bg
+
+        ctx.fillStyle = `rgb(${qr},${qg},${qb})`;
         ctx.fillText(ch, col * charW, row * charH);
       }
     }
