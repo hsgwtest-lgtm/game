@@ -108,17 +108,25 @@ export class HandTracker {
         const pinching = dist < PINCH_THRESHOLD_CLOSE;
         const released = !pinching && dist > PINCH_THRESHOLD_OPEN;
 
+        // Hand roll: angle of the wrist→middle-MCP direction relative to
+        // screen vertical.  0 = fingers pointing up; positive = tilted
+        // clockwise as seen in the (CSS-mirrored) video.
+        const midMcp = smoothed[9];
+        const rollDx = midMcp.x - wrist.x;
+        const rollDy = midMcp.y - wrist.y;
+        const handRoll = Math.atan2(rollDx, -rollDy);
+
         if (pinching && !this._lastPinchState) {
           this._lastPinchState = true;
           navigator.vibrate?.(40);
-          this.onPinchStart?.({ nx: midX, ny: midY, handScale });
+          this.onPinchStart?.({ nx: midX, ny: midY, handScale, handRoll });
         } else if (released && this._lastPinchState) {
           this._lastPinchState = false;
-          this.onPinchEnd?.({ nx: midX, ny: midY, handScale });
+          this.onPinchEnd?.({ nx: midX, ny: midY, handScale, handRoll });
         }
 
         if (this._lastPinchState) {
-          this.onPinchMove?.({ nx: midX, ny: midY, dist, handScale });
+          this.onPinchMove?.({ nx: midX, ny: midY, dist, handScale, handRoll });
         }
 
         // Expose for HUD / calibration
