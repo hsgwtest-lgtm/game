@@ -293,6 +293,7 @@ function onPinchMove(nx, ny, handScale, handRoll) {
 
   // Apply hand roll to the grabbed object so it tilts with the hand.
   // handRoll > 0 = clockwise in screen space → negative rotation around world Z.
+  // Quaternion half-angle formula: q = (axis * sin(θ/2), cos(θ/2))
   const halfRoll = handRoll / 2;
   physicsWorld.setKinematicRotation(objects[grabbedIdx].handle, {
     x: 0,
@@ -302,7 +303,7 @@ function onPinchMove(nx, ny, handScale, handRoll) {
   });
 }
 
-function onPinchEnd(nx, ny) {
+function onPinchEnd(nx, ny, handScale, handRoll) {
   updatePinchDot(nx, ny, false);
   pinchDot.style.display = 'none';
 
@@ -316,9 +317,9 @@ function onPinchEnd(nx, ny) {
     const first = grabHistory[0];
     const last  = grabHistory[grabHistory.length - 1];
     const dt = (last.t - first.t) / 1000;
-    if (dt > 0.01) {
+    if (dt > 0.01) {  // require at least 10 ms of history for a meaningful velocity estimate
       const THROW_SCALE = 1.5;
-      const MAX_SPEED   = 25;
+      const MAX_SPEED   = 25;  // world units/s; keeps blocks within the platform area
       let vx = (last.x - first.x) / dt * THROW_SCALE;
       let vy = (last.y - first.y) / dt * THROW_SCALE;
       let vz = (last.z - first.z) / dt * THROW_SCALE;
