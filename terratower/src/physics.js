@@ -97,6 +97,28 @@ export class PhysicsWorld {
   }
 
   /**
+   * Teleport a kinematic body to world position (used while grabbing).
+   * @param {number} handle
+   * @param {{x,y,z}} pos
+   */
+  setKinematicPosition(handle, pos) {
+    const body = this._bodies.get(handle);
+    if (!body) return;
+    body.setNextKinematicTranslation(pos);
+  }
+
+  /**
+   * Set the rotation of a kinematic body (used while grabbing).
+   * @param {number} handle
+   * @param {{x,y,z,w}} quat  Quaternion in Rapier/Three.js format
+   */
+  setKinematicRotation(handle, quat) {
+    const body = this._bodies.get(handle);
+    if (!body) return;
+    body.setNextKinematicRotation(quat);
+  }
+
+  /**
    * Release a grabbed body, switching it back to dynamic.
    * Rapier preserves the kinematic velocity automatically when body type changes.
    * @param {number} handle
@@ -109,14 +131,16 @@ export class PhysicsWorld {
   }
 
   /**
-   * Teleport a kinematic body to world position (used while grabbing).
+   * Release a grabbed body with an explicit throw velocity.
    * @param {number} handle
-   * @param {{x,y,z}} pos
+   * @param {{x,y,z}} vel  Linear velocity in world units/second
    */
-  setKinematicPosition(handle, pos) {
+  releaseBodyWithVelocity(handle, vel) {
     const body = this._bodies.get(handle);
     if (!body) return;
-    body.setNextKinematicTranslation(pos);
+    body.setBodyType(RAPIER.RigidBodyType.Dynamic, true);
+    body.setGravityScale(1, true);
+    body.setLinvel(vel, true);
   }
 
   step() {

@@ -33,7 +33,7 @@ const btnCalibSkip     = document.getElementById('btn-calib-skip');
 let renderer, physicsWorld, handTracker;
 const objects = [];       // [{type, handle, mesh, isGrabbed}]
 let grabbedIdx = -1;      // index into objects[]
-let prevGrabPos = null;   // for velocity estimation
+let grabHistory = [];     // [{x,y,z,t}] recent positions for throw velocity
 let score = 0;
 
 // FPS tracking
@@ -191,9 +191,9 @@ function scaleToDepth(handScale) {
 
 // ─── Begin gameplay ───────────────────────────────────────────────────────────
 function beginPlay() {
-  handTracker.onPinchStart = ({ nx, ny, handScale }) => onPinchStart(nx, ny, handScale);
-  handTracker.onPinchEnd   = ({ nx, ny, handScale }) => onPinchEnd(nx, ny, handScale);
-  handTracker.onPinchMove  = ({ nx, ny, handScale }) => onPinchMove(nx, ny, handScale);
+  handTracker.onPinchStart = ({ nx, ny, handScale, handRoll }) => onPinchStart(nx, ny, handScale, handRoll);
+  handTracker.onPinchEnd   = ({ nx, ny, handScale, handRoll }) => onPinchEnd(nx, ny, handScale, handRoll);
+  handTracker.onPinchMove  = ({ nx, ny, handScale, handRoll }) => onPinchMove(nx, ny, handScale, handRoll);
 
   spawnRandomBlock();
   spawnRandomBlock();
@@ -240,7 +240,7 @@ function gameLoop(now) {
 }
 
 // ─── Pinch interaction ────────────────────────────────────────────────────────
-function onPinchStart(nx, ny, handScale) {
+function onPinchStart(nx, ny, handScale, handRoll) {
   currentDepth = scaleToDepth(handScale);
 
   // Find the block closest to the pinch 3D position
@@ -263,7 +263,9 @@ function onPinchStart(nx, ny, handScale) {
     grabbedIdx = bestIdx;
     objects[bestIdx].isGrabbed = true;
     physicsWorld.grabBody(objects[bestIdx].handle);
-    prevGrabPos = worldPos.clone();
+
+    // Seed grab history for throw velocity tracking
+    grabHistory = [{ x: worldPos.x, y: worldPos.y, z: worldPos.z, t: performance.now() }];
 
     // Visual feedback
     objects[bestIdx].mesh.material.emissive.setHex(0x664400);
@@ -274,7 +276,7 @@ function onPinchStart(nx, ny, handScale) {
   updatePinchDot(nx, ny, true);
 }
 
-function onPinchMove(nx, ny, handScale) {
+function onPinchMove(nx, ny, handScale, handRoll) {
   updatePinchDot(nx, ny, true);
 
   if (grabbedIdx === -1) return;
@@ -284,7 +286,20 @@ function onPinchMove(nx, ny, handScale) {
   physicsWorld.setKinematicPosition(objects[grabbedIdx].handle, worldPos);
   objects[grabbedIdx].mesh.position.copy(worldPos);
 
-  prevGrabPos = worldPos.clone();
+  // Track position history (keep last ~5 frames) for throw velocity
+  const now = performance.now();
+  grabHistory.push({ x: worldPos.x, y: worldPos.y, z: worldPos.z, t: now });
+  if (grabHistory.length > 5) grabHistory.shift();
+
+  // Apply hand roll to the grabbed object so it tilts with the hand.
+  // handRoll > 0 = clockwise in screen space → negative rotation around world Z.
+  const halfRoll = handRoll / 2;
+  physicsWorld.setKinematicRotation(objects[grabbedIdx].handle, {
+    x: 0,
+    y: 0,
+    z: -Math.sin(halfRoll),
+    w:  Math.cos(halfRoll),
+  });
 }
 
 function onPinchEnd(nx, ny) {
@@ -296,15 +311,36 @@ function onPinchEnd(nx, ny) {
   const obj = objects[grabbedIdx];
   obj.isGrabbed = false;
 
-  // Estimate throw velocity from camera motion (simple: zero for now;
-  // Rapier will compute from kinematic delta automatically)
-  physicsWorld.releaseBody(obj.handle);
+  // Compute throw velocity from recent grab position history
+  if (grabHistory.length >= 2) {
+    const first = grabHistory[0];
+    const last  = grabHistory[grabHistory.length - 1];
+    const dt = (last.t - first.t) / 1000;
+    if (dt > 0.01) {
+      const THROW_SCALE = 1.5;
+      const MAX_SPEED   = 25;
+      let vx = (last.x - first.x) / dt * THROW_SCALE;
+      let vy = (last.y - first.y) / dt * THROW_SCALE;
+      let vz = (last.z - first.z) / dt * THROW_SCALE;
+      // Clamp to a maximum speed
+      const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
+      if (speed > MAX_SPEED) {
+        const s = MAX_SPEED / speed;
+        vx *= s; vy *= s; vz *= s;
+      }
+      physicsWorld.releaseBodyWithVelocity(obj.handle, { x: vx, y: vy, z: vz });
+    } else {
+      physicsWorld.releaseBody(obj.handle);
+    }
+  } else {
+    physicsWorld.releaseBody(obj.handle);
+  }
+  grabHistory = [];
 
   obj.mesh.material.emissive.setHex(0x000000);
   obj.mesh.material.emissiveIntensity = 0;
 
   grabbedIdx = -1;
-  prevGrabPos = null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

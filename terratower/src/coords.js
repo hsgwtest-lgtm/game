@@ -17,10 +17,12 @@ import * as THREE from 'https://esm.sh/three@0.176.0';
  * @returns {THREE.Vector3}
  */
 export function landmarkToWorld(nx, ny, depth, camera) {
-  // MediaPipe front-camera x is already mirrored; keep it as-is since the
-  // video feed is also CSS-mirrored — the user sees natural movement.
+  // The video element is CSS-mirrored (scaleX(-1)), so the user sees a natural
+  // mirror image. MediaPipe x=0 is the left edge of the raw frame which appears
+  // on the RIGHT side of the mirrored display. We must invert x here so that
+  // the world-space position matches what the user sees on screen.
   // NDC: x [-1,1], y [-1,1]  (y flipped because NDC +y = up)
-  const ndcX =  nx * 2 - 1;
+  const ndcX = (1 - nx) * 2 - 1;
   const ndcY = -(ny * 2 - 1);
 
   // Unproject NDC at near plane, then scale to desired depth
