@@ -159,7 +159,7 @@ function finishCalibration() {
   calibScreen.style.display = 'none';
 
   // If user calibrated near/far in the wrong order, swap them
-  if (calibScaleNear != null && calibScaleFar != null &&
+  if (calibScaleNear !== null && calibScaleFar !== null &&
       calibScaleNear < calibScaleFar) {
     [calibScaleNear, calibScaleFar] = [calibScaleFar, calibScaleNear];
   }
@@ -178,7 +178,7 @@ function skipCalibration() {
 
 /** Map current hand scale to a world-space depth value. */
 function scaleToDepth(handScale) {
-  if (calibScaleNear == null || calibScaleFar == null ||
+  if (calibScaleNear === null || calibScaleFar === null ||
       calibScaleNear === calibScaleFar) {
     return DEPTH_DEFAULT;
   }
