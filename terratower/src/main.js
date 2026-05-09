@@ -35,6 +35,7 @@ const objects = [];       // [{type, handle, mesh, isGrabbed}]
 let grabbedIdx = -1;      // index into objects[]
 let grabHistory = [];     // [{x,y,z,t}] recent positions for throw velocity
 let score = 0;
+let previewIdx = -1;  // index of block currently highlighted as grab preview
 
 // FPS tracking
 let lastTime = 0, frameCount = 0, fpsAccum = 0;
@@ -45,6 +46,8 @@ let lastTime = 0, frameCount = 0, fpsAccum = 0;
 const DEPTH_NEAR_DEFAULT = 15;   // world z ≈ +3 (front of block zone)
 const DEPTH_FAR_DEFAULT  = 21;   // world z ≈ -3 (back of block zone)
 const DEPTH_DEFAULT      = 18;   // world z ≈ 0 (scene centre, no calibration)
+
+const GRAB_REACH = 2.5;  // world-space radius within which a block can be grabbed
 
 let calibPhase    = 'near';   // 'near' | 'waitRelease' | 'far' | 'play'
 let calibScaleNear = null;    // hand scale recorded at near position
@@ -194,6 +197,33 @@ function beginPlay() {
   handTracker.onPinchStart = ({ nx, ny, handScale, handRoll }) => onPinchStart(nx, ny, handScale, handRoll);
   handTracker.onPinchEnd   = ({ nx, ny, handScale, handRoll }) => onPinchEnd(nx, ny, handScale, handRoll);
   handTracker.onPinchMove  = ({ nx, ny, handScale, handRoll }) => onPinchMove(nx, ny, handScale, handRoll);
+  handTracker.onHandMove   = ({ nx, ny, handScale }) => {
+    if (handTracker.isPinching) return; // onPinchMove handles position when pinching
+
+    currentDepth = scaleToDepth(handScale);
+    const worldPos = landmarkToWorld(nx, ny, currentDepth, renderer.camera);
+
+    // Find the nearest grabbable block within reach as a grab preview
+    let bestDist = GRAB_REACH;
+    let bestIdx  = -1;
+    for (let i = 0; i < objects.length; i++) {
+      if (objects[i].isGrabbed) continue;
+      const d = objects[i].mesh.position.distanceTo(worldPos);
+      if (d < bestDist) { bestDist = d; bestIdx = i; }
+    }
+
+    // Update preview highlight only when it changes
+    if (previewIdx !== bestIdx) {
+      clearPreviewHighlight();
+      previewIdx = bestIdx;
+      if (previewIdx !== -1) {
+        objects[previewIdx].mesh.material.emissive.setHex(0x665500);
+        objects[previewIdx].mesh.material.emissiveIntensity = 0.45;
+      }
+    }
+
+    updatePinchDot(nx, ny, true, true); // show idle dot at hand position
+  };
 
   spawnRandomBlock();
   spawnRandomBlock();
@@ -234,6 +264,8 @@ function gameLoop(now) {
     handPill.textContent = handTracker.isPinching ? '🤏 掴んでいる' : '✋ 検出済み';
   } else {
     handPill.textContent = '✋ 検出中...';
+    clearPreviewHighlight();
+    pinchDot.style.display = 'none';
   }
 
   renderer.render();
@@ -241,12 +273,13 @@ function gameLoop(now) {
 
 // ─── Pinch interaction ────────────────────────────────────────────────────────
 function onPinchStart(nx, ny, handScale, handRoll) {
+  clearPreviewHighlight();
   currentDepth = scaleToDepth(handScale);
 
   // Find the block closest to the pinch 3D position
   const worldPos = landmarkToWorld(nx, ny, currentDepth, renderer.camera);
 
-  let bestDist = 2.5; // grab radius
+  let bestDist = GRAB_REACH; // grab radius
   let bestIdx  = -1;
 
   for (let i = 0; i < objects.length; i++) {
@@ -292,13 +325,15 @@ function onPinchMove(nx, ny, handScale, handRoll) {
   if (grabHistory.length > 5) grabHistory.shift();
 
   // Apply hand roll to the grabbed object so it tilts with the hand.
-  // handRoll > 0 = clockwise in screen space → negative rotation around world Z.
+  // handRoll > 0 = clockwise (physical) but appears counterclockwise in the
+  // CSS-mirrored video; the block should match the visual appearance, so we
+  // apply +sin instead of -sin to align with the mirrored view.
   // Quaternion half-angle formula: q = (axis * sin(θ/2), cos(θ/2))
   const halfRoll = handRoll / 2;
   physicsWorld.setKinematicRotation(objects[grabbedIdx].handle, {
     x: 0,
     y: 0,
-    z: -Math.sin(halfRoll),
+    z:  Math.sin(halfRoll),
     w:  Math.cos(halfRoll),
   });
 }
@@ -345,14 +380,26 @@ function onPinchEnd(nx, ny, handScale, handRoll) {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-function updatePinchDot(nx, ny, visible) {
+function updatePinchDot(nx, ny, visible, isIdle = false) {
   const w = window.innerWidth;
   const h = window.innerHeight;
   // Mirror nx because video is CSS-mirrored
   pinchDot.style.left = ((1 - nx) * w) + 'px';
   pinchDot.style.top  = (ny * h) + 'px';
   pinchDot.style.display = visible ? 'block' : 'none';
-  pinchDot.classList.toggle('grabbing', visible && grabbedIdx !== -1);
+  pinchDot.classList.toggle('grabbing', visible && !isIdle && grabbedIdx !== -1);
+  pinchDot.classList.toggle('idle', visible && isIdle);
+}
+
+function clearPreviewHighlight() {
+  if (previewIdx !== -1) {
+    const obj = objects[previewIdx];
+    if (obj && !obj.isGrabbed) {
+      obj.mesh.material.emissive.setHex(0x000000);
+      obj.mesh.material.emissiveIntensity = 0;
+    }
+    previewIdx = -1;
+  }
 }
 
 function updateScore() {
@@ -384,6 +431,8 @@ function spawnRandomBlock() {
 }
 
 function cleanupFallen() {
+  // Reset preview index first since splicing will invalidate it
+  clearPreviewHighlight();
   for (let i = objects.length - 1; i >= 0; i--) {
     if (objects[i].mesh.position.y < -5) {
       renderer.remove(objects[i].mesh);

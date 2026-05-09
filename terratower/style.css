@@ -121,6 +121,13 @@ html, body {
   background: rgba(255, 100, 50, 0.9);
   box-shadow: 0 0 20px rgba(255, 100, 50, 0.7);
 }
+#pinch-dot.idle {
+  width: 20px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.25);
+  box-shadow: none;
+  border: 1.5px solid rgba(255, 215, 0, 0.55);
+}
 
 /* ===== Start screen ===== */
 #start-screen {

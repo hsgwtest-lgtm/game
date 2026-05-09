@@ -36,6 +36,7 @@ export class HandTracker {
     this.onPinchStart = null;
     this.onPinchEnd   = null;
     this.onPinchMove  = null; // ({nx, ny, nz})  nz ~ pinch depth hint
+    this.onHandMove   = null; // ({nx, ny, handScale, handRoll}) every frame when hand detected
   }
 
   async init(onProgress) {
@@ -133,6 +134,9 @@ export class HandTracker {
         this.lastHandScale = handScale;
         this.isPinching = this._lastPinchState;
         this.detected = true;
+
+        // Fire every frame when hand is detected (regardless of pinch state)
+        this.onHandMove?.({ nx: midX, ny: midY, handScale, handRoll });
       } else {
         this.detected = false;
         if (this._lastPinchState) {
