@@ -192,6 +192,85 @@ html, body {
 }
 .icon-instructions .step .emoji { font-size: 22px; }
 
+/* ===== Depth calibration screen ===== */
+#calib-screen {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: rgba(13, 17, 23, 0.94);
+  z-index: 100;
+  padding: 32px;
+  text-align: center;
+}
+
+#calib-step-badge {
+  background: rgba(88, 166, 255, 0.15);
+  border: 1.5px solid #58a6ff;
+  border-radius: 20px;
+  padding: 4px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #58a6ff;
+  letter-spacing: 0.08em;
+}
+
+#calib-screen h2 {
+  font-size: clamp(22px, 6vw, 32px);
+  font-weight: 800;
+  background: linear-gradient(135deg, #ffd700, #ff6b35);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+#calib-screen p {
+  font-size: 14px;
+  color: #c9d1d9;
+  max-width: 280px;
+  line-height: 1.6;
+}
+
+/* Animated circle that grows/shrinks with hand scale */
+#calib-indicator {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: rgba(88, 166, 255, 0.15);
+  border: 2.5px solid rgba(88, 166, 255, 0.3);
+  transition: width 0.1s, height 0.1s, background 0.2s, border-color 0.2s;
+}
+#calib-indicator.detected {
+  background: rgba(88, 166, 255, 0.25);
+  border-color: #58a6ff;
+  box-shadow: 0 0 18px rgba(88, 166, 255, 0.4);
+}
+
+#calib-hand-status {
+  font-size: 13px;
+  color: #8b949e;
+  min-height: 1.4em;
+}
+
+#btn-calib-skip {
+  margin-top: 8px;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 20px;
+  color: #8b949e;
+  font-size: 12px;
+  padding: 8px 20px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+#btn-calib-skip:active {
+  color: #e6edf3;
+  border-color: rgba(255,255,255,0.5);
+}
+
 /* ===== Loading overlay ===== */
 #loading-overlay {
   position: absolute;

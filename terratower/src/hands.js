@@ -97,6 +97,13 @@ export class HandTracker {
         const midX   = (thumb.x + index.x) / 2;
         const midY   = (thumb.y + index.y) / 2;
 
+        // Hand scale: wrist → middle-finger MCP distance in normalised screen
+        // coords. Larger value = hand is closer to the camera. Used as a
+        // depth proxy for 3D grab positioning.
+        const wrist  = smoothed[0];
+        const midMcp = smoothed[9];
+        const handScale = Math.hypot(wrist.x - midMcp.x, wrist.y - midMcp.y);
+
         const dist = Math.hypot(thumb.x - index.x, thumb.y - index.y);
         const pinching = dist < PINCH_THRESHOLD_CLOSE;
         const released = !pinching && dist > PINCH_THRESHOLD_OPEN;
@@ -104,18 +111,19 @@ export class HandTracker {
         if (pinching && !this._lastPinchState) {
           this._lastPinchState = true;
           navigator.vibrate?.(40);
-          this.onPinchStart?.({ nx: midX, ny: midY });
+          this.onPinchStart?.({ nx: midX, ny: midY, handScale });
         } else if (released && this._lastPinchState) {
           this._lastPinchState = false;
-          this.onPinchEnd?.({ nx: midX, ny: midY });
+          this.onPinchEnd?.({ nx: midX, ny: midY, handScale });
         }
 
         if (this._lastPinchState) {
-          this.onPinchMove?.({ nx: midX, ny: midY, dist });
+          this.onPinchMove?.({ nx: midX, ny: midY, dist, handScale });
         }
 
-        // Expose for HUD
+        // Expose for HUD / calibration
         this.lastMidpoint = { nx: midX, ny: midY };
+        this.lastHandScale = handScale;
         this.isPinching = this._lastPinchState;
         this.detected = true;
       } else {

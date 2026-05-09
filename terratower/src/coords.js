@@ -11,7 +11,8 @@ import * as THREE from 'https://esm.sh/three@0.176.0';
  *
  * @param {number} nx  - normalised x [0,1], 0=left edge of video
  * @param {number} ny  - normalised y [0,1], 0=top edge of video
- * @param {number} depth - world-space Z distance from camera (negative = in front)
+ * @param {number} depth - distance forward into the scene along the Z axis
+ *                        (world z = camera.z - depth; depth=camera.z → world z=0)
  * @param {THREE.PerspectiveCamera} camera
  * @returns {THREE.Vector3}
  */
@@ -28,7 +29,8 @@ export function landmarkToWorld(nx, ny, depth, camera) {
 
   // Ray from camera origin toward vec
   const dir = vec.sub(camera.position).normalize();
-  // Walk along ray until we reach desired depth along -Z from camera
-  const t = (camera.position.z + depth) / -dir.z;
+  // Walk along ray so that world.z = camera.z - depth
+  // (depth = camera.z gives world.z = 0, the scene centre)
+  const t = depth / -dir.z;
   return camera.position.clone().addScaledVector(dir, t);
 }

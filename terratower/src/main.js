@@ -20,6 +20,15 @@ const pinchDot       = document.getElementById('pinch-dot');
 const videoEl        = document.getElementById('camera-video');
 const canvasEl       = document.getElementById('three-canvas');
 
+// Calibration screen elements
+const calibScreen      = document.getElementById('calib-screen');
+const calibTitle       = document.getElementById('calib-title');
+const calibDesc        = document.getElementById('calib-desc');
+const calibStepEl      = document.getElementById('calib-step');
+const calibHandStatus  = document.getElementById('calib-hand-status');
+const calibIndicator   = document.getElementById('calib-indicator');
+const btnCalibSkip     = document.getElementById('btn-calib-skip');
+
 // ─── State ───────────────────────────────────────────────────────────────────
 let renderer, physicsWorld, handTracker;
 const objects = [];       // [{type, handle, mesh, isGrabbed}]
@@ -30,8 +39,17 @@ let score = 0;
 // FPS tracking
 let lastTime = 0, frameCount = 0, fpsAccum = 0;
 
-// Grab depth (Z-distance from camera when block was grabbed)
-const GRAB_DEPTH = 8;
+// ─── Depth calibration ───────────────────────────────────────────────────────
+// camera.z = 18; world z = camera.z - depth
+// depth=15 → world z≈3 (near side), depth=21 → world z≈-3 (far side)
+const DEPTH_NEAR_DEFAULT = 15;   // world z ≈ +3 (front of block zone)
+const DEPTH_FAR_DEFAULT  = 21;   // world z ≈ -3 (back of block zone)
+const DEPTH_DEFAULT      = 18;   // world z ≈ 0 (scene centre, no calibration)
+
+let calibPhase    = 'near';   // 'near' | 'waitRelease' | 'far' | 'play'
+let calibScaleNear = null;    // hand scale recorded at near position
+let calibScaleFar  = null;    // hand scale recorded at far position
+let currentDepth   = DEPTH_DEFAULT;
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
 btnStart.addEventListener('click', startGame);
@@ -64,21 +82,125 @@ async function startGame() {
     return;
   }
 
-  // Wire up hand callbacks
-  handTracker.onPinchStart = ({ nx, ny }) => onPinchStart(nx, ny);
-  handTracker.onPinchEnd   = ({ nx, ny }) => onPinchEnd(nx, ny);
-  handTracker.onPinchMove  = ({ nx, ny }) => onPinchMove(nx, ny);
-
   handTracker.start();
+  hideLoading();
 
-  // Spawn a few starter blocks
+  // Begin depth calibration before game starts
+  beginCalibration();
+}
+
+// ─── Calibration phase ────────────────────────────────────────────────────────
+function beginCalibration() {
+  calibPhase = 'near';
+  showCalibUI('near');
+  calibScreen.style.display = 'flex';
+
+  handTracker.onPinchStart = onCalibPinch;
+  handTracker.onPinchEnd   = onCalibRelease;
+  handTracker.onPinchMove  = null;
+
+  btnCalibSkip.addEventListener('click', skipCalibration);
+
+  requestAnimationFrame(calibLoop);
+}
+
+function calibLoop() {
+  if (calibPhase === 'play') return;
+
+  if (handTracker.detected) {
+    const scale = handTracker.lastHandScale || 0;
+    calibHandStatus.textContent = '✋ 手を検出中';
+    // Scale the indicator dot: map scale 0.05–0.30 → 40–120 px
+    const size = Math.round(40 + Math.min(1, Math.max(0, (scale - 0.05) / 0.25)) * 80);
+    calibIndicator.style.width  = size + 'px';
+    calibIndicator.style.height = size + 'px';
+    calibIndicator.classList.add('detected');
+  } else {
+    calibHandStatus.textContent = '手が検出されていません';
+    calibIndicator.classList.remove('detected');
+  }
+
+  requestAnimationFrame(calibLoop);
+}
+
+function showCalibUI(step) {
+  if (step === 'near') {
+    calibTitle.textContent   = '① 手前の設定';
+    calibDesc.textContent    = '手をカメラに近づけて、ピンチ（🤏）してください';
+    calibStepEl.textContent  = '1';
+  } else {
+    calibTitle.textContent   = '② 奥の設定';
+    calibDesc.textContent    = '手をカメラから遠ざけて、ピンチ（🤏）してください';
+    calibStepEl.textContent  = '2';
+  }
+}
+
+function onCalibPinch({ handScale }) {
+  if (calibPhase === 'near') {
+    calibScaleNear = handScale;
+    calibPhase = 'waitRelease';
+    // Show far step UI immediately so user sees what's next
+    showCalibUI('far');
+  } else if (calibPhase === 'far') {
+    calibScaleFar = handScale;
+    finishCalibration();
+  }
+}
+
+function onCalibRelease() {
+  // Advance from waitRelease → far only after user has released the pinch
+  if (calibPhase === 'waitRelease') {
+    calibPhase = 'far';
+  }
+}
+
+function finishCalibration() {
+  calibPhase = 'play';
+  calibScreen.style.display = 'none';
+
+  // If user calibrated near/far in the wrong order, swap them
+  if (calibScaleNear != null && calibScaleFar != null &&
+      calibScaleNear < calibScaleFar) {
+    [calibScaleNear, calibScaleFar] = [calibScaleFar, calibScaleNear];
+  }
+
+  beginPlay();
+}
+
+function skipCalibration() {
+  calibPhase     = 'play';
+  calibScaleNear = null;
+  calibScaleFar  = null;
+  currentDepth   = DEPTH_DEFAULT;
+  calibScreen.style.display = 'none';
+  beginPlay();
+}
+
+/** Map current hand scale to a world-space depth value. */
+function scaleToDepth(handScale) {
+  if (calibScaleNear == null || calibScaleFar == null ||
+      calibScaleNear === calibScaleFar) {
+    return DEPTH_DEFAULT;
+  }
+  // t=1 → near (large scale, front), t=0 → far (small scale, back)
+  const t = Math.max(0, Math.min(1,
+    (handScale - calibScaleFar) / (calibScaleNear - calibScaleFar)
+  ));
+  return DEPTH_NEAR_DEFAULT * t + DEPTH_FAR_DEFAULT * (1 - t);
+}
+
+// ─── Begin gameplay ───────────────────────────────────────────────────────────
+function beginPlay() {
+  handTracker.onPinchStart = ({ nx, ny, handScale }) => onPinchStart(nx, ny, handScale);
+  handTracker.onPinchEnd   = ({ nx, ny, handScale }) => onPinchEnd(nx, ny, handScale);
+  handTracker.onPinchMove  = ({ nx, ny, handScale }) => onPinchMove(nx, ny, handScale);
+
   spawnRandomBlock();
   spawnRandomBlock();
   spawnRandomBlock();
 
   btnSpawn.addEventListener('click', spawnRandomBlock);
 
-  hideLoading();
   requestAnimationFrame(gameLoop);
 }
 
@@ -118,9 +240,11 @@ function gameLoop(now) {
 }
 
 // ─── Pinch interaction ────────────────────────────────────────────────────────
-function onPinchStart(nx, ny) {
+function onPinchStart(nx, ny, handScale) {
+  currentDepth = scaleToDepth(handScale);
+
   // Find the block closest to the pinch 3D position
-  const worldPos = landmarkToWorld(nx, ny, GRAB_DEPTH, renderer.camera);
+  const worldPos = landmarkToWorld(nx, ny, currentDepth, renderer.camera);
 
   let bestDist = 2.5; // grab radius
   let bestIdx  = -1;
@@ -150,12 +274,13 @@ function onPinchStart(nx, ny) {
   updatePinchDot(nx, ny, true);
 }
 
-function onPinchMove(nx, ny) {
+function onPinchMove(nx, ny, handScale) {
   updatePinchDot(nx, ny, true);
 
   if (grabbedIdx === -1) return;
 
-  const worldPos = landmarkToWorld(nx, ny, GRAB_DEPTH, renderer.camera);
+  currentDepth = scaleToDepth(handScale);
+  const worldPos = landmarkToWorld(nx, ny, currentDepth, renderer.camera);
   physicsWorld.setKinematicPosition(objects[grabbedIdx].handle, worldPos);
   objects[grabbedIdx].mesh.position.copy(worldPos);
 
