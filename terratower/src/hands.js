@@ -111,7 +111,6 @@ export class HandTracker {
         // Hand roll: angle of the wrist→middle-MCP direction relative to
         // screen vertical.  0 = fingers pointing up; positive = tilted
         // clockwise as seen in the (CSS-mirrored) video.
-        const midMcp = smoothed[9];
         const rollDx = midMcp.x - wrist.x;
         const rollDy = midMcp.y - wrist.y;
         const handRoll = Math.atan2(rollDx, -rollDy);
