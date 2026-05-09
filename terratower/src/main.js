@@ -47,6 +47,8 @@ const DEPTH_NEAR_DEFAULT = 15;   // world z ≈ +3 (front of block zone)
 const DEPTH_FAR_DEFAULT  = 21;   // world z ≈ -3 (back of block zone)
 const DEPTH_DEFAULT      = 18;   // world z ≈ 0 (scene centre, no calibration)
 
+const GRAB_REACH = 2.5;  // world-space radius within which a block can be grabbed
+
 let calibPhase    = 'near';   // 'near' | 'waitRelease' | 'far' | 'play'
 let calibScaleNear = null;    // hand scale recorded at near position
 let calibScaleFar  = null;    // hand scale recorded at far position
@@ -202,7 +204,7 @@ function beginPlay() {
     const worldPos = landmarkToWorld(nx, ny, currentDepth, renderer.camera);
 
     // Find the nearest grabbable block within reach as a grab preview
-    let bestDist = 2.5;
+    let bestDist = GRAB_REACH;
     let bestIdx  = -1;
     for (let i = 0; i < objects.length; i++) {
       if (objects[i].isGrabbed) continue;
@@ -277,7 +279,7 @@ function onPinchStart(nx, ny, handScale, handRoll) {
   // Find the block closest to the pinch 3D position
   const worldPos = landmarkToWorld(nx, ny, currentDepth, renderer.camera);
 
-  let bestDist = 2.5; // grab radius
+  let bestDist = GRAB_REACH; // grab radius
   let bestIdx  = -1;
 
   for (let i = 0; i < objects.length; i++) {
