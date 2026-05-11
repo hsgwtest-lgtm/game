@@ -185,11 +185,11 @@ function scaleToDepth(handScale) {
       calibScaleNear === calibScaleFar) {
     return DEPTH_DEFAULT;
   }
-  // t=1 → near (large scale, front), t=0 → far (small scale, back)
+  // t=1 → far (large scale = hand close to camera, grabs back), t=0 → near (small scale = hand far, grabs front)
   const t = Math.max(0, Math.min(1,
     (handScale - calibScaleFar) / (calibScaleNear - calibScaleFar)
   ));
-  return DEPTH_NEAR_DEFAULT * t + DEPTH_FAR_DEFAULT * (1 - t);
+  return DEPTH_FAR_DEFAULT * t + DEPTH_NEAR_DEFAULT * (1 - t);
 }
 
 // ─── Begin gameplay ───────────────────────────────────────────────────────────
