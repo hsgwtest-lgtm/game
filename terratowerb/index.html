@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="TerraTowerβ">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0d1117">
+  <title>Terra Tower β</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <!-- Three.js canvas — WebXR renders here, transparent background -->
+  <canvas id="three-canvas"></canvas>
+
+  <!-- Centre crosshair shown while a block is being held -->
+  <div id="grab-dot"></div>
+
+  <!-- HUD overlay (used as WebXR dom-overlay when supported) -->
+  <div id="hud" style="display:none;">
+    <div id="top-bar">
+      <div class="hud-pill" id="score-pill">🏆 <span id="score-val">0</span><span class="pill-unit">cm</span></div>
+      <div class="hud-pill" id="mode-pill">🔍 床を探しています</div>
+      <div class="hud-pill" id="fps-pill"><span id="fps-val">--</span> fps</div>
+    </div>
+    <div id="bottom-bar">
+      <button id="btn-spawn">＋ ブロック追加</button>
+      <button id="btn-exit-ar">AR 終了</button>
+    </div>
+  </div>
+
+  <!-- Start screen -->
+  <div id="start-screen">
+    <h1>Terra<br>Tower<br><span class="beta-badge">β</span></h1>
+    <div class="icon-instructions">
+      <div class="step"><span class="emoji">🌍</span><span>カメラで床を検出（Hit Test）</span></div>
+      <div class="step"><span class="emoji">📍</span><span>タップで掴む／離して積む</span></div>
+      <div class="step"><span class="emoji">🏗️</span><span>現実空間に高く積み上げよう！</span></div>
+    </div>
+    <p>WebXR Hit Testで床を検知し、現実空間に<br>ブロックを物理演算で積み上げます</p>
+    <button id="btn-ar-start">AR START</button>
+    <p id="ar-not-supported" style="display:none;">
+      このデバイスはWebXR ARをサポートしていません。<br>iOS Safari 16以降またはChrome for Androidをお試しください。
+    </p>
+  </div>
+
+  <!-- Loading overlay -->
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <p id="loading-msg">初期化中...</p>
+  </div>
+</div>
+
+<script type="module" src="src/main.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js');
+  }
+</script>
+</body>
+</html>
