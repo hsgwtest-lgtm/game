@@ -4,7 +4,7 @@
  * Block dimensions are in metres (AR real-world scale):
  *   cube    : 0.15 m side
  *   sphere  : 0.075 m radius
- *   cylinder: 0.13 m diameter × 0.15 m tall
+ *   cylinder: 0.065 m radius × 0.15 m tall (0.13 m diameter)
  */
 import * as THREE from 'https://esm.sh/three@0.176.0';
 

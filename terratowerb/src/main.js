@@ -202,7 +202,7 @@ function xrLoop(time, frame) {
   // ── Grabbed block follows reticle ─────────────────────────────────────────
   if (grabbedIdx !== -1 && isReticleHit) {
     const hx = reticleWorldPos.x;
-    const hy = reticleWorldPos.y + 0.18;   // hold 18 cm above detected floor
+    const hy = reticleWorldPos.y + 0.18;   // hold 0.18 m (18 cm) above detected floor
     const hz = reticleWorldPos.z;
     physicsWorld.setKinematicPosition(objects[grabbedIdx].id, { x: hx, y: hy, z: hz });
     objects[grabbedIdx].mesh.position.set(hx, hy, hz);
