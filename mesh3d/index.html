@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a14">
+<title>Mesh3D – 写真から3Dモデル</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+
+<!-- ─── Import Map ─────────────────────────────────────────────────────── -->
+<script type="importmap">
+{
+  "imports": {
+    "three":           "https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.module.js",
+    "three/addons/":   "https://cdn.jsdelivr.net/npm/three@0.168.0/examples/jsm/"
+  }
+}
+</script>
+
+<style>
+/* ─── Reset & Root ─────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --c-bg:       #0a0a14;
+  --c-surface:  rgba(18, 18, 36, 0.82);
+  --c-border:   rgba(255,255,255,0.08);
+  --c-accent:   #4da3ff;
+  --c-accent2:  #a78bfa;
+  --c-text:     #e8e8f0;
+  --c-muted:    rgba(232,232,240,0.5);
+  --c-error:    #ff6b6b;
+  --c-success:  #4ade80;
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left,  0px);
+  --safe-right:  env(safe-area-inset-right, 0px);
+  --radius-pill: 100px;
+  --radius-lg:   20px;
+  --blur:        blur(20px) saturate(1.5);
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Three.js Canvas ──────────────────────────────────────────────────── */
+#three-canvas {
+  display: block;
+  width:  100vw;
+  height: 100vh;
+  touch-action: none;
+}
+
+/* ─── Dynamic-Island-inspired Progress Bar ─────────────────────────────── */
+#progress-bar {
+  position: fixed;
+  top: calc(var(--safe-top) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(260px, 70vw);
+  background: rgba(28, 28, 40, 0.92);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-pill);
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  z-index: 100;
+  transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(255,255,255,0.06);
+}
+#progress-bar.hidden {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-12px) scale(0.92);
+  pointer-events: none;
+}
+#progress-track {
+  flex: 1;
+  height: 4px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 4px;
+  overflow: hidden;
+}
+#progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--c-accent), var(--c-accent2));
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+#progress-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--c-muted);
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+}
+
+/* ─── Status Badge ─────────────────────────────────────────────────────── */
+#status-badge {
+  position: fixed;
+  top: calc(var(--safe-top) + 14px);
+  right: calc(var(--safe-right) + 16px);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  background: rgba(28,28,40,0.88);
+  border: 1px solid var(--c-border);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  z-index: 100;
+  transition: color 0.3s, background 0.3s;
+  letter-spacing: 0.01em;
+}
+.status-idle    { color: var(--c-muted); }
+.status-loading { color: var(--c-accent); }
+.status-ready   { color: var(--c-success); }
+.status-error   { color: var(--c-error); }
+
+/* ─── App Title (top-left) ─────────────────────────────────────────────── */
+#app-title {
+  position: fixed;
+  top: calc(var(--safe-top) + 14px);
+  left: calc(var(--safe-left) + 16px);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+#app-title h1 {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--c-accent), var(--c-accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+#app-title p {
+  font-size: 10px;
+  color: var(--c-muted);
+  font-weight: 400;
+}
+
+/* ─── Empty State Hint ─────────────────────────────────────────────────── */
+#hint {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+  transition: opacity 0.5s;
+  z-index: 10;
+}
+#hint.gone { opacity: 0; }
+#hint-icon { font-size: 64px; margin-bottom: 16px; opacity: 0.7; }
+#hint h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--c-text);
+}
+#hint p { font-size: 13px; color: var(--c-muted); line-height: 1.6; }
+
+/* ─── Bottom Toolbar ───────────────────────────────────────────────────── */
+#toolbar {
+  position: fixed;
+  bottom: calc(var(--safe-bottom) + 24px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  z-index: 100;
+  background: rgba(18,18,36,0.84);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-pill);
+  padding: 10px 20px;
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(255,255,255,0.06);
+}
+
+.tool-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  color: var(--c-text);
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 14px;
+  transition: background 0.15s, color 0.15s, transform 0.12s;
+  -webkit-tap-highlight-color: transparent;
+  min-width: 52px;
+}
+.tool-btn:active { transform: scale(0.9); }
+.tool-btn.active { color: var(--c-accent); }
+
+/* Camera button is the primary CTA */
+#btn-camera {
+  background: linear-gradient(135deg, var(--c-accent), var(--c-accent2));
+  color: #fff;
+  border-radius: var(--radius-pill);
+  padding: 12px 22px;
+  font-weight: 700;
+  font-size: 13px;
+  min-width: auto;
+  gap: 6px;
+  flex-direction: row;
+  box-shadow: 0 4px 16px rgba(77,163,255,0.35);
+}
+#btn-camera:active { transform: scale(0.94); }
+
+.btn-icon { font-size: 20px; line-height: 1; }
+.btn-label { font-size: 9px; font-weight: 500; color: var(--c-muted); letter-spacing: 0.04em; text-transform: uppercase; }
+#btn-camera .btn-label { display: none; }
+
+/* Divider */
+.divider {
+  width: 1px;
+  height: 28px;
+  background: var(--c-border);
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+/* ─── Hidden inputs ────────────────────────────────────────────────────── */
+input[type="file"] { display: none; }
+
+/* ─── Loading shimmer on hint icon ────────────────────────────────────── */
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50%       { opacity: 0.9; transform: scale(1.06); }
+}
+.pulse { animation: pulse 2.4s ease-in-out infinite; }
+
+/* ─── Orbit hint that appears once ────────────────────────────────────── */
+#orbit-hint {
+  position: fixed;
+  bottom: calc(var(--safe-bottom) + 96px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: var(--c-muted);
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0;
+  transition: opacity 0.6s;
+  background: rgba(10,10,20,0.6);
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+}
+#orbit-hint.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- ─── Three.js Render Canvas ──────────────────────────────────────── -->
+<canvas id="three-canvas"></canvas>
+
+<!-- ─── Dynamic Island Progress Bar ────────────────────────────────── -->
+<div id="progress-bar" class="hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+  <div id="progress-track"><div id="progress-fill"></div></div>
+  <span id="progress-label">読込中…</span>
+</div>
+
+<!-- ─── Status Badge ─────────────────────────────────────────────── -->
+<div id="status-badge" class="status-idle">初期化中</div>
+
+<!-- ─── App Title ────────────────────────────────────────────────── -->
+<div id="app-title" aria-label="アプリ名">
+  <h1>Mesh3D</h1>
+  <p>写真から完全な3Dメッシュを生成</p>
+</div>
+
+<!-- ─── Empty-state Hint ──────────────────────────────────────────── -->
+<div id="hint" role="status" aria-live="polite">
+  <div id="hint-icon" class="pulse">📷</div>
+  <h2>写真を選んでください</h2>
+  <p>カップヌードル、ペットボトル、フィギュアなど<br>
+  被写体が中央に写った1枚の写真から<br>
+  背面まで含む3Dモデルを生成します。</p>
+</div>
+
+<!-- ─── Orbit hint ────────────────────────────────────────────────── -->
+<div id="orbit-hint">ドラッグで回転・ピンチでズーム</div>
+
+<!-- ─── Bottom Toolbar ────────────────────────────────────────────── -->
+<div id="toolbar" role="toolbar" aria-label="操作">
+  <!-- Camera capture (primary) -->
+  <button id="btn-camera" class="tool-btn" aria-label="カメラで撮影">
+    <span class="btn-icon">📷</span>
+    <span class="btn-label">撮影</span>
+  </button>
+
+  <div class="divider"></div>
+
+  <!-- File picker -->
+  <button id="btn-file" class="tool-btn" aria-label="写真を選択">
+    <span class="btn-icon">🖼️</span>
+    <span class="btn-label">選択</span>
+  </button>
+
+  <!-- Auto-rotate toggle -->
+  <button id="btn-rotate" class="tool-btn" aria-label="自動回転" aria-pressed="false">
+    <span class="btn-icon">🔄</span>
+    <span class="btn-label">回転</span>
+  </button>
+
+  <!-- Reset camera -->
+  <button id="btn-reset" class="tool-btn" aria-label="カメラリセット">
+    <span class="btn-icon">⌖</span>
+    <span class="btn-label">リセット</span>
+  </button>
+</div>
+
+<!-- ─── Hidden file inputs ────────────────────────────────────────── -->
+<!-- Camera capture (iOS: capture="environment" opens rear camera) -->
+<input type="file" id="camera-input" accept="image/*" capture="environment">
+<!-- File picker -->
+<input type="file" id="file-input" accept="image/*">
+
+<!-- ─── App Script (ES Module) ────────────────────────────────────── -->
+<script type="module">
+// Inline bootstrap: show hint, wire up orbit hint, and import main app module
+const hint      = document.getElementById('hint');
+const orbitHint = document.getElementById('orbit-hint');
+let orbitShown  = false;
+
+// Import the app – Three.js is resolved via importmap
+import('./app.js').catch(err => {
+  console.error('App load error:', err);
+  document.getElementById('status-badge').textContent = '読込失敗';
+  document.getElementById('status-badge').className   = 'status-badge status-error';
+});
+
+// Hide empty-state hint once a 3D mesh is ready
+window.addEventListener('mesh3d:ready', () => {
+  hint.classList.add('gone');
+  if (!orbitShown) {
+    orbitShown = true;
+    orbitHint.classList.add('show');
+    setTimeout(() => orbitHint.classList.remove('show'), 3500);
+  }
+});
+</script>
+</body>
+</html>
