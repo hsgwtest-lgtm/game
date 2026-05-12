@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#080c1a">
+  <title>EvoStack — 進化する積み重ね</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ═══ Top HUD ═══ -->
+  <div id="top-bar">
+    <div class="hud-left">
+      <span class="hud-pill" id="gen-pill">🧬 世代 —</span>
+      <span class="hud-pill accent" id="best-pill">🏆 —</span>
+      <span class="hud-pill" id="avg-pill">📊 —</span>
+    </div>
+    <div class="hud-right">
+      <span class="hud-pill green" id="score-pill">🧱 0</span>
+    </div>
+  </div>
+
+  <!-- ═══ Game Canvas ═══ -->
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- ═══ Eval Progress Bar ═══ -->
+  <div id="eval-bar-wrap">
+    <div id="eval-fill"></div>
+    <span id="eval-time">⏱ 0.0 / 14s</span>
+  </div>
+
+  <!-- ═══ Bottom Controls ═══ -->
+  <div id="bottom-bar">
+    <div id="speed-control">
+      <button class="ctrl-btn" data-speed="0.5" title="0.5倍速">⏭ ½x</button>
+      <button class="ctrl-btn active" data-speed="1" title="1倍速">▶ 1x</button>
+      <button class="ctrl-btn" data-speed="2" title="2倍速">⏩ 2x</button>
+      <button class="ctrl-btn" data-speed="4" title="4倍速">⚡ 4x</button>
+    </div>
+    <div id="action-row">
+      <button class="action-btn" id="btn-add-block" title="ブロック追加 (B)">＋ブロック</button>
+      <button class="action-btn" id="btn-toggle-graph" title="グラフ (G)">📈 グラフ</button>
+    </div>
+  </div>
+
+  <!-- ═══ Fitness Graph Panel ═══ -->
+  <div id="graph-panel">
+    <div class="graph-header">
+      <span>📈 適応度 / スコア推移</span>
+      <button id="close-graph" title="閉じる">✕</button>
+    </div>
+    <canvas id="graphCanvas" width="310" height="140"></canvas>
+    <div class="graph-legend">
+      <span style="color:#f59e0b">● 最高適応度</span>
+      <span style="color:#60a5fa">● 平均適応度</span>
+      <span style="color:#22c55e">● 🧱スコア</span>
+    </div>
+  </div>
+
+  <!-- ═══ Generation Flash ═══ -->
+  <div id="gen-flash"></div>
+
+  <!-- ═══ Keyboard Hint ═══ -->
+  <div id="key-hint">Space: 一時停止 &nbsp;|&nbsp; 1/2/4: 速度 &nbsp;|&nbsp; B: ブロック追加 &nbsp;|&nbsp; G: グラフ</div>
+
+  <!-- ═══ Start Screen ═══ -->
+  <div id="start-screen">
+    <div id="start-card">
+      <div class="start-logo">
+        <span class="logo-evo">Evo</span><span class="logo-stack">Stack</span>
+      </div>
+      <p class="start-tagline">進化する軟体生物が<br>物理ブロックをゴールへ積み上げる</p>
+
+      <div class="feature-grid">
+        <div class="feature-item">
+          <div class="fi-icon">🧬</div>
+          <div class="fi-text">
+            <strong>軟体生物が世代を重ねて進化</strong>
+            <span>ニューラルネットワーク × 遺伝的アルゴリズム</span>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="fi-icon">🧱</div>
+          <div class="fi-text">
+            <strong>物理ブロックをゴールへ押し込む</strong>
+            <span>Verlet 積分による本格的な剛体物理</span>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="fi-icon">🏗️</div>
+          <div class="fi-text">
+            <strong>積み上げて高スコアを目指す</strong>
+            <span>ゴールシャフトにブロックが積み重なる</span>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="fi-icon">📈</div>
+          <div class="fi-text">
+            <strong>世代を重ねるほど賢くなる</strong>
+            <span>リアルタイムで進化の過程を観察</span>
+          </div>
+        </div>
+      </div>
+
+      <button id="btn-start-game">▶ START</button>
+      <p class="start-hint">SoftEvo7 の進化エンジン × TerraTower の物理積み重ね</p>
+    </div>
+  </div>
+
+</div>
+
+<script src="engine.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js');
+  }
+</script>
+</body>
+</html>
