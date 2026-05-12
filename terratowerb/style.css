@@ -24,19 +24,29 @@ html, body {
   height: -webkit-fill-available;
 }
 
-/* ===== Three.js canvas — WebXR renders here ===== */
+/* ===== Camera video background ===== */
+#ar-video {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+
+/* ===== Three.js canvas — transparent overlay ===== */
 #three-canvas {
-  position: absolute;
-  inset: 0;
+  position: fixed;
+  top: 0; left: 0;
   width: 100% !important;
   height: 100% !important;
   display: block;
   background: transparent;
+  z-index: 1;
 }
 
-/* ===== HUD overlay (dom-overlay) ===== */
+/* ===== HUD overlay ===== */
 #hud {
-  position: absolute;
+  position: fixed;
   inset: 0;
   pointer-events: none;
   display: flex;

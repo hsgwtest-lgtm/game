@@ -1,13 +1,15 @@
 /**
- * main.js — Terra Tower β  (WebXR AR version)
+ * main.js — Terra Tower β  (Camera AR version, iOS Safari compatible)
  *
  * Flow:
- *  1. Page load → init Three.js renderer with xr.enabled = true.
- *  2. User taps "AR START" → requestSession('immersive-ar', {hit-test}).
- *  3. Every XR frame → run hit test from viewer centre → update reticle position.
- *  4. First floor detection → set Cannon-es ground height, spawn 3 blocks.
+ *  1. Page load → init Three.js renderer (xr.enabled = false).
+ *  2. User taps "AR START" → request DeviceOrientation permission (iOS),
+ *     then getUserMedia for the rear camera → stream to <video>.
+ *  3. Every frame → update camera quaternion from DeviceOrientationEvent,
+ *     cast a ray to the virtual floor plane, position reticle there.
+ *  4. First tap → set floor Y = -1.2 m, spawn 3 blocks.
  *  5. Screen tap → grab nearest block (horizontal proximity to reticle) or release held block.
- *  6. While grabbed → block follows reticle position (held 15 cm above floor).
+ *  6. While grabbed → block follows reticle position (held 18 cm above floor).
  *  7. Release tap → block goes dynamic, Cannon-es physics drops it onto the stack.
  *  8. Score = max block height above detected floor (in centimetres).
  */
@@ -28,30 +30,45 @@ const modePill       = document.getElementById('mode-pill');
 const hudEl          = document.getElementById('hud');
 const arNotSupported = document.getElementById('ar-not-supported');
 const canvasEl       = document.getElementById('three-canvas');
+const arVideoEl      = document.getElementById('ar-video');
 
 // ─── Three.js globals ────────────────────────────────────────────────────────
 let scene, camera, renderer;
 let reticleMesh;
 
-// ─── WebXR state ─────────────────────────────────────────────────────────────
-let xrSession    = null;
-let hitTestSource = null;
-let xrRefSpace   = null;   // reference space used for hit-test pose resolution
+// ─── Camera stream ────────────────────────────────────────────────────────────
+let cameraStream = null;
+
+// ─── Device orientation state ────────────────────────────────────────────────
+let deviceAlpha = 0, deviceBeta = 0, deviceGamma = 0;
+window.addEventListener('deviceorientation', (e) => {
+  deviceAlpha = e.alpha ?? 0;
+  deviceBeta  = e.beta  ?? 0;
+  deviceGamma = e.gamma ?? 0;
+});
+
+// ─── Reticle state ────────────────────────────────────────────────────────────
 let isReticleHit = false;
 const reticleWorldPos = new THREE.Vector3();
 
+// Raycaster for floor-plane intersection (reused each frame)
+const _raycaster    = new THREE.Raycaster();
+const _screenCenter = new THREE.Vector2(0, 0);
+const _floorPlane   = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+
 // ─── Physics & game state ────────────────────────────────────────────────────
 let physicsWorld;
-const objects   = [];  // [{type, id, mesh, color, isGrabbed}]
-let grabbedIdx  = -1;
-let floorY      = null; // Y of the real-world floor in XR reference-space coords
+const objects  = [];   // [{type, id, mesh, color, isGrabbed}]
+let grabbedIdx = -1;
+let floorY     = null; // Y of the virtual floor in world coords
+let floorSet   = false;
 
 // Velocity tracking while holding (for a gentle toss on release)
-let holdHistory  = [];  // [{x,y,z,t}]
+let holdHistory = [];  // [{x,y,z,t}]
 
-let score       = 0;
-let lastTime    = 0;
-let frameCount  = 0, fpsAccum = 0;
+let score      = 0;
+let lastTime   = 0;
+let frameCount = 0, fpsAccum = 0;
 
 // ─── Three.js initialisation ─────────────────────────────────────────────────
 
@@ -60,10 +77,11 @@ function initThree() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.setClearColor(0x000000, 0);
-  renderer.xr.enabled = true;
+  renderer.xr.enabled = false;
 
   scene  = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 50);
+  camera.position.set(0, 0, 0);
 
   // Lights — bright ambient so blocks look natural in varied real-world lighting
   scene.add(new THREE.AmbientLight(0xffffff, 0.85));
@@ -71,17 +89,13 @@ function initThree() {
   dir.position.set(5, 10, 5);
   scene.add(dir);
 
-  // Reticle — a flat ring that sits on the detected floor
+  // Reticle — a flat ring that sits on the virtual floor
   const ringGeo = new THREE.RingGeometry(0.09, 0.12, 36);
   ringGeo.applyMatrix4(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
   const ringMat = new THREE.MeshBasicMaterial({ color: 0x58a6ff, side: THREE.DoubleSide });
   reticleMesh = new THREE.Mesh(ringGeo, ringMat);
   reticleMesh.visible = false;
-  reticleMesh.matrixAutoUpdate = false;
   scene.add(reticleMesh);
-
-  // Add a grab-dot indicator inside the HUD (shows grabbing state)
-  // (element is already in HTML; just reference it via setGrabDot helper)
 
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -91,16 +105,10 @@ function initThree() {
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-// ─── WebXR support check ─────────────────────────────────────────────────────
+// ─── Camera support check ────────────────────────────────────────────────────
 
-async function checkXRSupport() {
-  if (!navigator.xr) {
-    arNotSupported.style.display = '';
-    btnArStart.disabled = true;
-    return;
-  }
-  const supported = await navigator.xr.isSessionSupported('immersive-ar').catch(() => false);
-  if (!supported) {
+async function checkCameraSupport() {
+  if (!navigator.mediaDevices?.getUserMedia) {
     arNotSupported.style.display = '';
     btnArStart.disabled = true;
   }
@@ -111,53 +119,86 @@ async function checkXRSupport() {
 btnArStart.addEventListener('click', startAR);
 
 async function startAR() {
-  showLoading('ARセッション開始中...');
+  showLoading('カメラ起動中...');
 
   try {
-    const session = await navigator.xr.requestSession('immersive-ar', {
-      requiredFeatures: ['hit-test'],
-      optionalFeatures: ['dom-overlay'],
-      domOverlay: { root: document.getElementById('app') },
+    // Request DeviceOrientation permission on iOS 13+
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+      const perm = await DeviceOrientationEvent.requestPermission();
+      if (perm !== 'granted') {
+        throw new Error('デバイスの向きセンサーへのアクセスが拒否されました。');
+      }
+    }
+
+    // Get rear camera stream
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: 'environment',
+        width:  { ideal: 1280 },
+        height: { ideal: 720 },
+      },
     });
-
-    xrSession = session;
-
-    // Use 'local' reference space — origin at initial camera position, Y-up
-    renderer.xr.setReferenceSpaceType('local');
-    await renderer.xr.setSession(session);
-
-    xrRefSpace = await session.requestReferenceSpace('local');
-
-    // Request hit-test source from the viewer (screen-centre ray)
-    const viewerSpace = await session.requestReferenceSpace('viewer');
-    hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
-
-    session.addEventListener('end', onSessionEnd);
-
-    // Touch listener — single tap toggles grab / release
-    canvasEl.addEventListener('touchstart', onTouchStart, { passive: false });
-    // Also listen on the whole document so the HUD doesn't block taps
-    document.addEventListener('touchstart', onTouchStart, { passive: false });
+    arVideoEl.srcObject = cameraStream;
 
     // Initialise physics world
     physicsWorld = new PhysicsWorld();
+
+    // Touch listeners — single tap toggles grab / release
+    canvasEl.addEventListener('touchstart', onTouchStart, { passive: false });
+    document.addEventListener('touchstart', onTouchStart, { passive: false });
 
     startScreen.style.display = 'none';
     hudEl.style.display = 'flex';
     hideLoading();
 
-    renderer.setAnimationLoop(xrLoop);
+    renderer.setAnimationLoop(mainLoop);
 
   } catch (err) {
     hideLoading();
-    console.error('AR session error:', err);
-    alert('ARセッションの開始に失敗しました:\n' + err.message);
+    console.error('AR start error:', err);
+    alert('カメラへのアクセスを許可してください:\n' + err.message);
   }
 }
 
-// ─── XR render loop ──────────────────────────────────────────────────────────
+// ─── Camera orientation from DeviceOrientationEvent ─────────────────────────
 
-function xrLoop(time, frame) {
+function updateCameraFromOrientation() {
+  // deviceBeta - 90: converts portrait-held device (beta≈90°) to forward-looking camera.
+  // -deviceGamma: negates roll so left/right tilt maps correctly in Y-up world.
+  const euler = new THREE.Euler(
+    THREE.MathUtils.degToRad(deviceBeta - 90),
+    THREE.MathUtils.degToRad(deviceAlpha),
+    THREE.MathUtils.degToRad(-deviceGamma),
+    'YXZ'
+  );
+  camera.quaternion.setFromEuler(euler);
+}
+
+// ─── Reticle: cast screen-centre ray to virtual floor plane ─────────────────
+
+function updateReticlePos() {
+  if (!floorSet) {
+    isReticleHit = false;
+    reticleMesh.visible = false;
+    return;
+  }
+  _raycaster.setFromCamera(_screenCenter, camera);
+  _floorPlane.constant = -floorY;  // plane equation: y - floorY = 0
+  const hit = _raycaster.ray.intersectPlane(_floorPlane, reticleWorldPos);
+  if (hit) {
+    isReticleHit = true;
+    reticleMesh.position.copy(reticleWorldPos);
+    reticleMesh.visible = true;
+  } else {
+    isReticleHit = false;
+    reticleMesh.visible = false;
+  }
+}
+
+// ─── Main render loop (replaces WebXR xrLoop) ───────────────────────────────
+
+function mainLoop(time) {
   const dt = lastTime > 0 ? Math.min((time - lastTime) / 1000, 0.1) : 0;
   lastTime = time;
 
@@ -170,44 +211,20 @@ function xrLoop(time, frame) {
     frameCount = 0;
   }
 
-  // ── Hit Test ──────────────────────────────────────────────────────────────
-  isReticleHit = false;
-  if (frame && hitTestSource) {
-    const results = frame.getHitTestResults(hitTestSource);
-    if (results.length > 0) {
-      const pose = results[0].getPose(xrRefSpace);
-      if (pose) {
-        reticleMesh.visible = true;
-        reticleMesh.matrix.fromArray(pose.transform.matrix);
-        reticleMesh.matrixWorldNeedsUpdate = true;
-        reticleWorldPos.setFromMatrixPosition(reticleMesh.matrix);
-        isReticleHit = true;
+  // Update camera rotation from device orientation
+  updateCameraFromOrientation();
 
-        // On first floor detection — set physics ground, spawn initial blocks
-        if (floorY === null) {
-          floorY = reticleWorldPos.y;
-          physicsWorld.setFloorY(floorY);
-          modePill.textContent = '📍 床を検出しました';
-          spawnRandomBlock();
-          spawnRandomBlock();
-          spawnRandomBlock();
-        }
-      }
-    }
-    if (!isReticleHit) {
-      reticleMesh.visible = false;
-    }
-  }
+  // Update reticle position (floor-plane intersection)
+  updateReticlePos();
 
   // ── Grabbed block follows reticle ─────────────────────────────────────────
   if (grabbedIdx !== -1 && isReticleHit) {
     const hx = reticleWorldPos.x;
-    const hy = reticleWorldPos.y + 0.18;   // hold 0.18 m (18 cm) above detected floor
+    const hy = reticleWorldPos.y + 0.18;   // hold 18 cm above floor
     const hz = reticleWorldPos.z;
     physicsWorld.setKinematicPosition(objects[grabbedIdx].id, { x: hx, y: hy, z: hz });
     objects[grabbedIdx].mesh.position.set(hx, hy, hz);
 
-    // Track recent positions for throw velocity on release
     holdHistory.push({ x: hx, y: hy, z: hz, t: time });
     if (holdHistory.length > 6) holdHistory.shift();
   }
@@ -221,11 +238,26 @@ function xrLoop(time, frame) {
   physicsWorld.syncMeshes(objects);
 
   // ── Score ─────────────────────────────────────────────────────────────────
-  if (floorY !== null) {
+  if (floorSet) {
     updateScore();
   }
 
   renderer.render(scene, camera);
+}
+
+// ─── First tap: set virtual floor ────────────────────────────────────────────
+
+function onFirstTap() {
+  if (floorSet) return;
+  // Assume the floor is ~1.2 m below the camera (device held at chest/eye level).
+  // Users should tap while holding the device at roughly chest height.
+  floorY  = -1.2;
+  floorSet = true;
+  physicsWorld.setFloorY(floorY);
+  spawnRandomBlock();
+  spawnRandomBlock();
+  spawnRandomBlock();
+  modePill.textContent = '📍 床を設定しました';
 }
 
 // ─── Touch interaction ───────────────────────────────────────────────────────
@@ -235,11 +267,15 @@ function onTouchStart(e) {
   if (e.target.closest('#btn-spawn, #btn-exit-ar')) return;
   e.preventDefault();
 
+  // First tap sets the floor
+  if (!floorSet) {
+    onFirstTap();
+    return;
+  }
+
   if (grabbedIdx !== -1) {
-    // Release the held block
     releaseBlock();
   } else {
-    // Attempt to grab the nearest block to the reticle
     tryGrab();
   }
 }
@@ -310,14 +346,14 @@ function releaseBlock() {
   obj.mesh.material.emissiveIntensity = 0;
   grabbedIdx = -1;
 
-  modePill.textContent = isReticleHit ? '📍 床を検出しました' : '🔍 床を探しています';
+  modePill.textContent = '📍 床を設定しました';
   setGrabDot(false);
 }
 
 // ─── Block spawning ──────────────────────────────────────────────────────────
 
 function spawnRandomBlock() {
-  if (floorY === null) return;  // wait until floor is known
+  if (!floorSet) return;
 
   const type = BLOCK_TYPES[Math.floor(Math.random() * BLOCK_TYPES.length)];
 
@@ -334,7 +370,6 @@ function spawnRandomBlock() {
   const obj = spawnBlock(type, pos, physicsWorld, scene);
   objects.push(obj);
 
-  // Lazy cleanup: remove blocks that have fallen far below the floor
   setTimeout(() => cleanupFallen(), 15000);
 }
 
@@ -343,20 +378,22 @@ btnSpawn.addEventListener('click', (e) => {
   spawnRandomBlock();
 });
 
-// ─── Session end / cleanup ───────────────────────────────────────────────────
+// ─── Session stop / cleanup ──────────────────────────────────────────────────
 
 btnExitAr.addEventListener('click', (e) => {
   e.stopPropagation();
-  xrSession?.end();
+  stopAR();
 });
 
-function onSessionEnd() {
+function stopAR() {
   renderer.setAnimationLoop(null);
 
-  hitTestSource?.cancel();
-  hitTestSource  = null;
-  xrRefSpace     = null;
-  xrSession      = null;
+  // Stop camera stream
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+    arVideoEl.srcObject = null;
+  }
 
   canvasEl.removeEventListener('touchstart', onTouchStart);
   document.removeEventListener('touchstart', onTouchStart);
@@ -369,15 +406,16 @@ function onSessionEnd() {
   objects.length = 0;
   physicsWorld = null;
 
-  grabbedIdx  = -1;
-  floorY      = null;
-  holdHistory = [];
-  score       = 0;
+  grabbedIdx   = -1;
+  floorY       = null;
+  floorSet     = false;
+  holdHistory  = [];
+  score        = 0;
   scoreVal.textContent = '0';
   modePill.textContent = '🔍 床を探しています';
 
-  reticleMesh.visible   = false;
-  hudEl.style.display   = 'none';
+  reticleMesh.visible       = false;
+  hudEl.style.display       = 'none';
   startScreen.style.display = 'flex';
   setGrabDot(false);
 }
@@ -398,7 +436,7 @@ function updateScore() {
 }
 
 function cleanupFallen() {
-  if (floorY === null) return;
+  if (!floorSet) return;
   for (let i = objects.length - 1; i >= 0; i--) {
     if (objects[i].mesh.position.y < floorY - 1.5) {
       if (i === grabbedIdx) { grabbedIdx = -1; setGrabDot(false); }
@@ -427,4 +465,4 @@ function hideLoading() {
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 initThree();
-checkXRSupport();
+checkCameraSupport();
