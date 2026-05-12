@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="TerraTower AR">
+  <meta name="apple-mobile-web-app-title" content="TerraTower">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0d1117">
-  <title>Terra Tower AR</title>
+  <title>Terra Tower</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="icon" href="icons/icon-192.png">
@@ -35,22 +35,27 @@
     </div>
     <div id="bottom-bar">
       <button id="btn-reset-view" style="display:none">🔄 視点リセット</button>
+      <button id="btn-toggle-mode" style="display:none">📡 ARモード</button>
       <button id="btn-spawn">＋ ブロック追加</button>
     </div>
   </div>
 
   <!-- Start screen -->
   <div id="start-screen">
-    <h1>Terra<br>Tower<br><span class="ar-label">AR</span></h1>
+    <h1>Terra<br>Tower</h1>
+    <div id="mode-selector">
+      <button id="btn-mode-normal" class="mode-btn active">🎮 通常モード</button>
+      <button id="btn-mode-ar" class="mode-btn">📡 ARモード</button>
+    </div>
     <div class="icon-instructions">
       <div class="step"><span class="emoji">📷</span><span>カメラで手を映す</span></div>
       <div class="step"><span class="emoji">🤏</span><span>ピンチで掴む</span></div>
-      <div class="step"><span class="emoji">📱</span><span>デバイスを動かして視点変更</span></div>
+      <div class="step"><span class="emoji">📱</span><span>ARモード: デバイスを動かして視点変更</span></div>
       <div class="step"><span class="emoji">🏗️</span><span>高く積み上げよう！</span></div>
     </div>
-    <p>親指と人差し指でブロックを掴み、離すと物理落下。デバイスを傾けて自由に視点を変えられます。</p>
-    <p class="permission-note">※ カメラとDeviceOrientationの許可が必要です（iOSでは確認ダイアログが表示されます）</p>
-    <button id="btn-start">AR START</button>
+    <p>親指と人差し指でブロックを掴み、離すと物理落下。ARモードではデバイスを傾けて視点を変えられます。</p>
+    <p class="permission-note">※ カメラの許可が必要です。ARモードではDeviceOrientationの許可も必要です（iOSでは確認ダイアログが表示されます）</p>
+    <button id="btn-start">START</button>
   </div>
 
   <!-- Depth calibration screen -->
