@@ -41,6 +41,8 @@ export function landmarkToWorld(nx, ny, depth, camera) {
 
   // Walk along the ray until the projection onto the forward axis equals `depth`.
   // This is robust for any camera orientation (AR device-orientation mode included).
+  // Guard against near-perpendicular rays (|proj| < 0.0001) where division would
+  // produce an extremely large t value causing numerical instability.
   const proj = dir.dot(_camForward);
   const t = Math.abs(proj) > 0.0001 ? depth / proj : depth;
 

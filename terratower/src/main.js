@@ -87,12 +87,14 @@ function setupDeviceOrientation() {
 
   renderer.enableAR();
 
-  window.addEventListener('deviceorientation', (e) => {
+  // Store a reference to the handler so it can be removed if teardown is needed.
+  function orientationHandler(e) {
     if (!renderer) return;
     // Prefer screen.orientation.angle; fall back to the deprecated window.orientation
     const screenAngle = (window.screen?.orientation?.angle) ?? (window.orientation ?? 0);
     renderer.applyDeviceOrientation(e.alpha, e.beta, e.gamma, screenAngle);
-  }, true);
+  }
+  window.addEventListener('deviceorientation', orientationHandler, true);
 
   // Show AR badge
   if (arBadge) arBadge.style.display = 'flex';

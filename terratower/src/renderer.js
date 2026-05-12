@@ -170,7 +170,8 @@ export class Renderer {
     const target = this._arBaseQuat.clone();
     target.premultiply(Q_delta);
 
-    // Smooth slerp to avoid jitter (≈10 events to settle ≈ ~0.17s at 60 Hz)
+    // Smooth slerp to avoid jitter — factor 0.25 means ~10 orientation events
+    // (≈ 0.17 s at 60 Hz device rate) are needed for the camera to fully settle.
     this._arSmoothedQuat.slerp(target, 0.25);
     this.camera.quaternion.copy(this._arSmoothedQuat);
   }
