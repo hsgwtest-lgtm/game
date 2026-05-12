@@ -12,7 +12,10 @@ const startScreen    = document.getElementById('start-screen');
 const loadingOverlay = document.getElementById('loading-overlay');
 const loadingMsg     = document.getElementById('loading-msg');
 const btnStart       = document.getElementById('btn-start');
+const btnModeNormal  = document.getElementById('btn-mode-normal');
+const btnModeAr      = document.getElementById('btn-mode-ar');
 const btnSpawn       = document.getElementById('btn-spawn');
+const btnToggleMode  = document.getElementById('btn-toggle-mode');
 const scoreVal       = document.getElementById('score-val');
 const fpsVal         = document.getElementById('fps-val');
 const handPill       = document.getElementById('hand-pill');
@@ -41,6 +44,10 @@ let previewIdx = -1;  // index of block currently highlighted as grab preview
 
 // AR / device-orientation
 let arOrientationEnabled = false;
+let gameMode = 'normal';  // 'normal' | 'ar'
+
+// Stored reference to the orientation handler so the listener can be removed
+let _orientationHandler = null;
 
 // FPS tracking
 let lastTime = 0, frameCount = 0, fpsAccum = 0;
@@ -59,11 +66,25 @@ let calibScaleNear = null;
 let calibScaleFar  = null;
 let currentDepth   = DEPTH_DEFAULT;
 
+// ─── Start-screen mode selection ─────────────────────────────────────────────
+btnModeNormal.addEventListener('click', () => {
+  gameMode = 'normal';
+  btnModeNormal.classList.add('active');
+  btnModeAr.classList.remove('active');
+});
+btnModeAr.addEventListener('click', () => {
+  gameMode = 'ar';
+  btnModeAr.classList.add('active');
+  btnModeNormal.classList.remove('active');
+});
+
 // ─── Entry point ─────────────────────────────────────────────────────────────
 btnStart.addEventListener('click', async () => {
   // Request DeviceOrientationEvent permission FIRST — must happen synchronously
   // within (or immediately following) the user gesture on iOS 13+.
-  arOrientationEnabled = await requestOrientationPermission();
+  if (gameMode === 'ar') {
+    arOrientationEnabled = await requestOrientationPermission();
+  }
   startGame();
 });
 
@@ -87,14 +108,16 @@ function setupDeviceOrientation() {
 
   renderer.enableAR();
 
-  // Store a reference to the handler so it can be removed if teardown is needed.
-  function orientationHandler(e) {
+  // Remove any previously registered handler before adding a new one
+  removeDeviceOrientationListener();
+
+  _orientationHandler = (e) => {
     if (!renderer) return;
     // Prefer screen.orientation.angle; fall back to the deprecated window.orientation
     const screenAngle = (window.screen?.orientation?.angle) ?? (window.orientation ?? 0);
     renderer.applyDeviceOrientation(e.alpha, e.beta, e.gamma, screenAngle);
-  }
-  window.addEventListener('deviceorientation', orientationHandler, true);
+  };
+  window.addEventListener('deviceorientation', _orientationHandler, true);
 
   // Show AR badge
   if (arBadge) arBadge.style.display = 'flex';
@@ -102,7 +125,13 @@ function setupDeviceOrientation() {
   // Reset-view button
   if (btnResetView) {
     btnResetView.style.display = 'block';
-    btnResetView.addEventListener('click', () => renderer?.resetAROrientation());
+  }
+}
+
+function removeDeviceOrientationListener() {
+  if (_orientationHandler) {
+    window.removeEventListener('deviceorientation', _orientationHandler, true);
+    _orientationHandler = null;
   }
 }
 
@@ -277,8 +306,44 @@ function beginPlay() {
   spawnRandomBlock();
 
   btnSpawn.addEventListener('click', spawnRandomBlock);
+  btnResetView.addEventListener('click', () => renderer?.resetAROrientation());
+
+  // Show mode-toggle button and set initial label
+  updateModeToggleUI();
+  btnToggleMode.style.display = 'block';
+  btnToggleMode.addEventListener('click', toggleMode);
 
   requestAnimationFrame(gameLoop);
+}
+
+// ─── In-game mode toggle ─────────────────────────────────────────────────────
+async function toggleMode() {
+  if (gameMode === 'ar') {
+    // Switch to normal (fixed camera)
+    gameMode = 'normal';
+    removeDeviceOrientationListener();
+    renderer.disableAR();
+    arBadge.style.display   = 'none';
+    btnResetView.style.display = 'none';
+  } else {
+    // Switch to AR
+    if (!arOrientationEnabled) {
+      arOrientationEnabled = await requestOrientationPermission();
+    }
+    if (!arOrientationEnabled) {
+      alert('デバイスの向きセンサーの許可が必要です。ブラウザの設定でセンサーアクセスを許可してください。');
+      return;
+    }
+    gameMode = 'ar';
+    setupDeviceOrientation();
+    arBadge.style.display      = 'flex';
+    btnResetView.style.display = 'block';
+  }
+  updateModeToggleUI();
+}
+
+function updateModeToggleUI() {
+  btnToggleMode.textContent = gameMode === 'ar' ? '🎮 通常モード' : '📡 ARモード';
 }
 
 // ─── Game loop ────────────────────────────────────────────────────────────────

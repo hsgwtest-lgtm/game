@@ -67,6 +67,9 @@ export class Renderer {
     this.camera = new THREE.PerspectiveCamera(60, w / h, 0.1, 200);
     this.camera.position.set(0, 8, 18);
     this.camera.lookAt(0, 3, 0);
+    // Save default position/orientation for restoring when AR is disabled
+    this._defaultPosition   = this.camera.position.clone();
+    this._defaultQuaternion = this.camera.quaternion.clone();
   }
 
   _setupLights() {
@@ -184,6 +187,17 @@ export class Renderer {
     this._arDeviceQ0Inv = null;
     this._arBaseQuat    = this.camera.quaternion.clone();
     this._arSmoothedQuat.copy(this.camera.quaternion);
+  }
+
+  /**
+   * Disable device-orientation AR control and restore the default fixed camera.
+   */
+  disableAR() {
+    this._arEnabled     = false;
+    this._arDeviceQ0Inv = null;
+    this.camera.position.copy(this._defaultPosition);
+    this.camera.quaternion.copy(this._defaultQuaternion);
+    this._arSmoothedQuat.copy(this._defaultQuaternion);
   }
 
   // ─── Core render ────────────────────────────────────────────────────────────
