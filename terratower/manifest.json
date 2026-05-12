@@ -1,8 +1,9 @@
 {
-  "name": "Terra Tower — 3D積み上げゲーム",
-  "short_name": "TerraTower",
-  "description": "手で掴んで積み上げる3D物理スタッキングゲーム",
+  "name": "Terra Tower AR — 3D積み上げゲーム",
+  "short_name": "TerraTower AR",
+  "description": "手で掴んで積み上げる3D物理ARスタッキングゲーム",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#0d1117",

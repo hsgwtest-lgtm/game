@@ -1,5 +1,5 @@
 /**
- * main.js — Terra Tower bootstrap & game loop
+ * main.js — Terra Tower bootstrap & game loop (AR upgrade)
  */
 import { Renderer }     from './renderer.js';
 import { initRapier, PhysicsWorld } from './physics.js';
@@ -19,6 +19,8 @@ const handPill       = document.getElementById('hand-pill');
 const pinchDot       = document.getElementById('pinch-dot');
 const videoEl        = document.getElementById('camera-video');
 const canvasEl       = document.getElementById('three-canvas');
+const arBadge        = document.getElementById('ar-badge');
+const btnResetView   = document.getElementById('btn-reset-view');
 
 // Calibration screen elements
 const calibScreen      = document.getElementById('calib-screen');
@@ -37,25 +39,70 @@ let grabHistory = [];     // [{x,y,z,t}] recent positions for throw velocity
 let score = 0;
 let previewIdx = -1;  // index of block currently highlighted as grab preview
 
+// AR / device-orientation
+let arOrientationEnabled = false;
+
 // FPS tracking
 let lastTime = 0, frameCount = 0, fpsAccum = 0;
 
 // ─── Depth calibration ───────────────────────────────────────────────────────
-// camera.z = 18; world z = camera.z - depth
-// depth=15 → world z≈3 (near side), depth=21 → world z≈-3 (far side)
-const DEPTH_NEAR_DEFAULT = 15;   // world z ≈ +3 (front of block zone)
-const DEPTH_FAR_DEFAULT  = 21;   // world z ≈ -3 (back of block zone)
-const DEPTH_DEFAULT      = 18;   // world z ≈ 0 (scene centre, no calibration)
+// depth = distance along camera's forward axis (world units)
+// Larger value = object is farther from the camera
+const DEPTH_NEAR_DEFAULT = 15;
+const DEPTH_FAR_DEFAULT  = 21;
+const DEPTH_DEFAULT      = 18;
 
 const GRAB_REACH = 2.5;  // world-space radius within which a block can be grabbed
 
 let calibPhase    = 'near';   // 'near' | 'waitRelease' | 'far' | 'play'
-let calibScaleNear = null;    // hand scale recorded at near position
-let calibScaleFar  = null;    // hand scale recorded at far position
+let calibScaleNear = null;
+let calibScaleFar  = null;
 let currentDepth   = DEPTH_DEFAULT;
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
-btnStart.addEventListener('click', startGame);
+btnStart.addEventListener('click', async () => {
+  // Request DeviceOrientationEvent permission FIRST — must happen synchronously
+  // within (or immediately following) the user gesture on iOS 13+.
+  arOrientationEnabled = await requestOrientationPermission();
+  startGame();
+});
+
+// ─── Device-orientation permission (iOS 13+) ─────────────────────────────────
+async function requestOrientationPermission() {
+  if (typeof DeviceOrientationEvent?.requestPermission !== 'function') {
+    // Not iOS 13+ — orientation events are available without asking
+    return ('DeviceOrientationEvent' in window);
+  }
+  try {
+    const result = await DeviceOrientationEvent.requestPermission();
+    return result === 'granted';
+  } catch {
+    return false;
+  }
+}
+
+// ─── Device-orientation listener ─────────────────────────────────────────────
+function setupDeviceOrientation() {
+  if (!arOrientationEnabled || !renderer) return;
+
+  renderer.enableAR();
+
+  window.addEventListener('deviceorientation', (e) => {
+    if (!renderer) return;
+    // Prefer screen.orientation.angle; fall back to the deprecated window.orientation
+    const screenAngle = (window.screen?.orientation?.angle) ?? (window.orientation ?? 0);
+    renderer.applyDeviceOrientation(e.alpha, e.beta, e.gamma, screenAngle);
+  }, true);
+
+  // Show AR badge
+  if (arBadge) arBadge.style.display = 'flex';
+
+  // Reset-view button
+  if (btnResetView) {
+    btnResetView.style.display = 'block';
+    btnResetView.addEventListener('click', () => renderer?.resetAROrientation());
+  }
+}
 
 async function startGame() {
   startScreen.style.display = 'none';
@@ -86,6 +133,10 @@ async function startGame() {
   }
 
   handTracker.start();
+
+  // Enable device-orientation AR control now that the renderer is ready
+  setupDeviceOrientation();
+
   hideLoading();
 
   // Begin depth calibration before game starts
@@ -142,7 +193,6 @@ function onCalibPinch({ handScale }) {
   if (calibPhase === 'near') {
     calibScaleNear = handScale;
     calibPhase = 'waitRelease';
-    // Show far step UI immediately so user sees what's next
     showCalibUI('far');
   } else if (calibPhase === 'far') {
     calibScaleFar = handScale;
@@ -151,7 +201,6 @@ function onCalibPinch({ handScale }) {
 }
 
 function onCalibRelease() {
-  // Advance from waitRelease → far only after user has released the pinch
   if (calibPhase === 'waitRelease') {
     calibPhase = 'far';
   }
@@ -161,7 +210,6 @@ function finishCalibration() {
   calibPhase = 'play';
   calibScreen.style.display = 'none';
 
-  // If user calibrated near/far in the wrong order, swap them
   if (calibScaleNear !== null && calibScaleFar !== null &&
       calibScaleNear < calibScaleFar) {
     [calibScaleNear, calibScaleFar] = [calibScaleFar, calibScaleNear];
@@ -185,7 +233,6 @@ function scaleToDepth(handScale) {
       calibScaleNear === calibScaleFar) {
     return DEPTH_DEFAULT;
   }
-  // t=1 → far (large scale = hand close to camera, grabs back), t=0 → near (small scale = hand far, grabs front)
   const t = Math.max(0, Math.min(1,
     (handScale - calibScaleFar) / (calibScaleNear - calibScaleFar)
   ));
@@ -198,12 +245,11 @@ function beginPlay() {
   handTracker.onPinchEnd   = ({ nx, ny, handScale, handRoll }) => onPinchEnd(nx, ny, handScale, handRoll);
   handTracker.onPinchMove  = ({ nx, ny, handScale, handRoll }) => onPinchMove(nx, ny, handScale, handRoll);
   handTracker.onHandMove   = ({ nx, ny, handScale }) => {
-    if (handTracker.isPinching) return; // onPinchMove handles position when pinching
+    if (handTracker.isPinching) return;
 
     currentDepth = scaleToDepth(handScale);
     const worldPos = landmarkToWorld(nx, ny, currentDepth, renderer.camera);
 
-    // Find the nearest grabbable block within reach as a grab preview
     let bestDist = GRAB_REACH;
     let bestIdx  = -1;
     for (let i = 0; i < objects.length; i++) {
@@ -212,7 +258,6 @@ function beginPlay() {
       if (d < bestDist) { bestDist = d; bestIdx = i; }
     }
 
-    // Update preview highlight only when it changes
     if (previewIdx !== bestIdx) {
       clearPreviewHighlight();
       previewIdx = bestIdx;
@@ -222,7 +267,7 @@ function beginPlay() {
       }
     }
 
-    updatePinchDot(nx, ny, true, true); // show idle dot at hand position
+    updatePinchDot(nx, ny, true, true);
   };
 
   spawnRandomBlock();
@@ -238,7 +283,6 @@ function beginPlay() {
 function gameLoop(now) {
   requestAnimationFrame(gameLoop);
 
-  // FPS
   const dt = (now - lastTime) / 1000;
   lastTime = now;
   fpsAccum += dt;
@@ -249,17 +293,14 @@ function gameLoop(now) {
     frameCount = 0;
   }
 
-  // Step physics (skip if dt is weird, e.g. first frame)
   if (dt > 0 && dt < 0.1) {
     physicsWorld.step();
   }
 
   physicsWorld.syncMeshes(objects);
 
-  // Update score (highest block Y position above platform top)
   updateScore();
 
-  // Update HUD hand status
   if (handTracker.detected) {
     handPill.textContent = handTracker.isPinching ? '🤏 掴んでいる' : '✋ 検出済み';
   } else {
@@ -276,10 +317,9 @@ function onPinchStart(nx, ny, handScale, handRoll) {
   clearPreviewHighlight();
   currentDepth = scaleToDepth(handScale);
 
-  // Find the block closest to the pinch 3D position
   const worldPos = landmarkToWorld(nx, ny, currentDepth, renderer.camera);
 
-  let bestDist = GRAB_REACH; // grab radius
+  let bestDist = GRAB_REACH;
   let bestIdx  = -1;
 
   for (let i = 0; i < objects.length; i++) {
@@ -297,15 +337,12 @@ function onPinchStart(nx, ny, handScale, handRoll) {
     objects[bestIdx].isGrabbed = true;
     physicsWorld.grabBody(objects[bestIdx].handle);
 
-    // Seed grab history for throw velocity tracking
     grabHistory = [{ x: worldPos.x, y: worldPos.y, z: worldPos.z, t: performance.now() }];
 
-    // Visual feedback
     objects[bestIdx].mesh.material.emissive.setHex(0x664400);
     objects[bestIdx].mesh.material.emissiveIntensity = 0.5;
   }
 
-  // Update pinch dot
   updatePinchDot(nx, ny, true);
 }
 
@@ -319,16 +356,10 @@ function onPinchMove(nx, ny, handScale, handRoll) {
   physicsWorld.setKinematicPosition(objects[grabbedIdx].handle, worldPos);
   objects[grabbedIdx].mesh.position.copy(worldPos);
 
-  // Track position history (keep last ~5 frames) for throw velocity
   const now = performance.now();
   grabHistory.push({ x: worldPos.x, y: worldPos.y, z: worldPos.z, t: now });
   if (grabHistory.length > 5) grabHistory.shift();
 
-  // Apply hand roll to the grabbed object so it tilts with the hand.
-  // handRoll > 0 = clockwise (physical) but appears counterclockwise in the
-  // CSS-mirrored video; the block should match the visual appearance, so we
-  // apply +sin instead of -sin to align with the mirrored view.
-  // Quaternion half-angle formula: q = (axis * sin(θ/2), cos(θ/2))
   const halfRoll = handRoll / 2;
   physicsWorld.setKinematicRotation(objects[grabbedIdx].handle, {
     x: 0,
@@ -347,18 +378,16 @@ function onPinchEnd(nx, ny, handScale, handRoll) {
   const obj = objects[grabbedIdx];
   obj.isGrabbed = false;
 
-  // Compute throw velocity from recent grab position history
   if (grabHistory.length >= 2) {
     const first = grabHistory[0];
     const last  = grabHistory[grabHistory.length - 1];
     const dt = (last.t - first.t) / 1000;
-    if (dt > 0.01) {  // require at least 10 ms of history for a meaningful velocity estimate
+    if (dt > 0.01) {
       const THROW_SCALE = 1.5;
-      const MAX_SPEED   = 25;  // world units/s; keeps blocks within the platform area
+      const MAX_SPEED   = 25;
       let vx = (last.x - first.x) / dt * THROW_SCALE;
       let vy = (last.y - first.y) / dt * THROW_SCALE;
       let vz = (last.z - first.z) / dt * THROW_SCALE;
-      // Clamp to a maximum speed
       const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
       if (speed > MAX_SPEED) {
         const s = MAX_SPEED / speed;
@@ -383,7 +412,6 @@ function onPinchEnd(nx, ny, handScale, handRoll) {
 function updatePinchDot(nx, ny, visible, isIdle = false) {
   const w = window.innerWidth;
   const h = window.innerHeight;
-  // Mirror nx because video is CSS-mirrored
   pinchDot.style.left = ((1 - nx) * w) + 'px';
   pinchDot.style.top  = (ny * h) + 'px';
   pinchDot.style.display = visible ? 'block' : 'none';
@@ -405,7 +433,7 @@ function clearPreviewHighlight() {
 function updateScore() {
   let maxY = 0;
   for (const obj of objects) {
-    const y = obj.mesh.position.y - 0.2; // subtract base top
+    const y = obj.mesh.position.y - 0.2;
     if (y > maxY) maxY = y;
   }
   const newScore = Math.max(0, Math.floor(maxY * 10));
@@ -417,7 +445,6 @@ function updateScore() {
 
 function spawnRandomBlock() {
   const type = BLOCK_TYPES[Math.floor(Math.random() * BLOCK_TYPES.length)];
-  // Spawn above the platform at a random XZ
   const pos = {
     x: (Math.random() - 0.5) * 6,
     y: 8 + Math.random() * 2,
@@ -426,12 +453,10 @@ function spawnRandomBlock() {
   const obj = spawnBlock(type, pos, physicsWorld, renderer);
   objects.push(obj);
 
-  // Remove blocks that fall off (y < -5) — checked each frame lazily
   setTimeout(() => cleanupFallen(), 10000);
 }
 
 function cleanupFallen() {
-  // Reset preview index first since splicing will invalidate it
   clearPreviewHighlight();
   for (let i = objects.length - 1; i >= 0; i--) {
     if (objects[i].mesh.position.y < -5) {
