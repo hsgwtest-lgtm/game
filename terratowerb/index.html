@@ -16,7 +16,10 @@
 </head>
 <body>
 <div id="app">
-  <!-- Three.js canvas — WebXR renders here, transparent background -->
+  <!-- Camera feed — shown as AR background -->
+  <video id="ar-video" autoplay playsinline muted></video>
+
+  <!-- Three.js canvas — transparent overlay on top of video -->
   <canvas id="three-canvas"></canvas>
 
   <!-- Centre crosshair shown while a block is being held -->
@@ -39,14 +42,15 @@
   <div id="start-screen">
     <h1>Terra<br>Tower<br><span class="beta-badge">β</span></h1>
     <div class="icon-instructions">
-      <div class="step"><span class="emoji">🌍</span><span>カメラで床を検出（Hit Test）</span></div>
-      <div class="step"><span class="emoji">📍</span><span>タップで掴む／離して積む</span></div>
+      <div class="step"><span class="emoji">🌍</span><span>カメラで実空間を表示</span></div>
+      <div class="step"><span class="emoji">📍</span><span>最初のタップで床を固定</span></div>
+      <div class="step"><span class="emoji">✋</span><span>タップで掴む／離して積む</span></div>
       <div class="step"><span class="emoji">🏗️</span><span>現実空間に高く積み上げよう！</span></div>
     </div>
-    <p>WebXR Hit Testで床を検知し、現実空間に<br>ブロックを物理演算で積み上げます</p>
+    <p>カメラと物理演算で、現実空間に<br>ブロックを積み上げます</p>
     <button id="btn-ar-start">AR START</button>
     <p id="ar-not-supported" style="display:none;">
-      このデバイスはWebXR ARをサポートしていません。<br>iOS Safari 16以降またはChrome for Androidをお試しください。
+      カメラへのアクセスを許可してください。<br>お使いのブラウザがカメラに対応していない可能性があります。
     </p>
   </div>
 
