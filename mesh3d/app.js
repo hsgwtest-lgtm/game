@@ -21,7 +21,9 @@ import { pipeline, env, RawImage } from 'https://cdn.jsdelivr.net/npm/@huggingfa
 const MAX_IMG_SIZE    = 512;   // リサイズ上限 (px)
 const MESH_SEGMENTS   = 64;    // グリッド解像度 (前面・背面)
 const DEPTH_SCALE     = 0.45;  // Z 方向の変位スケール
-const NORMAL_SCALE    = 1.5;   // ノーマルマップ強度
+const NORMAL_SCALE       = 1.5;   // ノーマルマップ強度 (material normalScale に適用)
+const BACK_DEPTH_OFFSET  = 0.08;  // 背面の最小後退量 (DEPTH_SCALE の倍数)
+const BACK_DEPTH_RANGE   = 0.12;  // 深度による背面変位の追加幅 (DEPTH_SCALE の倍数)
 const MODEL_ID        = 'onnx-community/depth-anything-v2-small';
 const MODEL_DTYPE     = 'fp16'; // FP16 でメモリ節約
 
@@ -220,9 +222,11 @@ function sampleDepth(depthNorm, mapW, mapH, u, v) {
  */
 function buildNormalMapTexture(depthNorm, mapW, mapH) {
   const data = new Uint8ClampedArray(mapW * mapH * 4);
-  // World-space ratio: depth 0→1 spans DEPTH_SCALE in Z, while UV 0→1 spans 2
-  // in XY. Strength tunes how much the normals deviate from the flat forward.
-  const strength = NORMAL_SCALE * DEPTH_SCALE * 0.5;
+  // World-space ratio: depth 0→1 spans DEPTH_SCALE in Z, while UV 0→1
+  // spans 2 world units in XY (the geometry covers [-1,1]²), so the
+  // scale factor is DEPTH_SCALE / 2 = DEPTH_SCALE * 0.5.
+  // NORMAL_SCALE is applied via material.normalScale, not baked here.
+  const strength = DEPTH_SCALE * 0.5;
 
   for (let py = 0; py < mapH; py++) {
     for (let px = 0; px < mapW; px++) {
@@ -263,7 +267,7 @@ function buildNormalMapTexture(depthNorm, mapW, mapH) {
  *
  * Vertex layout  (total 2 × (S+1)² vertices):
  *   [ 0 … N−1 ]   front face  z =  depth(u,v)       · DEPTH_SCALE
- *   [ N … 2N−1]   back  face  z = −(0.08 + mirrorDepth·0.12) · DEPTH_SCALE
+ *   [ N … 2N−1]   back  face  z = −(BACK_DEPTH_OFFSET + mirrorDepth·BACK_DEPTH_RANGE) · DEPTH_SCALE
  *
  * The back face samples depth at mirrored U (1−u, v), creating a concave
  * surface that matches the front's convexity instead of being a flat plane.
@@ -307,7 +311,7 @@ function buildSolidMesh(depthNorm, mapW, mapH) {
       // on the back, giving a more realistic cross-section when viewed from
       // the side or from behind.
       const bd = sampleDepth(depthNorm, mapW, mapH, 1 - u, v);
-      const bz = -(0.08 + bd * 0.12) * DEPTH_SCALE;
+      const bz = -(BACK_DEPTH_OFFSET + bd * BACK_DEPTH_RANGE) * DEPTH_SCALE;
       const bk = N + k;
       pos[bk * 3]     = wx;
       pos[bk * 3 + 1] = wy;
@@ -449,7 +453,7 @@ async function processImage(file) {
   const mat = new THREE.MeshStandardMaterial({
     map:         colorTex,
     normalMap:   normalTex,
-    normalScale: new THREE.Vector2(1, 1),
+    normalScale: new THREE.Vector2(NORMAL_SCALE, NORMAL_SCALE),
     roughness:   0.6,
     metalness:   0.05,
     side:        THREE.FrontSide,
