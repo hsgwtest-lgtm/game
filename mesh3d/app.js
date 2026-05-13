@@ -1,12 +1,16 @@
 /**
- * Mesh3D – 1枚の写真からオブジェクトの背面を推定し完全な3Dメッシュを生成
+ * Mesh3D v2 – Depth-Shell + Normal Map
  *
  * Pipeline:
  *  1. 画像ロード → 512px以下にリサイズ (iOS メモリ対策)
  *  2. Transformers.js v3 (Depth-Anything-Small / WebGPU or WASM FP16) で深度マップ取得
- *  3. 深度マップ → 前面・背面・側面の BufferGeometry を生成 (Depth Displacement Mesh)
- *  4. 元画像をテクスチャとして前面に投影、ミラー反転を背面に適用
- *  5. Three.js で OrbitControls 付きシーンに表示
+ *  3. 深度マップ勾配 → タンジェント空間 Normal Map テクスチャ生成
+ *  4. 深度マップ → 閉じた3Dシェルメッシュ生成 (buildSolidMesh)
+ *     ・前面 : 深度で Z 変位したグリッド (MESH_SEGMENTS²)
+ *     ・背面 : ミラー深度で変位した曲面 (ハーフシェル、フラット板ポリゴンから脱却)
+ *     ・側面 : 前面エッジ⇔背面エッジを繋ぐ壁 (closed seams)
+ *  5. カラーテクスチャ + Normal Map を Three.js MeshStandardMaterial に適用
+ *  6. OrbitControls 付きシーンに表示
  */
 
 import * as THREE from 'three';
@@ -15,8 +19,9 @@ import { pipeline, env, RawImage } from 'https://cdn.jsdelivr.net/npm/@huggingfa
 
 // ─── iOS / WebKit memory optimisations ───────────────────────────────────────
 const MAX_IMG_SIZE    = 512;   // リサイズ上限 (px)
-const MESH_SEGMENTS   = 64;    // フロント面グリッド解像度
+const MESH_SEGMENTS   = 64;    // グリッド解像度 (前面・背面)
 const DEPTH_SCALE     = 0.45;  // Z 方向の変位スケール
+const NORMAL_SCALE    = 1.5;   // ノーマルマップ強度
 const MODEL_ID        = 'onnx-community/depth-anything-v2-small';
 const MODEL_DTYPE     = 'fp16'; // FP16 でメモリ節約
 
@@ -183,10 +188,11 @@ async function estimateDepth(imgCanvas) {
   return norm;
 }
 
-// ─── Mesh Builder ─────────────────────────────────────────────────────────────
+// ─── Depth Sampler ────────────────────────────────────────────────────────────
 
 /**
- * Bilinear sample of a depth map.
+ * Bilinear sample of a depth map at UV coordinates (u,v) ∈ [0,1]².
+ * Image row 0 is the top of the picture; UV v=1 maps to row 0.
  */
 function sampleDepth(depthNorm, mapW, mapH, u, v) {
   const px = u * (mapW - 1);
@@ -202,138 +208,183 @@ function sampleDepth(depthNorm, mapW, mapH, u, v) {
          d01 * (1 - tx) * ty       + d11 * tx * ty;
 }
 
-/**
- * Build a depth-displaced front surface.
- * Vertices are on a MESH_SEGMENTS × MESH_SEGMENTS grid in XY, displaced in Z.
- */
-function buildFrontGeometry(depthNorm, mapW, mapH) {
-  const segs = MESH_SEGMENTS;
-  const geo  = new THREE.PlaneGeometry(2, 2, segs, segs);
-  const pos  = geo.attributes.position;
-  const uv   = geo.attributes.uv;
+// ─── Step 3 – Normal Map ──────────────────────────────────────────────────────
 
-  for (let i = 0; i < pos.count; i++) {
-    const u = uv.getX(i);
-    const v = uv.getY(i);
-    const d = sampleDepth(depthNorm, mapW, mapH, u, v);
-    pos.setZ(i, d * DEPTH_SCALE);
+/**
+ * Build a tangent-space normal map DataTexture from a depth map.
+ *
+ * Central differences on the depth gradient are used to derive per-pixel
+ * surface normals. The result is encoded as RGB (128,128,255 = flat surface).
+ * Image y increases downward while UV v increases upward, so the gy sign
+ * is flipped to stay consistent with the geometry UVs.
+ */
+function buildNormalMapTexture(depthNorm, mapW, mapH) {
+  const data = new Uint8ClampedArray(mapW * mapH * 4);
+  // World-space ratio: depth 0→1 spans DEPTH_SCALE in Z, while UV 0→1 spans 2
+  // in XY. Strength tunes how much the normals deviate from the flat forward.
+  const strength = NORMAL_SCALE * DEPTH_SCALE * 0.5;
+
+  for (let py = 0; py < mapH; py++) {
+    for (let px = 0; px < mapW; px++) {
+      const xl = Math.max(0, px - 1), xr = Math.min(mapW - 1, px + 1);
+      const yt = Math.max(0, py - 1), yb = Math.min(mapH - 1, py + 1);
+
+      // Central differences in pixel space
+      const gx =  (depthNorm[py * mapW + xr] - depthNorm[py * mapW + xl]) / (xr - xl);
+      // Image y↓ vs UV v↑ → negate
+      const gy = -(depthNorm[yb * mapW + px] - depthNorm[yt * mapW + px]) / (yb - yt);
+
+      // Tangent-space normal (not yet normalised)
+      const nx = -gx * strength;
+      const ny = -gy * strength;
+      const nz = 1.0;
+      const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+
+      const i = (py * mapW + px) * 4;
+      data[i]   = ((nx / len) * 0.5 + 0.5) * 255 + 0.5 | 0;
+      data[i+1] = ((ny / len) * 0.5 + 0.5) * 255 + 0.5 | 0;
+      data[i+2] = ((nz / len) * 0.5 + 0.5) * 255 + 0.5 | 0;
+      data[i+3] = 255;
+    }
   }
-  pos.needsUpdate = true;
-  geo.computeVertexNormals();
-  return geo;
+
+  const tex = new THREE.DataTexture(
+    data, mapW, mapH, THREE.RGBAFormat, THREE.UnsignedByteType
+  );
+  // Normal maps carry linear data – no sRGB conversion
+  tex.needsUpdate = true;
+  return tex;
 }
 
-/**
- * Build a flat back plane slightly behind the object.
- * Uses mirrored UVs (horizontally flipped) so the texture reads as a reflection.
- */
-function buildBackGeometry() {
-  const segs = 8;
-  const geo  = new THREE.PlaneGeometry(2, 2, segs, segs);
-  // Rotate to face backwards
-  geo.rotateY(Math.PI);
-  // Shift to back
-  geo.translate(0, 0, -DEPTH_SCALE * 0.15);
-  // UVs are already mirrored by the Y-rotation (U flips)
-  geo.computeVertexNormals();
-  return geo;
-}
+// ─── Step 1 & 2 – Closed Solid Shell Mesh ────────────────────────────────────
 
 /**
- * Build side wall geometry connecting the front face edges to the back plane.
+ * Build a watertight depth-shell mesh from a depth map.
  *
- * Each of the 4 edges (top / bottom / left / right) is sampled from the
- * depth-displaced front surface and extruded back to z = backZ.
+ * Vertex layout  (total 2 × (S+1)² vertices):
+ *   [ 0 … N−1 ]   front face  z =  depth(u,v)       · DEPTH_SCALE
+ *   [ N … 2N−1]   back  face  z = −(0.08 + mirrorDepth·0.12) · DEPTH_SCALE
  *
- * @param {Float32Array} depthNorm
- * @param {number} mapW
- * @param {number} mapH
- * @returns {THREE.BufferGeometry}
+ * The back face samples depth at mirrored U (1−u, v), creating a concave
+ * surface that matches the front's convexity instead of being a flat plane.
+ * UV on the back face is (1−u, v) so the colour texture reads as a mirror.
+ *
+ * Four side walls close the seams between the front and back edges so the
+ * mesh is fully closed and correct normals are maintained throughout.
+ *
+ * Winding conventions (THREE.FrontSide rendering):
+ *   Front  – CCW from +Z  → normal points toward viewer
+ *   Back   – CW  from +Z  → normal points away from viewer
+ *   Sides  – chosen per-edge to give outward-pointing normals
  */
-function buildSideGeometry(depthNorm, mapW, mapH) {
-  const segs  = MESH_SEGMENTS;
-  const backZ = -DEPTH_SCALE * 0.15;
+function buildSolidMesh(depthNorm, mapW, mapH) {
+  const S  = MESH_SEGMENTS;
+  const nx = S + 1;
+  const ny = S + 1;
+  const N  = nx * ny;  // vertices per face
 
-  const positions = [];
-  const normals   = [];
-  const uvs       = [];
-  const indices   = [];
+  const pos   = new Float32Array(N * 2 * 3);
+  const uvArr = new Float32Array(N * 2 * 2);
 
-  /**
-   * Append one side strip.
-   * edgePts: Array of {x, y, z, u, v} – front edge vertices from low to high
-   * dir: outward normal direction {x, y, z}
-   * mirrorU: flip U when sampling back edge
-   */
-  function addStrip(edgePts, outNormal) {
-    const base = positions.length / 3;
-    const n    = edgePts.length;
+  for (let iy = 0; iy < ny; iy++) {
+    for (let ix = 0; ix < nx; ix++) {
+      const k  = iy * nx + ix;
+      const u  = ix / S;
+      const v  = iy / S;
+      const wx = u * 2 - 1;
+      const wy = v * 2 - 1;
 
-    for (let i = 0; i < n; i++) {
-      const p = edgePts[i];
-      // Front vertex (index base + i*2)
-      positions.push(p.x, p.y, p.z);
-      normals.push(outNormal.x, outNormal.y, outNormal.z);
-      uvs.push(p.u, p.v);
+      // ── Front vertex ──────────────────────────────────────────────────────
+      const fz = sampleDepth(depthNorm, mapW, mapH, u, v) * DEPTH_SCALE;
+      pos[k * 3]     = wx;
+      pos[k * 3 + 1] = wy;
+      pos[k * 3 + 2] = fz;
+      uvArr[k * 2]     = u;
+      uvArr[k * 2 + 1] = v;
 
-      // Back vertex (index base + i*2+1)
-      positions.push(p.x, p.y, backZ);
-      normals.push(outNormal.x, outNormal.y, outNormal.z);
-      uvs.push(p.u, p.v);
-    }
-
-    for (let i = 0; i < n - 1; i++) {
-      const a = base + i * 2;
-      const b = base + i * 2 + 1;
-      const c = base + (i + 1) * 2;
-      const d = base + (i + 1) * 2 + 1;
-      // Two triangles per quad (consistent winding)
-      indices.push(a, b, c, b, d, c);
+      // ── Back vertex (Step 2: depth-varied instead of flat) ────────────────
+      // Mirror depth so raised areas on the front produce matching concavity
+      // on the back, giving a more realistic cross-section when viewed from
+      // the side or from behind.
+      const bd = sampleDepth(depthNorm, mapW, mapH, 1 - u, v);
+      const bz = -(0.08 + bd * 0.12) * DEPTH_SCALE;
+      const bk = N + k;
+      pos[bk * 3]     = wx;
+      pos[bk * 3 + 1] = wy;
+      pos[bk * 3 + 2] = bz;
+      uvArr[bk * 2]     = 1 - u;  // mirror U → photo reads correctly from behind
+      uvArr[bk * 2 + 1] = v;
     }
   }
 
-  /**
-   * Sample edge points along UV space.
-   * @param {'u'|'v'} axis - 'u' = fixed U (left/right vertical edge), 'v' = fixed V (top/bottom horizontal edge)
-   * @param {number} fixedVal - fixed coordinate value (0 or 1)
-   * @param {number} fromT - start of the varying coordinate
-   * @param {number} toT   - end of the varying coordinate
-   * @param {number} steps - number of segments
-   */
-  function edgeSample(axis, fixedVal, fromT, toT, steps) {
-    const pts = [];
-    for (let i = 0; i <= steps; i++) {
-      const t = fromT + (toT - fromT) * (i / steps);
-      let u, v, x, y;
-      if (axis === 'u') { // fixed U → left or right vertical edge; V varies
-        u = fixedVal; v = t;
-        x = u * 2 - 1; y = v * 2 - 1;
-      } else {            // fixed V → bottom or top horizontal edge; U varies
-        u = t; v = fixedVal;
-        x = u * 2 - 1; y = v * 2 - 1;
-      }
-      const z = sampleDepth(depthNorm, mapW, mapH, u, v) * DEPTH_SCALE;
-      pts.push({ x, y, z, u, v });
+  // ── Index buffer ──────────────────────────────────────────────────────────
+  const idxCount = S * S * 6 * 2  // front + back quads
+                 + S * 6 * 4;     // 4 side walls
+  const idx = new Uint32Array(idxCount);
+  let ptr = 0;
+
+  // Front face – CCW from +Z
+  for (let iy = 0; iy < S; iy++) {
+    for (let ix = 0; ix < S; ix++) {
+      const a = iy * nx + ix,        b = iy * nx + ix + 1;
+      const c = (iy+1) * nx + ix + 1, d = (iy+1) * nx + ix;
+      idx[ptr++] = a; idx[ptr++] = b; idx[ptr++] = c;
+      idx[ptr++] = a; idx[ptr++] = c; idx[ptr++] = d;
     }
-    return pts;
   }
 
-  const s = segs;
-  addStrip(edgeSample('v', 0,  0, 1, s), { x: 0, y: -1, z: 0 }); // bottom (v=0, u varies)
-  addStrip(edgeSample('v', 1,  0, 1, s), { x: 0, y:  1, z: 0 }); // top    (v=1, u varies)
-  addStrip(edgeSample('u', 0,  0, 1, s), { x: -1, y: 0, z: 0 }); // left   (u=0, v varies)
-  addStrip(edgeSample('u', 1,  0, 1, s), { x:  1, y: 0, z: 0 }); // right  (u=1, v varies)
+  // Back face – CW from +Z (= CCW from −Z)
+  for (let iy = 0; iy < S; iy++) {
+    for (let ix = 0; ix < S; ix++) {
+      const a = N + iy * nx + ix,        b = N + iy * nx + ix + 1;
+      const c = N + (iy+1) * nx + ix + 1, d = N + (iy+1) * nx + ix;
+      idx[ptr++] = a; idx[ptr++] = c; idx[ptr++] = b;
+      idx[ptr++] = a; idx[ptr++] = d; idx[ptr++] = c;
+    }
+  }
+
+  // Bottom edge iy=0  – outward normal −Y
+  for (let ix = 0; ix < S; ix++) {
+    const af = ix,     bf = ix + 1;
+    const ab = N + ix, bb = N + ix + 1;
+    idx[ptr++] = af; idx[ptr++] = ab; idx[ptr++] = bf;
+    idx[ptr++] = bf; idx[ptr++] = ab; idx[ptr++] = bb;
+  }
+
+  // Top edge iy=S  – outward normal +Y
+  for (let ix = 0; ix < S; ix++) {
+    const af = S * nx + ix,     bf = S * nx + ix + 1;
+    const ab = N + S * nx + ix, bb = N + S * nx + ix + 1;
+    idx[ptr++] = af; idx[ptr++] = bf; idx[ptr++] = ab;
+    idx[ptr++] = bf; idx[ptr++] = bb; idx[ptr++] = ab;
+  }
+
+  // Left edge ix=0  – outward normal −X
+  for (let iy = 0; iy < S; iy++) {
+    const af = iy * nx,       bf = (iy+1) * nx;
+    const ab = N + iy * nx,   bb = N + (iy+1) * nx;
+    idx[ptr++] = af; idx[ptr++] = bf; idx[ptr++] = ab;
+    idx[ptr++] = bf; idx[ptr++] = bb; idx[ptr++] = ab;
+  }
+
+  // Right edge ix=S  – outward normal +X
+  for (let iy = 0; iy < S; iy++) {
+    const af = iy * nx + S,     bf = (iy+1) * nx + S;
+    const ab = N + iy * nx + S, bb = N + (iy+1) * nx + S;
+    idx[ptr++] = af; idx[ptr++] = ab; idx[ptr++] = bf;
+    idx[ptr++] = bf; idx[ptr++] = ab; idx[ptr++] = bb;
+  }
 
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geo.setAttribute('normal',   new THREE.Float32BufferAttribute(normals,   3));
-  geo.setAttribute('uv',       new THREE.Float32BufferAttribute(uvs,       2));
-  geo.setIndex(indices);
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv',       new THREE.Float32BufferAttribute(uvArr, 2));
+  geo.setIndex(new THREE.BufferAttribute(idx, 1));
   geo.computeVertexNormals();
+  geo.computeTangents();  // required for correct tangent-space normal mapping
   return geo;
 }
 
-// ─── Texture Helpers ──────────────────────────────────────────────────────────
+// ─── Texture Helper ───────────────────────────────────────────────────────────
 
 /**
  * Create a THREE.Texture from a canvas element.
@@ -343,31 +394,6 @@ function canvasToTexture(c) {
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.needsUpdate = true;
   return tex;
-}
-
-/**
- * Create a horizontally-mirrored version of a canvas.
- */
-function mirrorCanvas(src, w, h) {
-  const dst = document.createElement('canvas');
-  dst.width  = w; dst.height = h;
-  const ctx  = dst.getContext('2d');
-  ctx.translate(w, 0);
-  ctx.scale(-1, 1);
-  ctx.drawImage(src, 0, 0, w, h);
-  return dst;
-}
-
-/**
- * Create a blurred / desaturated edge canvas for sides.
- */
-function sideCanvas(src, w, h) {
-  const dst = document.createElement('canvas');
-  dst.width  = w; dst.height = h;
-  const ctx  = dst.getContext('2d');
-  ctx.filter = 'blur(6px) saturate(0.5) brightness(0.7)';
-  ctx.drawImage(src, 0, 0, w, h);
-  return dst;
 }
 
 // ─── Main Processing ──────────────────────────────────────────────────────────
@@ -413,33 +439,24 @@ async function processImage(file) {
 
   setProgress(85, 'メッシュ生成中…');
 
-  // 3. Build geometries
-  const frontGeo = buildFrontGeometry(depthNorm, imgW, imgH);
-  const backGeo  = buildBackGeometry();
-  const sideGeo  = buildSideGeometry(depthNorm, imgW, imgH);
+  // 3. Build closed watertight shell geometry (front + depth-varied back + sides)
+  const geo = buildSolidMesh(depthNorm, imgW, imgH);
 
   // 4. Textures
-  const frontTex = canvasToTexture(imgCanvas);
-  const backTex  = canvasToTexture(mirrorCanvas(imgCanvas, imgW, imgH));
-  const sideTex  = canvasToTexture(sideCanvas(imgCanvas, imgW, imgH));
+  const colorTex  = canvasToTexture(imgCanvas);
+  const normalTex = buildNormalMapTexture(depthNorm, imgW, imgH);
 
-  const matFront = new THREE.MeshStandardMaterial({
-    map: frontTex, side: THREE.FrontSide,
-    roughness: 0.6, metalness: 0.05
-  });
-  const matBack = new THREE.MeshStandardMaterial({
-    map: backTex, side: THREE.FrontSide,
-    roughness: 0.8, metalness: 0.02
-  });
-  const matSide = new THREE.MeshStandardMaterial({
-    map: sideTex, side: THREE.DoubleSide,
-    roughness: 0.9, metalness: 0.01
+  const mat = new THREE.MeshStandardMaterial({
+    map:         colorTex,
+    normalMap:   normalTex,
+    normalScale: new THREE.Vector2(1, 1),
+    roughness:   0.6,
+    metalness:   0.05,
+    side:        THREE.FrontSide,
   });
 
   const group = new THREE.Group();
-  group.add(new THREE.Mesh(frontGeo, matFront));
-  group.add(new THREE.Mesh(backGeo,  matBack));
-  group.add(new THREE.Mesh(sideGeo,  matSide));
+  group.add(new THREE.Mesh(geo, mat));
 
   // Aspect-ratio correction so the object isn't distorted
   const aspect = imgW / imgH;
