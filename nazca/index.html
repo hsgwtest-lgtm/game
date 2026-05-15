@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#060a14">
+<title>Nazca-α</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ═══ Header ═══ -->
+  <header id="header">
+    <span id="header-title">Nazca-α</span>
+    <span id="header-mode-label">記録モード</span>
+  </header>
+
+  <!-- ═══ Map ═══ -->
+  <div id="map-container">
+    <div id="map"></div>
+
+    <!-- Recording badge -->
+    <div id="rec-indicator" class="hidden">
+      <span class="rec-dot"></span>REC
+    </div>
+
+    <!-- GPS accuracy -->
+    <div id="gps-accuracy" class="map-badge hidden"></div>
+
+    <!-- Replay overlay -->
+    <div id="replay-overlay" class="hidden">
+      <span id="replay-label">▶ タイムラプス再生中</span>
+      <button id="btn-stop-replay">■ 停止</button>
+    </div>
+  </div>
+
+  <!-- ═══ Mode A — Record ═══ -->
+  <div id="panel-record" class="mode-panel">
+    <div id="stats-row">
+      <div class="stat-item">
+        <span class="stat-value" id="stat-dist">0.00</span>
+        <span class="stat-unit">km</span>
+        <span class="stat-label">距離</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-value" id="stat-steps">0</span>
+        <span class="stat-unit">歩</span>
+        <span class="stat-label">推定歩数</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-value" id="stat-cal">0</span>
+        <span class="stat-unit">kcal</span>
+        <span class="stat-label">消費カロリー</span>
+      </div>
+    </div>
+    <div id="record-controls">
+      <button id="btn-start" class="action-btn primary-btn">▶ スタート</button>
+      <button id="btn-stop"  class="action-btn danger-btn  hidden">■ ストップ</button>
+      <button id="btn-save"  class="action-btn primary-btn hidden">💾 保存</button>
+      <button id="btn-post"  class="action-btn accent-btn  hidden">☁ グローバルに投稿</button>
+    </div>
+    <div id="track-title-row" class="hidden">
+      <input type="text" id="track-title-input" placeholder="記録名を入力（省略可）…" maxlength="30" autocomplete="off">
+    </div>
+  </div>
+
+  <!-- ═══ Mode B — My Gallery ═══ -->
+  <div id="panel-gallery" class="mode-panel hidden">
+    <!-- List sub-view -->
+    <div id="gallery-list-view">
+      <div id="gallery-list"></div>
+    </div>
+    <!-- Detail sub-view -->
+    <div id="gallery-detail-view" class="hidden">
+      <div id="gallery-detail-stats"></div>
+      <div id="gallery-detail-controls">
+        <button id="btn-gallery-back"   class="action-btn secondary-btn">← 一覧</button>
+        <button id="btn-gallery-replay" class="action-btn accent-btn">▶ タイムラプス</button>
+        <button id="btn-gallery-delete" class="action-btn danger-btn icon-btn">🗑</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Mode C — Global Gallery ═══ -->
+  <div id="panel-global" class="mode-panel hidden">
+    <!-- List sub-view -->
+    <div id="global-list-view">
+      <div id="global-list"></div>
+    </div>
+    <!-- Detail sub-view -->
+    <div id="global-detail-view" class="hidden">
+      <div id="global-detail-info"></div>
+      <div id="global-detail-controls">
+        <button id="btn-global-back"   class="action-btn secondary-btn">← 一覧</button>
+        <button id="btn-global-replay" class="action-btn accent-btn">▶ タイムラプス</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Bottom Nav ═══ -->
+  <nav id="bottom-nav">
+    <button class="nav-btn active" data-mode="record">
+      <span class="nav-icon">📍</span>
+      <span class="nav-label">記録</span>
+    </button>
+    <button class="nav-btn" data-mode="gallery">
+      <span class="nav-icon">🖼</span>
+      <span class="nav-label">マイ鑑賞</span>
+    </button>
+    <button class="nav-btn" data-mode="global">
+      <span class="nav-icon">🌐</span>
+      <span class="nav-label">グローバル</span>
+    </button>
+  </nav>
+
+</div><!-- #app -->
+
+<!-- Toast -->
+<div id="toast-container"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+<script src="app.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js');
+}
+</script>
+</body>
+</html>
