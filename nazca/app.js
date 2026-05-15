@@ -2,6 +2,7 @@
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const LS_KEY       = 'nazca_tracks';
+const LS_USER_KEY  = 'nazca_user';
 const STEPS_PER_KM = 1300;
 const BODY_WEIGHT  = 60;   // kg (spec value)
 const REPLAY_SPEED = 1000; // 1000× real-time
@@ -151,6 +152,7 @@ function init() {
   bindGalleryPanel();
   bindGlobalPanel();
   document.getElementById('btn-stop-replay').addEventListener('click', stopReplay);
+  initUserName();
   switchMode('record');
 }
 
@@ -172,7 +174,7 @@ function initMap() {
 function initCompass() {
   map.on('rotate', () => {
     const b = map.getBearing ? map.getBearing() : 0;
-    document.getElementById('compass-rose').style.transform = `rotate(${-b}deg)`;
+    document.getElementById('compass-rose').style.transform = `rotate(${b}deg)`;
   });
   document.getElementById('compass-rose').addEventListener('click', () => {
     if (map.setBearing) map.setBearing(0, { animate: true });
@@ -399,11 +401,13 @@ function confirmSave() {
 function saveTrack(title) {
   const dist = calcDistance(currentPath);
   const track = {
-    id:     generateId(),
+    id:        generateId(),
     title,
-    path:   [...currentPath],
-    stats:  { distance: round2(dist), calories: Math.round(BODY_WEIGHT * dist) },
-    date:   new Date().toISOString().slice(0, 10),
+    path:      [...currentPath],
+    stats:     { distance: round2(dist), calories: Math.round(BODY_WEIGHT * dist) },
+    date:      new Date().toISOString().slice(0, 10),
+    startTime: currentPath[0][2],
+    endTime:   currentPath[currentPath.length - 1][2],
     posted: false
   };
 
@@ -581,7 +585,7 @@ function renderGalleryDetailStats(track) {
     `📏 ${track.stats.distance} km &nbsp;` +
     `👣 ${Math.round(track.stats.distance * STEPS_PER_KM).toLocaleString('ja-JP')} 歩 &nbsp;` +
     `🔥 ${track.stats.calories} kcal<br>` +
-    `📅 ${track.date}${track.posted ? ' &nbsp;☁ 投稿済み' : ''}`;
+    `🕐 ${formatTimeRange(track)}${track.posted ? ' &nbsp;☁ 投稿済み' : ''}`;
 
   const btn = document.getElementById('btn-gallery-post');
   if (track.posted) {
@@ -606,8 +610,15 @@ function postFromGallery(id) {
   // fetch('/api/post', { method:'POST', body:JSON.stringify(track), headers:{'Content-Type':'application/json'} })
   //   .then(r => r.json()).then(...).catch(...);
   setTimeout(() => {
+    const name = getUserName();
+    if (!name) {
+      showToast('記録タブで名前を入力してから投稿してください', 'error');
+      btn.disabled = false;
+      btn.textContent = '☁ 投稿';
+      return;
+    }
     track.posted = true;
-    track.user   = track.user || 'あなた';
+    track.user   = name;
     saveTracks(tracks);
     selectedGalleryTrack = track;
     renderGalleryDetailStats(track);
@@ -693,7 +704,7 @@ function renderGlobalMap() {
     const label = L.marker([midPt[0], midPt[1]], {
       icon: L.divIcon({
         html: `<div class="track-label" style="border-color:${color};color:${color}">${esc(track.user)}<br>${esc(track.title)}</div>`,
-        iconAnchor: [0, 0], className: ''
+        iconSize: [1, 1], iconAnchor: [0, 0], className: ''
       }),
       interactive: false, zIndexOffset: 200
     }).addTo(map);
@@ -729,7 +740,7 @@ function selectGlobalTrack(track, idx) {
       const label = L.marker([midPt[0], midPt[1]], {
         icon: L.divIcon({
           html: `<div class="track-label" style="border-color:${color};color:${color}">${esc(t.user)}<br>${esc(t.title)}</div>`,
-          iconAnchor: [0, 0], className: ''
+          iconSize: [1, 1], iconAnchor: [0, 0], className: ''
         }),
         interactive: false, zIndexOffset: 300
       }).addTo(map);
@@ -745,7 +756,7 @@ function selectGlobalTrack(track, idx) {
 
   document.getElementById('global-detail-info').innerHTML =
     `<strong>${esc(track.title)}</strong><br>` +
-    `👤 ${esc(track.user)} &nbsp; 📅 ${track.date}<br>` +
+    `👤 ${esc(track.user)} &nbsp; 🕐 ${formatTimeRange(track)}<br>` +
     `📏 ${track.stats.distance} km &nbsp; 🔥 ${track.stats.calories} kcal`;
 
   showGlobalDetailView();
@@ -826,6 +837,19 @@ function saveTracks(tracks) {
   catch { showToast('保存容量が不足しています', 'error'); }
 }
 
+function getUserName() {
+  return localStorage.getItem(LS_USER_KEY) || '';
+}
+function saveUserName(name) {
+  localStorage.setItem(LS_USER_KEY, name);
+}
+
+function initUserName() {
+  const input = document.getElementById('user-name-input');
+  input.value = getUserName();
+  input.addEventListener('change', () => saveUserName(input.value.trim()));
+}
+
 // ─── Utilities ────────────────────────────────────────────────────────────────
 function calcDistance(path) {
   if (path.length < 2) return 0;
@@ -860,6 +884,18 @@ function generateId() {
 }
 
 function round2(n) { return Math.round(n * 100) / 100; }
+
+function formatTimeRange(track) {
+  const startTs = track.startTime
+    || (track.path && track.path.length > 0 && track.path[0][2] ? track.path[0][2] : null);
+  const endTs   = track.endTime
+    || (track.path && track.path.length > 0 && track.path[track.path.length - 1][2] ? track.path[track.path.length - 1][2] : null);
+  if (!startTs) return track.date || '';
+  const d = new Date(startTs);
+  const dateStr = d.toLocaleDateString('ja-JP', { year: 'numeric', month: 'numeric', day: 'numeric' });
+  const fmtTime = ts => new Date(ts).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+  return endTs ? `${dateStr} ${fmtTime(startTs)}〜${fmtTime(endTs)}` : `${dateStr} ${fmtTime(startTs)}`;
+}
 
 function esc(str) {
   return String(str)

@@ -143,15 +143,18 @@ html, body {
 
 /* Track map label */
 .track-label {
-  background: rgba(6,10,20,0.82);
-  border: 1px solid;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 9px;
+  background: rgba(6,10,20,0.88);
+  border: 1.5px solid;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
   white-space: nowrap;
-  line-height: 1.4;
+  line-height: 1.5;
   text-align: center;
   pointer-events: none;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5);
 }
 
 /* Replay overlay */
@@ -224,6 +227,16 @@ html, body {
 }
 #track-title-input:focus { border-color: rgba(99,210,255,0.4); }
 #track-title-input::placeholder { color: rgba(226,232,240,0.28); }
+#user-name-row { margin-top: 7px; }
+#user-name-input {
+  width: 100%; padding: 7px 10px;
+  background: rgba(167,139,250,0.05);
+  border: 1px solid rgba(167,139,250,0.2);
+  border-radius: 8px; color: #e2e8f0;
+  font-size: 13px; font-family: inherit; outline: none;
+}
+#user-name-input:focus { border-color: rgba(167,139,250,0.4); }
+#user-name-input::placeholder { color: rgba(226,232,240,0.28); }
 
 /* ─ Panels B & C ─ */
 #panel-gallery,
