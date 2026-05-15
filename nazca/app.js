@@ -125,6 +125,10 @@ let currentPolyline = null;
 let currentMarker   = null;
 let lastSavedId     = null;
 
+// Pre-start location awareness
+let locateDot       = null;
+let preLocateWatchId = null;
+
 // Layers owned by gallery / global mode
 let galleryLayers = [];
 let globalLayers  = [];
@@ -152,11 +156,56 @@ function init() {
 
 // ─── Map initialisation ───────────────────────────────────────────────────────
 function initMap() {
-  map = L.map('map', { center: [35.681, 139.767], zoom: 13, zoomControl: true });
+  map = L.map('map', {
+    center: [35.681, 139.767], zoom: 13, zoomControl: true,
+    rotate: true, touchRotate: true, bearing: 0
+  });
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     maxZoom: 19
   }).addTo(map);
+  initCompass();
+  startPreLocate();
+}
+
+// ─── Compass ─────────────────────────────────────────────────────────────────
+function initCompass() {
+  map.on('rotate', () => {
+    const b = map.getBearing ? map.getBearing() : 0;
+    document.getElementById('compass-rose').style.transform = `rotate(${-b}deg)`;
+  });
+  document.getElementById('compass-rose').addEventListener('click', () => {
+    if (map.setBearing) map.setBearing(0, { animate: true });
+    document.getElementById('compass-rose').style.transform = 'rotate(0deg)';
+  });
+}
+
+// ─── Pre-start GPS locate ─────────────────────────────────────────────────────
+function startPreLocate() {
+  if (!navigator.geolocation) return;
+  let gotFirst = false;
+  preLocateWatchId = navigator.geolocation.watchPosition(pos => {
+    const { latitude: lat, longitude: lng } = pos.coords;
+    if (!locateDot) {
+      if (!gotFirst) {
+        map.setView([lat, lng], 16);
+        gotFirst = true;
+      }
+      locateDot = L.circleMarker([lat, lng], {
+        radius: 8, color: '#fff', weight: 2,
+        fillColor: '#4fc3f7', fillOpacity: 1,
+        zIndexOffset: 900
+      }).addTo(map);
+    } else {
+      locateDot.setLatLng([lat, lng]);
+      if (!gotFirst) {
+        map.setView([lat, lng], 16);
+        gotFirst = true;
+      }
+    }
+  }, err => {
+    console.warn('Pre-locate error:', err.message);
+  }, GPS_OPTIONS);
 }
 
 // ─── Navigation ───────────────────────────────────────────────────────────────
@@ -197,15 +246,20 @@ function switchMode(mode) {
     // Re-display active recording polyline/marker if any
     if (currentPolyline && !map.hasLayer(currentPolyline)) map.addLayer(currentPolyline);
     if (currentMarker   && !map.hasLayer(currentMarker))   map.addLayer(currentMarker);
+    // Show locate dot if not recording
+    if (!isRecording && locateDot && !map.hasLayer(locateDot)) map.addLayer(locateDot);
   } else {
     // Hide recording layers while browsing other modes
     if (currentPolyline && map.hasLayer(currentPolyline)) map.removeLayer(currentPolyline);
     if (currentMarker   && map.hasLayer(currentMarker))   map.removeLayer(currentMarker);
+    // Hide locate dot in other modes
+    if (locateDot && map.hasLayer(locateDot)) map.removeLayer(locateDot);
   }
 
   if (mode === 'gallery') {
     showGalleryListView();
     renderGalleryList();
+    renderGalleryMap();
   } else if (mode === 'global') {
     showGlobalListView();
     renderGlobalList();
@@ -236,6 +290,9 @@ function startRecording() {
   // Remove previous recording layers
   if (currentPolyline) { map.removeLayer(currentPolyline); currentPolyline = null; }
   if (currentMarker)   { map.removeLayer(currentMarker);   currentMarker   = null; }
+
+  // Hide locate dot while recording (replaced by red rec marker)
+  if (locateDot && map.hasLayer(locateDot)) map.removeLayer(locateDot);
 
   // UI
   setRecordUI('recording');
@@ -294,6 +351,9 @@ function stopRecording() {
 
   document.getElementById('rec-indicator').classList.add('hidden');
   document.getElementById('gps-accuracy').classList.add('hidden');
+
+  // Restore locate dot
+  if (locateDot && !map.hasLayer(locateDot)) map.addLayer(locateDot);
 
   if (currentPath.length < 2) {
     showToast('記録が短すぎます（最低2点必要）', 'error');
@@ -407,6 +467,7 @@ function bindGalleryPanel() {
     selectedGalleryTrack = null;
     showGalleryListView();
     renderGalleryList();
+    renderGalleryMap();
   });
 
   document.getElementById('btn-gallery-replay').addEventListener('click', () => {
@@ -421,6 +482,7 @@ function bindGalleryPanel() {
     selectedGalleryTrack = null;
     showGalleryListView();
     renderGalleryList();
+    renderGalleryMap();
     showToast('削除しました', 'info');
   });
 }
@@ -462,6 +524,26 @@ function renderGalleryList() {
     item.addEventListener('click', () => selectGalleryTrack(track));
     container.appendChild(item);
   });
+}
+
+function renderGalleryMap() {
+  galleryLayers.forEach(l => map.removeLayer(l)); galleryLayers = [];
+
+  const tracks = getTracks();
+  if (tracks.length === 0) return;
+
+  const allLatLng = [];
+  tracks.forEach(track => {
+    const latlngs = track.path.map(p => [p[0], p[1]]);
+    const poly = L.polyline(latlngs, { color: MY_COLOR, weight: 3, opacity: 0.7 }).addTo(map);
+    poly.on('click', () => selectGalleryTrack(track));
+    galleryLayers.push(poly);
+    allLatLng.push(...latlngs);
+  });
+
+  if (allLatLng.length > 0) {
+    map.fitBounds(L.latLngBounds(allLatLng), { padding: [20, 20] });
+  }
 }
 
 function selectGalleryTrack(track) {
@@ -557,6 +639,17 @@ function renderGlobalMap() {
     poly.on('click', () => selectGlobalTrack(track, i));
     globalLayers.push(poly);
     allLatLng.push(...latlngs);
+
+    // Name + title label at track midpoint
+    const midPt = track.path[Math.floor(track.path.length / 2)];
+    const label = L.marker([midPt[0], midPt[1]], {
+      icon: L.divIcon({
+        html: `<div class="track-label" style="border-color:${color};color:${color}">${esc(track.user)}<br>${esc(track.title)}</div>`,
+        iconAnchor: [0, 0], className: ''
+      }),
+      interactive: false, zIndexOffset: 200
+    }).addTo(map);
+    globalLayers.push(label);
   });
 
   if (allLatLng.length > 0) {
@@ -573,13 +666,27 @@ function selectGlobalTrack(track, idx) {
   const tracks = getGlobalTracks();
   tracks.forEach((t, i) => {
     const selected = t.id === track.id;
+    const color = trackColor(t.user, i);
     const poly = L.polyline(t.path.map(p => [p[0], p[1]]), {
-      color:   trackColor(t.user, i),
+      color,
       weight:  selected ? 5 : 2,
       opacity: selected ? 0.95 : 0.28
     }).addTo(map);
     poly.on('click', () => selectGlobalTrack(t, i));
     globalLayers.push(poly);
+
+    // Show label for selected track
+    if (selected) {
+      const midPt = t.path[Math.floor(t.path.length / 2)];
+      const label = L.marker([midPt[0], midPt[1]], {
+        icon: L.divIcon({
+          html: `<div class="track-label" style="border-color:${color};color:${color}">${esc(t.user)}<br>${esc(t.title)}</div>`,
+          iconAnchor: [0, 0], className: ''
+        }),
+        interactive: false, zIndexOffset: 300
+      }).addTo(map);
+      globalLayers.push(label);
+    }
   });
 
   // Fit to selected track
@@ -597,9 +704,19 @@ function selectGlobalTrack(track, idx) {
 }
 
 // ─── Timelapse Replay ─────────────────────────────────────────────────────────
+function getReplayPolylines() {
+  return [...galleryLayers, ...globalLayers].filter(l => l instanceof L.Polyline);
+}
+
 function startReplay(path, color) {
   stopReplay();
   if (!path || path.length === 0) return;
+
+  // Hide existing track polylines so the animation builds the picture from scratch
+  getReplayPolylines().forEach(l => {
+    l._savedOpacity = l.options.opacity;
+    l.setStyle({ opacity: 0 });
+  });
 
   if (replayPolyline) { map.removeLayer(replayPolyline); replayPolyline = null; }
   replayPolyline = L.polyline([], { color, weight: 5, opacity: 0.95 }).addTo(map);
@@ -612,6 +729,7 @@ function startReplay(path, color) {
 
   function step() {
     if (i >= path.length) {
+      restoreReplayLayers();
       document.getElementById('replay-overlay').classList.add('hidden');
       return;
     }
@@ -626,6 +744,7 @@ function startReplay(path, color) {
       }
       replayTimer = setTimeout(step, delay);
     } else {
+      restoreReplayLayers();
       document.getElementById('replay-overlay').classList.add('hidden');
     }
   }
@@ -633,9 +752,19 @@ function startReplay(path, color) {
   step();
 }
 
+function restoreReplayLayers() {
+  getReplayPolylines().forEach(l => {
+    if (l._savedOpacity !== undefined) {
+      l.setStyle({ opacity: l._savedOpacity });
+      delete l._savedOpacity;
+    }
+  });
+}
+
 function stopReplay() {
   if (replayTimer !== null) { clearTimeout(replayTimer); replayTimer = null; }
   if (replayPolyline) { map.removeLayer(replayPolyline); replayPolyline = null; }
+  restoreReplayLayers();
   document.getElementById('replay-overlay').classList.add('hidden');
 }
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nazca-v1';
+const CACHE_NAME = 'nazca-v2';
 const ASSETS = [
   './',
   './index.html',

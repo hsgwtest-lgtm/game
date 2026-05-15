@@ -10,6 +10,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -32,6 +33,20 @@
 
     <!-- GPS accuracy -->
     <div id="gps-accuracy" class="map-badge hidden"></div>
+
+    <!-- Compass -->
+    <div id="compass-container">
+      <div id="compass-rose">
+        <span class="cp-n">N</span>
+        <span class="cp-e">E</span>
+        <span class="cp-s">S</span>
+        <span class="cp-w">W</span>
+        <div class="cp-needle">
+          <div class="cp-needle-n"></div>
+          <div class="cp-needle-s"></div>
+        </div>
+      </div>
+    </div>
 
     <!-- Replay overlay -->
     <div id="replay-overlay" class="hidden">
@@ -127,6 +142,7 @@
 <div id="toast-container"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
 <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
 <script src="app.js"></script>
 <script>
