@@ -48,6 +48,9 @@
       </div>
     </div>
 
+    <!-- Locate button -->
+    <button id="btn-locate" title="現在地">📍</button>
+
     <!-- Replay overlay -->
     <div id="replay-overlay" class="hidden">
       <span id="replay-label">▶ タイムラプス再生中</span>
@@ -80,7 +83,7 @@
       <button id="btn-start" class="action-btn primary-btn">▶ スタート</button>
       <button id="btn-stop"  class="action-btn danger-btn  hidden">■ ストップ</button>
       <button id="btn-save"  class="action-btn primary-btn hidden">💾 保存</button>
-      <button id="btn-post"  class="action-btn accent-btn  hidden">☁ グローバルに投稿</button>
+      <button id="btn-reset" class="action-btn secondary-btn hidden">↺ リセット</button>
     </div>
     <div id="track-title-row" class="hidden">
       <input type="text" id="track-title-input" placeholder="記録名を入力（省略可）…" maxlength="30" autocomplete="off">
@@ -99,6 +102,7 @@
       <div id="gallery-detail-controls">
         <button id="btn-gallery-back"   class="action-btn secondary-btn">← 一覧</button>
         <button id="btn-gallery-replay" class="action-btn accent-btn">▶ タイムラプス</button>
+        <button id="btn-gallery-post"   class="action-btn accent-btn hidden">☁ 投稿</button>
         <button id="btn-gallery-delete" class="action-btn danger-btn icon-btn">🗑</button>
       </div>
     </div>

@@ -127,6 +127,20 @@ html, body {
   margin-top: 2px;
 }
 
+/* ─── Locate button ─── */
+#btn-locate {
+  position: absolute; top: 124px; right: 10px; z-index: 500;
+  width: 36px; height: 36px; border-radius: 8px;
+  background: rgba(6,10,20,0.88);
+  border: 1.5px solid rgba(99,210,255,0.32);
+  color: #63d2ff; font-size: 17px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: background 0.15s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  padding: 0;
+}
+#btn-locate:active { background: rgba(99,210,255,0.18); }
+
 /* Track map label */
 .track-label {
   background: rgba(6,10,20,0.82);

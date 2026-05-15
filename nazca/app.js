@@ -172,12 +172,13 @@ function initMap() {
 function initCompass() {
   map.on('rotate', () => {
     const b = map.getBearing ? map.getBearing() : 0;
-    document.getElementById('compass-rose').style.transform = `rotate(${-b}deg)`;
+    document.getElementById('compass-rose').style.transform = `rotate(${b}deg)`;
   });
   document.getElementById('compass-rose').addEventListener('click', () => {
     if (map.setBearing) map.setBearing(0, { animate: true });
     document.getElementById('compass-rose').style.transform = 'rotate(0deg)';
   });
+  document.getElementById('btn-locate').addEventListener('click', locateUser);
 }
 
 // ─── Pre-start GPS locate ─────────────────────────────────────────────────────
@@ -206,6 +207,30 @@ function startPreLocate() {
   }, err => {
     console.warn('Pre-locate error:', err.message);
   }, GPS_OPTIONS);
+}
+
+function locateUser() {
+  // During active recording, pan to the most recent GPS point
+  if (isRecording && currentPath.length > 0) {
+    const last = currentPath[currentPath.length - 1];
+    map.setView([last[0], last[1]], map.getZoom());
+    return;
+  }
+  // Use the pre-locate dot position if available
+  if (locateDot) {
+    map.setView(locateDot.getLatLng(), map.getZoom());
+    return;
+  }
+  // Fallback: request a fresh one-shot position
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      map.setView([pos.coords.latitude, pos.coords.longitude], 16);
+    }, () => {
+      showToast('現在地を取得できません', 'error');
+    }, GPS_OPTIONS);
+  } else {
+    showToast('このデバイスはGPSに対応していません', 'error');
+  }
 }
 
 // ─── Navigation ───────────────────────────────────────────────────────────────
@@ -272,9 +297,7 @@ function bindRecordPanel() {
   document.getElementById('btn-start').addEventListener('click', startRecording);
   document.getElementById('btn-stop').addEventListener('click', stopRecording);
   document.getElementById('btn-save').addEventListener('click', confirmSave);
-  document.getElementById('btn-post').addEventListener('click', () => {
-    if (lastSavedId) postTrack(lastSavedId);
-  });
+  document.getElementById('btn-reset').addEventListener('click', resetRecording);
 }
 
 function startRecording() {
@@ -394,28 +417,15 @@ function saveTrack(title) {
   showToast(`「${esc(title)}」を保存しました`, 'success');
 }
 
-function postTrack(id) {
-  const tracks = getTracks();
-  const track  = tracks.find(t => t.id === id);
-  if (!track) return;
-
-  const btn = document.getElementById('btn-post');
-  btn.disabled = true;
-  btn.textContent = '送信中…';
-
-  // Simulate upload — replace the setTimeout body with a real fetch() call:
-  // fetch('/api/post', { method:'POST', body:JSON.stringify(track), headers:{'Content-Type':'application/json'} })
-  //   .then(r => r.json()).then(...).catch(...);
-  setTimeout(() => {
-    track.posted = true;
-    track.user   = 'あなた';
-    saveTracks(tracks);
-    btn.textContent = '✓ 投稿済み';
-    showToast('グローバルに投稿しました！', 'success');
-  }, 1200);
+function resetRecording() {
+  // Clear the current track display (the track is already saved)
+  currentPath = [];
+  lastSavedId = null;
+  if (currentPolyline) { map.removeLayer(currentPolyline); currentPolyline = null; }
+  if (currentMarker)   { map.removeLayer(currentMarker);   currentMarker   = null; }
+  updateStats();
+  setRecordUI('idle');
 }
-
-function updateStats() {
   const dist  = calcDistance(currentPath);
   const steps = Math.round(dist * STEPS_PER_KM);
   const cal   = Math.round(BODY_WEIGHT * dist);
@@ -433,15 +443,14 @@ function setRecordUI(state) {
   const s  = document.getElementById('btn-start');
   const st = document.getElementById('btn-stop');
   const sv = document.getElementById('btn-save');
-  const po = document.getElementById('btn-post');
+  const rs = document.getElementById('btn-reset');
   const ti = document.getElementById('track-title-row');
   const ri = document.getElementById('rec-indicator');
 
   // reset all
-  [s, st, sv, po].forEach(b => b.classList.add('hidden'));
+  [s, st, sv, rs].forEach(b => b.classList.add('hidden'));
   ti.classList.add('hidden');
   ri.classList.add('hidden');
-  po.disabled = false;
 
   if (state === 'idle') {
     s.classList.remove('hidden');
@@ -454,8 +463,7 @@ function setRecordUI(state) {
     document.getElementById('track-title-input').value = '';
   } else if (state === 'saved') {
     s.classList.remove('hidden');
-    po.classList.remove('hidden');
-    po.textContent = '☁ グローバルに投稿';
+    rs.classList.remove('hidden');
   }
 }
 
@@ -472,6 +480,10 @@ function bindGalleryPanel() {
 
   document.getElementById('btn-gallery-replay').addEventListener('click', () => {
     if (selectedGalleryTrack) startReplay(selectedGalleryTrack.path, MY_COLOR);
+  });
+
+  document.getElementById('btn-gallery-post').addEventListener('click', () => {
+    if (selectedGalleryTrack) postFromGallery(selectedGalleryTrack.id);
   });
 
   document.getElementById('btn-gallery-delete').addEventListener('click', () => {
@@ -557,6 +569,11 @@ function selectGalleryTrack(track) {
   galleryLayers.push(poly);
   map.fitBounds(poly.getBounds(), { padding: [30, 30] });
 
+  renderGalleryDetailStats(track);
+  showGalleryDetailView();
+}
+
+function renderGalleryDetailStats(track) {
   document.getElementById('gallery-detail-stats').innerHTML =
     `<strong>${esc(track.title)}</strong><br>` +
     `📏 ${track.stats.distance} km &nbsp;` +
@@ -564,7 +581,36 @@ function selectGalleryTrack(track) {
     `🔥 ${track.stats.calories} kcal<br>` +
     `📅 ${track.date}${track.posted ? ' &nbsp;☁ 投稿済み' : ''}`;
 
-  showGalleryDetailView();
+  const btn = document.getElementById('btn-gallery-post');
+  if (track.posted) {
+    btn.classList.add('hidden');
+  } else {
+    btn.classList.remove('hidden');
+    btn.disabled = false;
+    btn.textContent = '☁ 投稿';
+  }
+}
+
+function postFromGallery(id) {
+  const tracks = getTracks();
+  const track  = tracks.find(t => t.id === id);
+  if (!track) return;
+
+  const btn = document.getElementById('btn-gallery-post');
+  btn.disabled = true;
+  btn.textContent = '送信中…';
+
+  // Simulate upload — replace the setTimeout body with a real fetch() call:
+  // fetch('/api/post', { method:'POST', body:JSON.stringify(track), headers:{'Content-Type':'application/json'} })
+  //   .then(r => r.json()).then(...).catch(...);
+  setTimeout(() => {
+    track.posted = true;
+    track.user   = track.user || 'あなた';
+    saveTracks(tracks);
+    selectedGalleryTrack = track;
+    renderGalleryDetailStats(track);
+    showToast('グローバルに投稿しました！', 'success');
+  }, 1200);
 }
 
 // ─── Mode C — Global Gallery ──────────────────────────────────────────────────
