@@ -172,7 +172,7 @@ function initMap() {
 function initCompass() {
   map.on('rotate', () => {
     const b = map.getBearing ? map.getBearing() : 0;
-    document.getElementById('compass-rose').style.transform = `rotate(${b}deg)`;
+    document.getElementById('compass-rose').style.transform = `rotate(${-b}deg)`;
   });
   document.getElementById('compass-rose').addEventListener('click', () => {
     if (map.setBearing) map.setBearing(0, { animate: true });
@@ -426,6 +426,8 @@ function resetRecording() {
   updateStats();
   setRecordUI('idle');
 }
+
+function updateStats() {
   const dist  = calcDistance(currentPath);
   const steps = Math.round(dist * STEPS_PER_KM);
   const cal   = Math.round(BODY_WEIGHT * dist);
