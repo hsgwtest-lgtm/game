@@ -86,6 +86,60 @@ html, body {
   pointer-events: none;
 }
 
+/* ─── Compass ─── */
+#compass-container {
+  position: absolute; top: 60px; right: 10px; z-index: 500;
+  width: 54px; height: 54px;
+}
+#compass-rose {
+  width: 54px; height: 54px; border-radius: 50%;
+  background: rgba(6,10,20,0.88);
+  border: 1.5px solid rgba(99,210,255,0.32);
+  position: relative; cursor: pointer;
+  transition: transform 0.15s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+#compass-rose:active { background: rgba(99,210,255,0.12); }
+.cp-n, .cp-e, .cp-s, .cp-w {
+  position: absolute; font-weight: 800; user-select: none; pointer-events: none;
+}
+.cp-n { font-size: 10px; top: 3px; left: 50%; transform: translateX(-50%); color: #f87171; }
+.cp-e { font-size: 9px; right: 4px; top: 50%; transform: translateY(-50%); color: rgba(226,232,240,0.6); }
+.cp-s { font-size: 9px; bottom: 3px; left: 50%; transform: translateX(-50%); color: rgba(226,232,240,0.6); }
+.cp-w { font-size: 9px; left: 4px; top: 50%; transform: translateY(-50%); color: rgba(226,232,240,0.6); }
+.cp-needle {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center;
+  pointer-events: none;
+}
+.cp-needle-n {
+  width: 0; height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 16px solid #f87171;
+}
+.cp-needle-s {
+  width: 0; height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 16px solid rgba(226,232,240,0.35);
+  margin-top: 2px;
+}
+
+/* Track map label */
+.track-label {
+  background: rgba(6,10,20,0.82);
+  border: 1px solid;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  white-space: nowrap;
+  line-height: 1.4;
+  text-align: center;
+  pointer-events: none;
+}
+
 /* Replay overlay */
 #replay-overlay {
   position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
