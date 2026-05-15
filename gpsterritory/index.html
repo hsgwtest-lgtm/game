@@ -1544,7 +1544,7 @@ function _submitArtworkName() {
 document.getElementById('btn-artwork-save').addEventListener('click', _submitArtworkName);
 document.getElementById('btn-artwork-skip').addEventListener('click', () => {
   const input = document.getElementById('artwork-name-input');
-  const name = input.value.trim() || input.getAttribute('data-default') || '無題';
+  const name = input.value.trim() || '無題';
   document.getElementById('artwork-name-dialog').style.display = 'none';
   if (_artworkCallback) { _artworkCallback(name); _artworkCallback = null; }
 });
@@ -1786,7 +1786,7 @@ function playTimelapse(territory) {
     ctx.fill();
 
     let i = 1;
-    const speed = Math.max(30, Math.min(120, 4000 / pts.length)); // adaptive speed
+    const frameDelay = Math.max(30, Math.min(120, 4000 / pts.length)); // adaptive frame interval (ms)
 
     _tlInterval = setInterval(() => {
       if (i >= pts.length) {
@@ -1843,7 +1843,7 @@ function playTimelapse(territory) {
 
       info.textContent = `「${artName}」 ${i}/${pts.length} pt`;
       i++;
-    }, speed);
+    }, frameDelay);
   }
 
   runAnimation();
