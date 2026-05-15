@@ -1,0 +1,14 @@
+{
+  "name": "Nazca-α — 歩くGPSアート",
+  "short_name": "Nazca-α",
+  "description": "社内ウォーキングイベント用GPSトラッキングPWA",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#060a14",
+  "theme_color": "#060a14",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
