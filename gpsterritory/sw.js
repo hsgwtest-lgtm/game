@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gpsterritory-v1';
+const CACHE_NAME = 'gpsterritory-v2';
 const ASSETS = [
   './',
   './index.html',
