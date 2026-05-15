@@ -310,7 +310,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:-apple-system,Blink
   <div id="stats-row">
     <div class="stat-box">
       <div class="stat-val" id="stat-dist">0</div>
-      <div class="stat-lbl">距離 (m)</div>
+      <div class="stat-lbl">距離</div>
     </div>
     <div class="stat-box">
       <div class="stat-val" id="stat-steps">0</div>
@@ -398,6 +398,7 @@ const C = {
   CONFIRM_RADIUS: 10,     // meters — how close to start to confirm territory
   MIN_POINTS: 5,          // minimum recorded GPS points for valid territory
   MIN_AREA_M2: 50,        // minimum territory area in square meters
+  MIN_OVERLAP_M2: 10,     // minimum overlap area to trigger territory capture
   GPS_MIN_DIST: 3,        // meters — minimum movement to record a new point
   GPS_MAX_JUMP: 150,      // meters — ignore GPS jumps larger than this
   GPS_ACCURACY_MAX: 40,   // meters — ignore GPS fixes less accurate than this
@@ -405,6 +406,8 @@ const C = {
   WEIGHT_KG: 65,          // default user weight for calorie calculation
   WALKING_MET: 3.5,       // metabolic equivalent for walking
   POSITION_SYNC_MS: 5000, // how often to sync position to Firebase
+  PLAYER_TIMEOUT_MS: 5 * 60 * 1000, // remove inactive player markers after 5 minutes
+  SIMPLIFY_THRESHOLD: 20, // path point count above which simplification is applied
   TERRITORY_SIMPLIFY: 0.00003, // Turf simplify tolerance (degrees)
   COLORS: [
     '#F44336','#E91E63','#9C27B0','#3F51B5',
@@ -424,7 +427,7 @@ function haversine(lat1, lng1, lat2, lng2) {
   const f1 = lat1 * Math.PI / 180, f2 = lat2 * Math.PI / 180;
   const df = (lat2 - lat1) * Math.PI / 180;
   const dl = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(df/2)**2 + Math.cos(f1)*Math.cos(f2)*Math.sin(dl/2)**2;
+  const a = Math.sin(df/2) * Math.sin(df/2) + Math.cos(f1)*Math.cos(f2)*Math.sin(dl/2)*Math.sin(dl/2);
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
@@ -795,7 +798,7 @@ function confirmTerritory(path) {
 
   // Simplify path to reduce point count
   let simplePts = path;
-  if (path.length > 20) {
+  if (path.length > C.SIMPLIFY_THRESHOLD) {
     const poly = turfPolygon(path);
     if (poly) {
       const simple = turf.simplify(poly, { tolerance: C.TERRITORY_SIMPLIFY, highQuality: false });
@@ -828,7 +831,7 @@ function confirmTerritory(path) {
         const intersection = turf.intersect(newPoly, existingPoly);
         if (!intersection) continue;
         const intersectArea = turf.area(intersection);
-        if (intersectArea < 10) continue; // < 10m² overlap, ignore
+        if (intersectArea < C.MIN_OVERLAP_M2) continue;
 
         capturedCount++;
         const difference = turf.difference(existingPoly, newPoly);
@@ -1076,7 +1079,7 @@ function hideApproachIndicator() {
 }
 
 function updateStatsHUD() {
-  document.getElementById('stat-dist').textContent = fmtDist(State.totalDistM).replace(' m','').replace(' km',' km');
+  document.getElementById('stat-dist').textContent = fmtDist(State.totalDistM);
   document.getElementById('stat-steps').textContent = State.totalSteps.toLocaleString();
   document.getElementById('stat-kcal').textContent = State.totalKcal;
   document.getElementById('stat-time').textContent = fmtTime(State.elapsedSec);
@@ -1175,7 +1178,7 @@ function setupFirebaseSync() {
       }
       for (const [pid, data] of Object.entries(players)) {
         if (pid === Player.id) continue;
-        if (now - data.ts > 5 * 60 * 1000) { removeOtherMarker(pid); continue; }
+        if (now - data.ts > C.PLAYER_TIMEOUT_MS) { removeOtherMarker(pid); continue; }
         updateOtherMarker(pid, data.lat, data.lng, data.color, data.name);
       }
     });
