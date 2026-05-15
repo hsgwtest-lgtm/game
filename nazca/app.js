@@ -1,5 +1,7 @@
 'use strict';
 
+import { IS_FIREBASE_CONFIGURED, postTrack, subscribeToTracks } from './firebase.js';
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 const LS_KEY       = 'nazca_tracks';
 const LS_USER_KEY  = 'nazca_user';
@@ -133,6 +135,11 @@ let preLocateWatchId = null;
 // Layers owned by gallery / global mode
 let galleryLayers = [];
 let globalLayers  = [];
+
+// Global gallery — Firebase subscription handle & track cache
+let globalUnsubscribe  = null;
+let cachedGlobalTracks = [];
+let globalTracksLoaded = false;
 
 // Selected tracks for detail view
 let selectedGalleryTrack = null;
@@ -268,6 +275,7 @@ function switchMode(mode) {
   // Manage map layers
   galleryLayers.forEach(l => map.removeLayer(l)); galleryLayers = [];
   globalLayers.forEach(l => map.removeLayer(l));  globalLayers = [];
+  exitGlobalMode();
 
   if (mode === 'record') {
     // Re-display active recording polyline/marker if any
@@ -288,9 +296,7 @@ function switchMode(mode) {
     renderGalleryList();
     renderGalleryMap();
   } else if (mode === 'global') {
-    showGlobalListView();
-    renderGlobalList();
-    renderGlobalMap();
+    enterGlobalMode();
   }
 }
 
@@ -597,36 +603,80 @@ function renderGalleryDetailStats(track) {
   }
 }
 
-function postFromGallery(id) {
+async function postFromGallery(id) {
   const tracks = getTracks();
   const track  = tracks.find(t => t.id === id);
   if (!track) return;
+
+  const name = getUserName();
+  if (!name) {
+    showToast('記録タブで名前を入力してから投稿してください', 'error');
+    return;
+  }
+
+  if (!IS_FIREBASE_CONFIGURED) {
+    showToast('Firebase が未設定です。nazca/firebase-config.js を編集してください', 'error');
+    return;
+  }
 
   const btn = document.getElementById('btn-gallery-post');
   btn.disabled = true;
   btn.textContent = '送信中…';
 
-  // Simulate upload — replace the setTimeout body with a real fetch() call:
-  // fetch('/api/post', { method:'POST', body:JSON.stringify(track), headers:{'Content-Type':'application/json'} })
-  //   .then(r => r.json()).then(...).catch(...);
-  setTimeout(() => {
-    const name = getUserName();
-    if (!name) {
-      showToast('記録タブで名前を入力してから投稿してください', 'error');
-      btn.disabled = false;
-      btn.textContent = '☁ 投稿';
-      return;
-    }
+  try {
+    await postTrack({ ...track, user: name });
     track.posted = true;
     track.user   = name;
     saveTracks(tracks);
     selectedGalleryTrack = track;
     renderGalleryDetailStats(track);
     showToast('グローバルに投稿しました！', 'success');
-  }, 1200);
+  } catch (e) {
+    console.error('postTrack failed:', e);
+    showToast('投稿に失敗しました: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '☁ 投稿';
+  }
 }
 
 // ─── Mode C — Global Gallery ──────────────────────────────────────────────────
+function enterGlobalMode() {
+  if (IS_FIREBASE_CONFIGURED) {
+    cachedGlobalTracks  = [];
+    globalTracksLoaded  = false;
+  } else {
+    // Firebase 未設定時はサンプルデータにローカル投稿済みトラックを合わせて表示
+    const posted = getTracks()
+      .filter(t => t.posted)
+      .map(t => ({ ...t, path: t.path.map(p => [...p]), user: t.user || 'あなた' }));
+    cachedGlobalTracks = [...MOCK_GLOBAL, ...posted];
+    globalTracksLoaded = true;
+  }
+
+  showGlobalListView();
+  renderGlobalList();
+  renderGlobalMap();
+
+  if (IS_FIREBASE_CONFIGURED) {
+    globalUnsubscribe = subscribeToTracks((tracks, err) => {
+      if (err) {
+        showToast('グローバルデータの取得に失敗しました', 'error');
+        return;
+      }
+      globalTracksLoaded = true;
+      cachedGlobalTracks = tracks;
+      if (currentMode === 'global') {
+        renderGlobalList();
+        if (!selectedGlobalTrack) renderGlobalMap();
+      }
+    });
+  }
+}
+
+function exitGlobalMode() {
+  if (globalUnsubscribe) { globalUnsubscribe(); globalUnsubscribe = null; }
+}
+
 function bindGlobalPanel() {
   document.getElementById('btn-global-back').addEventListener('click', () => {
     stopReplay();
@@ -656,18 +706,41 @@ function showGlobalDetailView() {
 }
 
 function getGlobalTracks() {
-  // Combine mock data with locally-posted tracks.
-  // To replace with real API: `return fetch('/api/tracks').then(r => r.json());`
-  const posted = getTracks()
-    .filter(t => t.posted)
-    .map(t => ({ ...t, path: t.path.map(p => [...p]), user: t.user || 'あなた' }));
-  return [...MOCK_GLOBAL, ...posted];
+  return cachedGlobalTracks;
 }
 
 function renderGlobalList() {
   const tracks    = getGlobalTracks();
   const container = document.getElementById('global-list');
   container.innerHTML = '';
+
+  // Firebase 設定済みで未ロードの場合はローディング表示
+  if (IS_FIREBASE_CONFIGURED && !globalTracksLoaded) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <span class="empty-icon">🌐</span>
+        <span class="empty-text">読み込み中…</span>
+      </div>`;
+    return;
+  }
+
+  // Firebase 未設定の場合はサンプルデータ利用中バナーを表示
+  if (!IS_FIREBASE_CONFIGURED) {
+    const banner = document.createElement('div');
+    banner.className = 'firebase-notice';
+    banner.textContent = '⚠️ Firebase 未設定 — サンプルデータを表示中';
+    container.appendChild(banner);
+  }
+
+  if (tracks.length === 0) {
+    container.innerHTML += `
+      <div class="empty-state">
+        <span class="empty-icon">🌐</span>
+        <span class="empty-text">まだ投稿がありません</span>
+        <span class="empty-sub">マイ鑑賞から地上絵を投稿しましょう</span>
+      </div>`;
+    return;
+  }
 
   tracks.forEach((track, i) => {
     const color = trackColor(track.user, i);

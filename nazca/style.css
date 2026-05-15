@@ -309,6 +309,15 @@ html, body {
 .empty-text { font-size: 13px; }
 .empty-sub  { font-size: 11px; color: rgba(226,232,240,0.2); }
 
+/* Firebase 未設定バナー */
+.firebase-notice {
+  font-size: 11px; color: rgba(253,186,116,0.75);
+  background: rgba(253,186,116,0.08);
+  border: 1px solid rgba(253,186,116,0.25);
+  border-radius: 6px; padding: 5px 9px;
+  margin-bottom: 6px; text-align: center;
+}
+
 /* ═══ Buttons ═══ */
 .action-btn {
   padding: 7px 15px; border-radius: 8px;
