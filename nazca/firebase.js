@@ -8,6 +8,8 @@
 
 import { FIREBASE_CONFIG, IS_FIREBASE_CONFIGURED } from './firebase-config.js';
 
+export { IS_FIREBASE_CONFIGURED } from './firebase-config.js';
+
 const SDK_BASE = 'https://www.gstatic.com/firebasejs/10.12.2';
 
 // ─── Firebase シングルトン ───────────────────────────────────────────────────
