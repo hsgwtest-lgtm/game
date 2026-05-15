@@ -256,6 +256,146 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:-apple-system,Blink
 }
 @keyframes spin{to{transform:rotate(360deg);}}
 #loading p{color:rgba(255,255,255,.7);font-size:14px;}
+
+/* ── Compass Control ── */
+#compass-ctrl{
+  position:fixed;right:16px;top:calc(max(env(safe-area-inset-top),12px) + 60px);
+  z-index:10;width:52px;height:52px;
+  background:rgba(13,27,46,.88);border-radius:50%;
+  border:2px solid rgba(255,255,255,.18);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,.45);
+  user-select:none;
+}
+#compass-inner{position:relative;width:38px;height:38px;transition:transform .15s;}
+.compass-lbl{
+  position:absolute;font-size:8px;font-weight:700;
+  color:rgba(255,255,255,.65);width:10px;text-align:center;line-height:1;
+}
+.compass-lbl.N{top:0;left:50%;transform:translateX(-50%);color:#F44336;}
+.compass-lbl.S{bottom:0;left:50%;transform:translateX(-50%);}
+.compass-lbl.E{right:0;top:50%;transform:translateY(-50%);}
+.compass-lbl.W{left:0;top:50%;transform:translateY(-50%);}
+#compass-needle{
+  position:absolute;top:50%;left:50%;
+  width:4px;height:30px;
+  transform:translate(-50%,-50%);
+  transform-origin:50% 50%;
+}
+#compass-n{position:absolute;top:0;left:0;right:0;height:50%;background:#F44336;border-radius:2px 2px 0 0;}
+#compass-s{position:absolute;bottom:0;left:0;right:0;height:50%;background:rgba(255,255,255,.7);border-radius:0 0 2px 2px;}
+
+/* ── Appreciation Button ── */
+#btn-appreciation{
+  background:rgba(255,255,255,.12);border:none;color:#fff;
+  border-radius:20px;padding:8px 12px;font-size:13px;cursor:pointer;
+  display:flex;align-items:center;gap:5px;flex-shrink:0;
+}
+#btn-appreciation:active{background:rgba(255,255,255,.25);}
+
+/* ── Appreciation Panel ── */
+#appreciation-panel{
+  position:fixed;inset:0;z-index:80;
+  background:#0d1b2e;
+  display:flex;flex-direction:column;
+}
+#ap-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:max(env(safe-area-inset-top),16px) 16px 12px;
+  border-bottom:1px solid rgba(255,255,255,.1);
+  flex-shrink:0;
+}
+#ap-header h2{color:#fff;font-size:18px;}
+#btn-close-ap{background:none;border:none;color:rgba(255,255,255,.6);font-size:24px;cursor:pointer;padding:4px;}
+#ap-tabs{display:flex;border-bottom:1px solid rgba(255,255,255,.1);flex-shrink:0;}
+.ap-tab{
+  flex:1;padding:12px;border:none;background:none;
+  color:rgba(255,255,255,.5);font-size:14px;font-weight:600;
+  cursor:pointer;border-bottom:3px solid transparent;
+}
+.ap-tab.active{color:#64B5F6;border-bottom-color:#64B5F6;}
+#ap-list{
+  flex:1;overflow-y:auto;padding:12px;
+  display:grid;grid-template-columns:repeat(2,1fr);gap:10px;
+  align-content:start;
+}
+#ap-empty{
+  grid-column:1/-1;text-align:center;padding:48px 16px;
+  color:rgba(255,255,255,.35);font-size:14px;line-height:1.6;
+}
+.ap-card{
+  background:rgba(255,255,255,.06);border-radius:14px;overflow:hidden;cursor:pointer;
+  border:1px solid rgba(255,255,255,.1);transition:transform .1s,border-color .15s;
+}
+.ap-card:active{transform:scale(.96);}
+.ap-card.selected{border-color:#64B5F6;}
+.ap-card-thumb{width:100%;aspect-ratio:1;display:block;background:#111a2e;}
+.ap-card-info{padding:8px 10px;}
+.ap-card-name{color:#fff;font-size:13px;font-weight:600;margin-bottom:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ap-card-sub{color:rgba(255,255,255,.45);font-size:10px;}
+.ap-card-player{color:#64B5F6;font-size:11px;font-weight:600;margin-bottom:1px;}
+#ap-footer{
+  padding:12px 16px max(env(safe-area-inset-bottom),12px);
+  border-top:1px solid rgba(255,255,255,.08);flex-shrink:0;
+  display:none;gap:10px;
+}
+#ap-footer.show{display:flex;}
+#btn-ap-timelapse{
+  flex:1;padding:13px;border:none;border-radius:12px;
+  background:linear-gradient(135deg,#1565C0,#0D47A1);color:#fff;
+  font-size:15px;font-weight:700;cursor:pointer;
+}
+#btn-ap-timelapse:active{opacity:.85;}
+
+/* ── Artwork Name Dialog ── */
+#artwork-name-dialog{
+  position:fixed;inset:0;z-index:110;
+  background:rgba(0,0,0,.72);
+  display:flex;align-items:center;justify-content:center;
+  padding:24px;
+}
+#artwork-dialog-inner{
+  background:#0d1b2e;border-radius:20px;
+  padding:24px;width:100%;max-width:340px;
+  border:1px solid rgba(100,181,246,.35);
+}
+#artwork-dialog-inner h3{color:#fff;font-size:18px;margin-bottom:16px;text-align:center;}
+#artwork-name-input{
+  width:100%;padding:14px 16px;border-radius:12px;
+  border:2px solid rgba(100,181,246,.4);
+  background:rgba(255,255,255,.08);color:#fff;font-size:16px;
+  margin-bottom:16px;outline:none;
+}
+#artwork-name-input:focus{border-color:#64B5F6;}
+#artwork-name-input::placeholder{color:rgba(255,255,255,.3);}
+#artwork-dialog-buttons{display:flex;gap:10px;}
+.artwork-dialog-btn{
+  flex:1;padding:13px;border:none;border-radius:12px;
+  font-size:15px;font-weight:600;cursor:pointer;
+}
+#btn-artwork-skip{background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);}
+#btn-artwork-save{background:linear-gradient(135deg,#1565C0,#0D47A1);color:#fff;}
+
+/* ── Timelapse Overlay ── */
+#timelapse-overlay{
+  position:fixed;inset:0;z-index:90;
+  background:#0d1b2e;display:flex;flex-direction:column;
+}
+#timelapse-canvas{flex:1;width:100%;display:block;}
+#timelapse-controls{
+  padding:14px 16px max(env(safe-area-inset-bottom),14px);
+  display:flex;align-items:center;gap:12px;
+  background:rgba(13,27,46,.97);flex-shrink:0;
+}
+#tl-info{flex:1;color:rgba(255,255,255,.75);font-size:13px;}
+.tl-btn{
+  padding:10px 18px;border:none;border-radius:12px;
+  font-size:14px;font-weight:600;cursor:pointer;
+}
+#btn-tl-close{background:rgba(255,255,255,.12);color:#fff;}
+#btn-tl-replay{background:linear-gradient(135deg,#1565C0,#0D47A1);color:#fff;}
+#btn-tl-replay:disabled{opacity:.5;}
 </style>
 </head>
 <body>
@@ -299,6 +439,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:-apple-system,Blink
     <div id="my-area-value">自分の陣地</div>
   </div>
   <button id="btn-leaderboard">🏆 ランク</button>
+  <button id="btn-appreciation">🎨 鑑賞</button>
 </div>
 
 <!-- Bottom HUD -->
@@ -364,6 +505,8 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:-apple-system,Blink
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <!-- Turf.js for polygon operations -->
 <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+<!-- Leaflet Rotate plugin (two-finger map rotation) -->
+<script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
 
 <!-- Firebase (optional — fill FIREBASE_CONFIG below to enable multiplayer) -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -420,6 +563,10 @@ const C = {
 // ================================================================
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function haversine(lat1, lng1, lat2, lng2) {
@@ -593,10 +740,19 @@ const territoryLayers = new Map(); // id → {polygon, label}
 const playerMarkers = new Map();   // playerId → marker
 
 function initMap() {
-  map = L.map('map', {
+  const mapOpts = {
     zoomControl: false,
     attributionControl: true,
-  }).setView([35.6812, 139.7671], 15);
+  };
+  // Enable rotation if leaflet-rotate plugin loaded
+  if (typeof L.Map.mergeOptions === 'function') {
+    mapOpts.rotate = true;
+    mapOpts.touchRotate = true;
+    mapOpts.rotateControl = false;
+    mapOpts.bearing = 0;
+  }
+
+  map = L.map('map', mapOpts).setView([35.6812, 139.7671], 15);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a>',
@@ -607,6 +763,12 @@ function initMap() {
 
   layerGroups.territories = L.layerGroup().addTo(map);
   layerGroups.players = L.layerGroup().addTo(map);
+
+  // Compass: update when map bearing changes (leaflet-rotate)
+  map.on('rotate', function() {
+    const bearing = map.getBearing ? map.getBearing() : 0;
+    updateCompass(bearing);
+  });
 }
 
 function setMapCenter(lat, lng) {
@@ -706,7 +868,7 @@ function addTerritoryLayer(t) {
     const label = L.marker([lat, lng], {
       icon: L.divIcon({
         className: 'territory-label',
-        html: `${t.playerName}<br><small>${fmtArea(t.area)}</small>`,
+        html: `${escHtml(t.artworkName || t.playerName)}<br><small>${fmtArea(t.area)}</small>`,
         iconAnchor: [50, 16],
         iconSize: [100, 32],
       }),
@@ -809,11 +971,13 @@ function confirmTerritory(path) {
     }
   }
 
+  const myCount = Object.values(State.territories).filter(t => t.playerId === Player.id).length + 1;
   const t = {
     id: uid(),
     playerId: Player.id,
     playerName: Player.name,
     playerColor: Player.color,
+    artworkName: `${Player.name}の作品${myCount}`,
     points: simplePts,
     area,
     createdAt: Date.now(),
@@ -846,16 +1010,19 @@ function confirmTerritory(path) {
     }
   }
 
-  addTerritory(t);
-  State.elapsedSec = 0;
-  if (capturedCount > 0) {
-    showToast(`🏴 ${capturedCount}つの陣地を奪取！ +${fmtArea(area)}`, 'capture');
-  } else {
-    showToast(`✅ 陣地確定！ +${fmtArea(area)}`);
-  }
-
-  // Vibrate if supported
-  if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]);
+  const _capturedCount = capturedCount;
+  // Show artwork naming dialog before committing
+  showArtworkNameDialog(t.artworkName, function(name) {
+    t.artworkName = name;
+    addTerritory(t);
+    State.elapsedSec = 0;
+    if (_capturedCount > 0) {
+      showToast(`🏴 ${_capturedCount}つの陣地を奪取！ +${fmtArea(area)}`, 'capture');
+    } else {
+      showToast(`✅ 陣地確定！「${name}」+${fmtArea(area)}`);
+    }
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]);
+  });
   return true;
 }
 
@@ -1236,6 +1403,9 @@ function init() {
   // Load saved territories
   loadLocalTerritories();
 
+  // Always start GPS immediately so map centers on current location
+  startGPS();
+
   // Firebase
   const firebaseOK = initFirebase();
   if (firebaseOK) {
@@ -1254,7 +1424,6 @@ function init() {
   } else {
     hideSetupPanel();
     updateTopHUD();
-    startGPS();
   }
 
   // Periodically sync position to Firebase even when not recording
@@ -1280,7 +1449,7 @@ document.getElementById('btn-start-game').addEventListener('click', () => {
   Player.name = name;
   hideSetupPanel();
   updateTopHUD();
-  startGPS();
+  // GPS already started in init(); just ensure Firebase sync
   if (FB) {
     setupFirebaseSync();
   }
@@ -1336,6 +1505,411 @@ if ('serviceWorker' in navigator) {
 
 // Start when DOM is ready
 window.addEventListener('load', init);
+
+// ================================================================
+// COMPASS
+// ================================================================
+function updateCompass(bearing) {
+  const needle = document.getElementById('compass-needle');
+  if (needle) needle.style.transform = `translate(-50%,-50%) rotate(${bearing}deg)`;
+}
+
+document.getElementById('compass-ctrl').addEventListener('click', () => {
+  if (map.setBearing) {
+    map.setBearing(0);
+    updateCompass(0);
+  }
+});
+
+// ================================================================
+// ARTWORK NAMING DIALOG
+// ================================================================
+let _artworkCallback = null;
+
+function showArtworkNameDialog(defaultName, callback) {
+  _artworkCallback = callback;
+  const input = document.getElementById('artwork-name-input');
+  input.value = defaultName || '';
+  document.getElementById('artwork-name-dialog').style.display = 'flex';
+  setTimeout(() => input.focus(), 100);
+}
+
+function _submitArtworkName() {
+  const name = document.getElementById('artwork-name-input').value.trim();
+  const finalName = name || document.getElementById('artwork-name-input').placeholder || '無題';
+  document.getElementById('artwork-name-dialog').style.display = 'none';
+  if (_artworkCallback) { _artworkCallback(finalName); _artworkCallback = null; }
+}
+
+document.getElementById('btn-artwork-save').addEventListener('click', _submitArtworkName);
+document.getElementById('btn-artwork-skip').addEventListener('click', () => {
+  const input = document.getElementById('artwork-name-input');
+  const name = input.value.trim() || input.getAttribute('data-default') || '無題';
+  document.getElementById('artwork-name-dialog').style.display = 'none';
+  if (_artworkCallback) { _artworkCallback(name); _artworkCallback = null; }
+});
+document.getElementById('artwork-name-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') _submitArtworkName();
+});
+
+// ================================================================
+// TERRITORY SVG THUMBNAIL
+// ================================================================
+function territoryToSVGDataURL(territory, size) {
+  size = size || 120;
+  const pts = territory.points;
+  if (!pts || pts.length < 2) return null;
+
+  const lats = pts.map(p => p.lat);
+  const lngs = pts.map(p => p.lng);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+  const rangeX = maxLng - minLng || 1e-6;
+  const rangeY = maxLat - minLat || 1e-6;
+  const scale = Math.min((size - 16) / rangeX, (size - 16) / rangeY);
+  const offX = (size - rangeX * scale) / 2;
+  const offY = (size - rangeY * scale) / 2;
+
+  const svgPts = pts.map(p => {
+    const x = offX + (p.lng - minLng) * scale;
+    const y = size - offY - (p.lat - minLat) * scale;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+
+  // Path line
+  const pathD = pts.map((p, i) => {
+    const x = (offX + (p.lng - minLng) * scale).toFixed(1);
+    const y = (size - offY - (p.lat - minLat) * scale).toFixed(1);
+    return (i === 0 ? 'M' : 'L') + `${x},${y}`;
+  }).join(' ') + ' Z';
+
+  const color = territory.playerColor || '#2196F3';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">
+    <rect width="${size}" height="${size}" fill="#0d1b2e"/>
+    <path d="${pathD}" fill="${color}44" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>
+    <polygon points="${svgPts}" fill="none" stroke="${color}88" stroke-width="1" stroke-dasharray="3,2"/>
+  </svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+
+// ================================================================
+// APPRECIATION MODE
+// ================================================================
+let _apTab = 'my';
+let _apSelectedId = null;
+
+function openAppreciation() {
+  _apSelectedId = null;
+  document.getElementById('appreciation-panel').style.display = 'flex';
+  renderApList();
+}
+
+function closeAppreciation() {
+  document.getElementById('appreciation-panel').style.display = 'none';
+  document.getElementById('ap-footer').classList.remove('show');
+}
+
+function renderApList() {
+  const list = document.getElementById('ap-list');
+  list.innerHTML = '';
+
+  let items;
+  if (_apTab === 'my') {
+    items = Object.values(State.territories).filter(t => t.playerId === Player.id);
+  } else {
+    items = Object.values(State.territories);
+  }
+
+  // Sort by creation date descending
+  items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+  if (items.length === 0) {
+    const empty = document.createElement('div');
+    empty.id = 'ap-empty';
+    empty.innerHTML = _apTab === 'my'
+      ? '📍 まだ地上絵がありません。<br>歩いて陣地を作ろう！'
+      : '🌏 地上絵がまだありません。';
+    list.appendChild(empty);
+    document.getElementById('ap-footer').classList.remove('show');
+    return;
+  }
+
+  items.forEach(t => {
+    const card = document.createElement('div');
+    card.className = 'ap-card' + (t.id === _apSelectedId ? ' selected' : '');
+    card.dataset.id = t.id;
+
+    const thumb = document.createElement('img');
+    thumb.className = 'ap-card-thumb';
+    const dataURL = territoryToSVGDataURL(t, 120);
+    if (dataURL) thumb.src = dataURL;
+    thumb.alt = t.artworkName || t.playerName;
+
+    const info = document.createElement('div');
+    info.className = 'ap-card-info';
+
+    let html = '';
+    if (_apTab === 'global') {
+      html += `<div class="ap-card-player">${escHtml(t.playerName || '?')}</div>`;
+    }
+    html += `<div class="ap-card-name">${escHtml(t.artworkName || t.playerName || '無題')}</div>`;
+    html += `<div class="ap-card-sub">${fmtArea(t.area)} · ${fmtDate(t.createdAt)}</div>`;
+    info.innerHTML = html;
+
+    card.appendChild(thumb);
+    card.appendChild(info);
+
+    card.addEventListener('click', () => {
+      _apSelectedId = t.id;
+      // Update selection visuals
+      list.querySelectorAll('.ap-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      document.getElementById('ap-footer').classList.add('show');
+    });
+
+    list.appendChild(card);
+  });
+}
+
+function fmtDate(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return `${d.getMonth()+1}/${d.getDate()}`;
+}
+
+// Appreciation button
+document.getElementById('btn-appreciation').addEventListener('click', openAppreciation);
+document.getElementById('btn-close-ap').addEventListener('click', closeAppreciation);
+
+// Tabs
+document.querySelectorAll('.ap-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.ap-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    _apTab = tab.dataset.tab;
+    _apSelectedId = null;
+    document.getElementById('ap-footer').classList.remove('show');
+    renderApList();
+  });
+});
+
+// Timelapse from appreciation panel
+document.getElementById('btn-ap-timelapse').addEventListener('click', () => {
+  if (!_apSelectedId) return;
+  const t = State.territories[_apSelectedId];
+  if (t) {
+    closeAppreciation();
+    playTimelapse(t);
+  }
+});
+
+// ================================================================
+// TIMELAPSE
+// ================================================================
+let _tlInterval = null;
+
+function playTimelapse(territory) {
+  const overlay = document.getElementById('timelapse-overlay');
+  const canvas = document.getElementById('timelapse-canvas');
+  const info = document.getElementById('tl-info');
+  const replayBtn = document.getElementById('btn-tl-replay');
+
+  overlay.style.display = 'flex';
+
+  // Size canvas to match layout
+  function resizeCanvas() {
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+  }
+  resizeCanvas();
+
+  const pts = territory.points;
+  const color = territory.playerColor || '#2196F3';
+  const artName = territory.artworkName || territory.playerName || '無題';
+  const playerName = territory.playerName || '';
+
+  replayBtn.disabled = true;
+  info.textContent = `「${artName}」`;
+
+  function runAnimation() {
+    if (_tlInterval) { clearInterval(_tlInterval); _tlInterval = null; }
+    resizeCanvas();
+
+    const W = canvas.width, H = canvas.height;
+    const ctx = canvas.getContext('2d');
+
+    if (!pts || pts.length < 2) {
+      ctx.fillStyle = '#0d1b2e';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(255,255,255,.5)';
+      ctx.font = '16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('ポイントが少なすぎます', W/2, H/2);
+      replayBtn.disabled = false;
+      return;
+    }
+
+    // Compute bounding box
+    const lats = pts.map(p => p.lat);
+    const lngs = pts.map(p => p.lng);
+    const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+    const pad = Math.min(W, H) * 0.1;
+    const rangeX = maxLng - minLng || 1e-6;
+    const rangeY = maxLat - minLat || 1e-6;
+    const scale = Math.min((W - pad*2) / rangeX, (H - pad*2) / rangeY);
+    const offX = (W - rangeX * scale) / 2;
+    const offY = (H - rangeY * scale) / 2;
+
+    function toXY(p) {
+      return [offX + (p.lng - minLng) * scale, H - offY - (p.lat - minLat) * scale];
+    }
+
+    // Draw grid background
+    function drawBg() {
+      ctx.fillStyle = '#0d1b2e';
+      ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = 'rgba(100,181,246,0.06)';
+      ctx.lineWidth = 1;
+      const step = Math.min(W, H) / 12;
+      for (let x = 0; x < W; x += step) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+      for (let y = 0; y < H; y += step) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+    }
+
+    drawBg();
+
+    // Draw start point
+    const [sx, sy] = toXY(pts[0]);
+    ctx.beginPath();
+    ctx.arc(sx, sy, 6, 0, Math.PI*2);
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    let i = 1;
+    const speed = Math.max(30, Math.min(120, 4000 / pts.length)); // adaptive speed
+
+    _tlInterval = setInterval(() => {
+      if (i >= pts.length) {
+        clearInterval(_tlInterval); _tlInterval = null;
+
+        // Draw filled polygon
+        ctx.beginPath();
+        pts.forEach((p, idx) => {
+          const [x, y] = toXY(p);
+          if (idx === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.closePath();
+        ctx.fillStyle = color + '44';
+        ctx.fill();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // Label
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.font = `bold ${Math.min(20, W/18)}px -apple-system,sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(artName, W/2, H - 52);
+        if (playerName) {
+          ctx.fillStyle = 'rgba(100,181,246,0.85)';
+          ctx.font = `${Math.min(14, W/24)}px -apple-system,sans-serif`;
+          ctx.fillText(playerName, W/2, H - 30);
+        }
+
+        replayBtn.disabled = false;
+        return;
+      }
+
+      const [x1, y1] = toXY(pts[i-1]);
+      const [x2, y2] = toXY(pts[i]);
+
+      // Glow trail
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 10;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Moving dot
+      ctx.beginPath();
+      ctx.arc(x2, y2, 5, 0, Math.PI*2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+
+      info.textContent = `「${artName}」 ${i}/${pts.length} pt`;
+      i++;
+    }, speed);
+  }
+
+  runAnimation();
+
+  replayBtn.onclick = () => {
+    replayBtn.disabled = true;
+    runAnimation();
+  };
+}
+
+document.getElementById('btn-tl-close').addEventListener('click', () => {
+  if (_tlInterval) { clearInterval(_tlInterval); _tlInterval = null; }
+  document.getElementById('timelapse-overlay').style.display = 'none';
+});
 </script>
+<!-- Compass Control -->
+<div id="compass-ctrl" title="タップで北を上にリセット">
+  <div id="compass-inner">
+    <span class="compass-lbl N">N</span>
+    <span class="compass-lbl E">E</span>
+    <span class="compass-lbl S">S</span>
+    <span class="compass-lbl W">W</span>
+    <div id="compass-needle">
+      <div id="compass-n"></div>
+      <div id="compass-s"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Appreciation Panel -->
+<div id="appreciation-panel" style="display:none;">
+  <div id="ap-header">
+    <h2>🎨 地上絵ギャラリー</h2>
+    <button id="btn-close-ap">×</button>
+  </div>
+  <div id="ap-tabs">
+    <button class="ap-tab active" data-tab="my">マイ地上絵</button>
+    <button class="ap-tab" data-tab="global">グローバル</button>
+  </div>
+  <div id="ap-list"></div>
+  <div id="ap-footer">
+    <button id="btn-ap-timelapse">▶ タイムラプス再生</button>
+  </div>
+</div>
+
+<!-- Artwork Name Dialog -->
+<div id="artwork-name-dialog" style="display:none;">
+  <div id="artwork-dialog-inner">
+    <h3>🎨 作品に名前をつけよう</h3>
+    <input id="artwork-name-input" type="text" placeholder="作品名を入力..." maxlength="30">
+    <div id="artwork-dialog-buttons">
+      <button class="artwork-dialog-btn" id="btn-artwork-skip">スキップ</button>
+      <button class="artwork-dialog-btn" id="btn-artwork-save">保存 ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- Timelapse Overlay -->
+<div id="timelapse-overlay" style="display:none;">
+  <canvas id="timelapse-canvas"></canvas>
+  <div id="timelapse-controls">
+    <button class="tl-btn" id="btn-tl-close">✕ 閉じる</button>
+    <button class="tl-btn" id="btn-tl-replay">▶ 再生</button>
+    <div id="tl-info"></div>
+  </div>
+</div>
+
 </body>
 </html>
