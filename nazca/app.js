@@ -519,7 +519,7 @@ function getGlobalTracks() {
   // To replace with real API: `return fetch('/api/tracks').then(r => r.json());`
   const posted = getTracks()
     .filter(t => t.posted)
-    .map(t => ({ ...t, user: t.user || 'あなた' }));
+    .map(t => ({ ...t, path: t.path.map(p => [...p]), user: t.user || 'あなた' }));
   return [...MOCK_GLOBAL, ...posted];
 }
 
@@ -655,8 +655,8 @@ function calcDistance(path) {
   try {
     const line = turf.lineString(path.map(p => [p[1], p[0]])); // GeoJSON [lng,lat]
     return turf.length(line, { units: 'kilometers' });
-  } catch {
-    // Haversine fallback
+  } catch (err) {
+    console.warn('turf.length failed, falling back to Haversine:', err);
     let total = 0;
     for (let i = 1; i < path.length; i++) {
       total += haversine(path[i - 1][0], path[i - 1][1], path[i][0], path[i][1]);
