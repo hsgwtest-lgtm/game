@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GPS陣取り">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1565C0">
+<title>GPS陣取りゲーム</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{width:100%;height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+#map{position:fixed;inset:0;z-index:1;}
+
+/* ── Top HUD ── */
+#top-hud{
+  position:fixed;top:0;left:0;right:0;z-index:10;
+  background:linear-gradient(180deg,rgba(13,27,46,.92) 0%,rgba(13,27,46,.0) 100%);
+  padding:max(env(safe-area-inset-top),12px) 12px 20px;
+  display:flex;align-items:center;gap:10px;
+}
+#player-badge{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,.12);
+  border-radius:24px;padding:6px 12px 6px 6px;
+  cursor:pointer;flex-shrink:0;
+}
+#player-color-dot{width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,.5);}
+#player-name-label{color:#fff;font-size:14px;font-weight:600;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#score-bar{
+  flex:1;display:flex;flex-direction:column;align-items:flex-end;
+}
+#my-area-label{color:#64B5F6;font-size:13px;font-weight:700;}
+#my-area-value{color:#fff;font-size:11px;opacity:.8;}
+#btn-leaderboard{
+  background:rgba(255,255,255,.12);border:none;color:#fff;
+  border-radius:20px;padding:8px 12px;font-size:13px;cursor:pointer;
+  display:flex;align-items:center;gap:5px;flex-shrink:0;
+}
+#btn-leaderboard:active{background:rgba(255,255,255,.25);}
+
+/* ── Bottom HUD ── */
+#bottom-hud{
+  position:fixed;bottom:0;left:0;right:0;z-index:10;
+  background:linear-gradient(0deg,rgba(13,27,46,.96) 0%,rgba(13,27,46,.0) 100%);
+  padding:24px 16px max(env(safe-area-inset-bottom),16px);
+}
+#stats-row{
+  display:flex;justify-content:space-around;margin-bottom:14px;
+}
+.stat-box{text-align:center;}
+.stat-val{color:#fff;font-size:20px;font-weight:700;line-height:1;}
+.stat-lbl{color:rgba(255,255,255,.55);font-size:10px;margin-top:3px;}
+
+#record-btn{
+  width:100%;padding:16px;border:none;border-radius:16px;
+  font-size:18px;font-weight:700;cursor:pointer;
+  transition:transform .1s,opacity .2s;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+}
+#record-btn:active{transform:scale(.97);}
+#record-btn.idle{background:linear-gradient(135deg,#1565C0,#0D47A1);color:#fff;}
+#record-btn.recording{background:linear-gradient(135deg,#d32f2f,#b71c1c);color:#fff;}
+#record-btn.approaching{background:linear-gradient(135deg,#2e7d32,#1b5e20);color:#fff;animation:glow 1s ease-in-out infinite alternate;}
+@keyframes glow{from{box-shadow:0 0 8px #4CAF50;}to{box-shadow:0 0 24px #4CAF50;}}
+#btn-pulse{
+  width:14px;height:14px;border-radius:50%;background:currentColor;
+  animation:pulse-dot 1.2s ease-in-out infinite;
+}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.5;transform:scale(.7);}}
+
+/* GPS status */
+#gps-status{
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  margin-bottom:10px;font-size:12px;
+}
+#gps-dot{width:8px;height:8px;border-radius:50%;background:#9e9e9e;}
+#gps-dot.good{background:#4CAF50;}
+#gps-dot.fair{background:#FF9800;}
+#gps-dot.poor{background:#F44336;}
+#gps-text{color:rgba(255,255,255,.7);}
+
+/* Approach ring indicator */
+#approach-indicator{
+  position:fixed;left:50%;bottom:210px;transform:translateX(-50%);
+  z-index:11;display:none;
+  flex-direction:column;align-items:center;gap:6px;
+}
+#approach-ring{
+  width:80px;height:80px;border-radius:50%;
+  border:4px solid #4CAF50;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(76,175,80,.15);
+  font-size:22px;font-weight:700;color:#4CAF50;
+}
+#approach-text{color:#4CAF50;font-size:13px;font-weight:600;text-shadow:0 1px 4px rgba(0,0,0,.7);}
+
+/* ── Setup Panel ── */
+#setup-panel{
+  position:fixed;inset:0;z-index:100;
+  background:linear-gradient(135deg,#0d1b2e 0%,#1a237e 50%,#0d1b2e 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:24px;
+}
+#setup-panel h1{color:#64B5F6;font-size:28px;font-weight:800;text-align:center;margin-bottom:8px;}
+#setup-panel .tagline{color:rgba(255,255,255,.7);font-size:14px;text-align:center;margin-bottom:36px;line-height:1.6;}
+#setup-panel .feature-list{
+  list-style:none;width:100%;max-width:340px;margin-bottom:32px;
+}
+#setup-panel .feature-list li{
+  color:rgba(255,255,255,.85);font-size:14px;padding:8px 0;
+  border-bottom:1px solid rgba(255,255,255,.1);
+  display:flex;align-items:center;gap:10px;
+}
+.setup-form{width:100%;max-width:340px;}
+.setup-label{color:rgba(255,255,255,.7);font-size:12px;font-weight:600;margin-bottom:6px;display:block;letter-spacing:.5px;}
+#name-input{
+  width:100%;padding:14px 16px;border-radius:12px;border:2px solid rgba(100,181,246,.4);
+  background:rgba(255,255,255,.08);color:#fff;font-size:16px;
+  margin-bottom:12px;outline:none;
+}
+#name-input:focus{border-color:#64B5F6;}
+#name-input::placeholder{color:rgba(255,255,255,.3);}
+.color-picker{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:28px;}
+.color-swatch{
+  width:32px;height:32px;border-radius:50%;border:3px solid transparent;
+  cursor:pointer;transition:transform .15s;flex-shrink:0;
+}
+.color-swatch:hover,.color-swatch.selected{transform:scale(1.25);border-color:rgba(255,255,255,.8);}
+#btn-start-game{
+  width:100%;padding:16px;border:none;border-radius:16px;
+  background:linear-gradient(135deg,#1565C0,#0D47A1);color:#fff;
+  font-size:18px;font-weight:700;cursor:pointer;
+}
+#btn-start-game:active{opacity:.85;}
+
+/* ── Leaderboard Panel ── */
+#leaderboard-panel{
+  position:fixed;top:0;right:-100%;bottom:0;width:min(360px,100%);
+  z-index:50;background:#0d1b2e;
+  transition:right .3s cubic-bezier(.4,0,.2,1);
+  display:flex;flex-direction:column;
+  padding:max(env(safe-area-inset-top),16px) 0 max(env(safe-area-inset-bottom),16px);
+  box-shadow:-4px 0 24px rgba(0,0,0,.5);
+}
+#leaderboard-panel.open{right:0;}
+#lb-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 16px 16px;border-bottom:1px solid rgba(255,255,255,.1);
+}
+#lb-header h2{color:#fff;font-size:18px;}
+#btn-close-lb{background:none;border:none;color:rgba(255,255,255,.6);font-size:24px;cursor:pointer;padding:4px;}
+#lb-list{flex:1;overflow-y:auto;padding:12px 0;}
+.lb-item{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 16px;
+}
+.lb-rank{color:rgba(255,255,255,.5);font-size:14px;width:20px;text-align:center;flex-shrink:0;}
+.lb-color{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
+.lb-name{color:#fff;font-size:14px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.lb-score{color:#64B5F6;font-size:13px;font-weight:700;text-align:right;}
+.lb-item.me{background:rgba(100,181,246,.1);border-radius:10px;margin:0 8px;}
+#lb-footer{
+  padding:12px 16px 0;border-top:1px solid rgba(255,255,255,.1);
+  color:rgba(255,255,255,.4);font-size:11px;text-align:center;
+}
+
+/* ── Territory Capture Toast ── */
+#toast{
+  position:fixed;top:90px;left:50%;transform:translateX(-50%) translateY(-20px);
+  z-index:60;
+  background:linear-gradient(135deg,#2e7d32,#1b5e20);
+  color:#fff;padding:12px 20px;border-radius:24px;
+  font-size:15px;font-weight:600;
+  opacity:0;transition:opacity .3s,transform .3s;
+  pointer-events:none;white-space:nowrap;
+  box-shadow:0 4px 20px rgba(0,0,0,.4);
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+#toast.capture{background:linear-gradient(135deg,#d32f2f,#b71c1c);}
+
+/* ── Firebase setup card ── */
+#firebase-card{
+  position:fixed;bottom:220px;left:16px;right:16px;z-index:20;
+  background:rgba(30,60,100,.95);border:1px solid rgba(100,181,246,.3);
+  border-radius:16px;padding:14px 16px;
+  font-size:12px;color:rgba(255,255,255,.8);
+  display:none;
+}
+#firebase-card strong{color:#64B5F6;}
+#btn-dismiss-firebase{
+  float:right;background:none;border:none;color:rgba(255,255,255,.5);
+  font-size:16px;cursor:pointer;margin-top:-2px;
+}
+
+/* Leaflet overrides */
+.leaflet-control-attribution{font-size:10px!important;}
+.player-dot{
+  width:16px;height:16px;border-radius:50%;
+  border:3px solid rgba(255,255,255,.9);
+  box-shadow:0 0 0 4px rgba(255,255,255,.25);
+  animation:player-pulse 2s ease-in-out infinite;
+}
+@keyframes player-pulse{
+  0%,100%{box-shadow:0 0 0 4px rgba(255,255,255,.25);}
+  50%{box-shadow:0 0 0 8px rgba(255,255,255,.1);}
+}
+.my-player-dot{
+  width:18px;height:18px;border-radius:50%;
+  border:3px solid rgba(255,255,255,1);
+  box-shadow:0 0 0 6px rgba(255,255,255,.3),0 0 16px rgba(100,181,246,.6);
+  animation:my-pulse 2s ease-in-out infinite;
+}
+@keyframes my-pulse{
+  0%,100%{box-shadow:0 0 0 6px rgba(255,255,255,.3),0 0 16px rgba(100,181,246,.6);}
+  50%{box-shadow:0 0 0 10px rgba(255,255,255,.1),0 0 28px rgba(100,181,246,.8);}
+}
+.start-marker-icon{
+  width:20px;height:20px;border-radius:50%;
+  border:3px solid #fff;
+  animation:start-blink 1s ease-in-out infinite alternate;
+}
+@keyframes start-blink{from{opacity:1;}to{opacity:.4;}}
+.territory-label{
+  background:none!important;border:none!important;
+  font-size:11px;font-weight:700;color:#fff;
+  text-shadow:1px 1px 3px rgba(0,0,0,.9),-1px -1px 3px rgba(0,0,0,.9);
+  white-space:nowrap;pointer-events:none;
+}
+
+/* Overlay dim for panels */
+#overlay{
+  position:fixed;inset:0;z-index:49;
+  background:rgba(0,0,0,.4);
+  display:none;
+}
+#overlay.show{display:block;}
+
+/* Loading */
+#loading{
+  position:fixed;inset:0;z-index:200;
+  background:#0d1b2e;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
+}
+.spinner{
+  width:40px;height:40px;border-radius:50%;
+  border:4px solid rgba(100,181,246,.2);
+  border-top-color:#64B5F6;
+  animation:spin 1s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+#loading p{color:rgba(255,255,255,.7);font-size:14px;}
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p>GPS陣取りゲーム 読み込み中...</p>
+</div>
+
+<!-- Map -->
+<div id="map"></div>
+
+<!-- Setup Panel -->
+<div id="setup-panel" style="display:none;">
+  <h1>🗺️ GPS陣取り</h1>
+  <p class="tagline">歩いて地図に陣地を刻もう。<br>体を動かしながら戦略的に領土を広げよう。</p>
+  <ul class="feature-list">
+    <li>📍 実際に歩いた軌跡が陣地になる</li>
+    <li>🔄 スタート地点に戻ると陣地確定</li>
+    <li>⚔️ 相手の陣地に侵入して奪取</li>
+    <li>🏃 歩数・カロリーをリアルタイム計測</li>
+  </ul>
+  <div class="setup-form">
+    <label class="setup-label" for="name-input">プレイヤー名</label>
+    <input id="name-input" type="text" placeholder="名前を入力..." maxlength="16">
+    <label class="setup-label">カラーを選択</label>
+    <div class="color-picker" id="color-picker"></div>
+    <button id="btn-start-game">ゲームを始める 🚀</button>
+  </div>
+</div>
+
+<!-- Top HUD -->
+<div id="top-hud" style="display:none;">
+  <div id="player-badge" title="プロフィール編集">
+    <div id="player-color-dot"></div>
+    <div id="player-name-label">Player</div>
+  </div>
+  <div id="score-bar">
+    <div id="my-area-label">0 m²</div>
+    <div id="my-area-value">自分の陣地</div>
+  </div>
+  <button id="btn-leaderboard">🏆 ランク</button>
+</div>
+
+<!-- Bottom HUD -->
+<div id="bottom-hud" style="display:none;">
+  <div id="gps-status">
+    <div id="gps-dot"></div>
+    <span id="gps-text">GPS取得中...</span>
+  </div>
+  <div id="stats-row">
+    <div class="stat-box">
+      <div class="stat-val" id="stat-dist">0</div>
+      <div class="stat-lbl">距離</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="stat-steps">0</div>
+      <div class="stat-lbl">歩数</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="stat-kcal">0</div>
+      <div class="stat-lbl">kcal</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="stat-time">0:00</div>
+      <div class="stat-lbl">時間</div>
+    </div>
+  </div>
+  <button id="record-btn" class="idle">
+    <span id="btn-pulse" style="display:none;"></span>
+    <span id="btn-label">🚀 記録開始</span>
+  </button>
+</div>
+
+<!-- Approach Indicator -->
+<div id="approach-indicator">
+  <div id="approach-ring">--</div>
+  <div id="approach-text">スタート地点に近づいています</div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Firebase info card -->
+<div id="firebase-card">
+  <button id="btn-dismiss-firebase">×</button>
+  <strong>マルチプレイヤーを有効にするには</strong><br>
+  Firebaseプロジェクトを作成し、index.htmlの<br>
+  <code>FIREBASE_CONFIG</code> を設定してください。<br>
+  現在はシングルプレイヤーモードです。
+</div>
+
+<!-- Leaderboard Panel -->
+<div id="overlay"></div>
+<div id="leaderboard-panel">
+  <div id="lb-header">
+    <h2>🏆 ランキング</h2>
+    <button id="btn-close-lb">×</button>
+  </div>
+  <div id="lb-list"></div>
+  <div id="lb-footer">陣地の広さで順位が決まります</div>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Turf.js for polygon operations -->
+<script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+
+<!-- Firebase (optional — fill FIREBASE_CONFIG below to enable multiplayer) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+<script>
+'use strict';
+
+// ================================================================
+// FIREBASE CONFIG — replace with your own project credentials
+// Leave as null to run in single-player / offline mode.
+// Setup: Firebase console → Project settings → Your apps → Config
+// Enable: Realtime Database + Anonymous Authentication
+// ================================================================
+const FIREBASE_CONFIG = null;
+// Example:
+// const FIREBASE_CONFIG = {
+//   apiKey: "...",
+//   authDomain: "...",
+//   databaseURL: "https://your-project.firebaseio.com",
+//   projectId: "...",
+//   storageBucket: "...",
+//   messagingSenderId: "...",
+//   appId: "..."
+// };
+
+// ================================================================
+// CONSTANTS
+// ================================================================
+const C = {
+  CONFIRM_RADIUS: 10,     // meters — how close to start to confirm territory
+  MIN_POINTS: 5,          // minimum recorded GPS points for valid territory
+  MIN_AREA_M2: 50,        // minimum territory area in square meters
+  MIN_OVERLAP_M2: 10,     // minimum overlap area to trigger territory capture
+  GPS_MIN_DIST: 3,        // meters — minimum movement to record a new point
+  GPS_MAX_JUMP: 150,      // meters — ignore GPS jumps larger than this
+  GPS_ACCURACY_MAX: 40,   // meters — ignore GPS fixes less accurate than this
+  STEP_LENGTH: 0.75,      // meters per average step
+  WEIGHT_KG: 65,          // default user weight for calorie calculation
+  WALKING_MET: 3.5,       // metabolic equivalent for walking
+  POSITION_SYNC_MS: 5000, // how often to sync position to Firebase
+  PLAYER_TIMEOUT_MS: 5 * 60 * 1000, // remove inactive player markers after 5 minutes
+  SIMPLIFY_THRESHOLD: 20, // path point count above which simplification is applied
+  TERRITORY_SIMPLIFY: 0.00003, // Turf simplify tolerance (degrees)
+  COLORS: [
+    '#F44336','#E91E63','#9C27B0','#3F51B5',
+    '#2196F3','#009688','#4CAF50','#FF9800','#FF5722','#795548',
+  ],
+};
+
+// ================================================================
+// UTILITIES
+// ================================================================
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const f1 = lat1 * Math.PI / 180, f2 = lat2 * Math.PI / 180;
+  const df = (lat2 - lat1) * Math.PI / 180;
+  const dl = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(df/2) * Math.sin(df/2) + Math.cos(f1)*Math.cos(f2)*Math.sin(dl/2)*Math.sin(dl/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function fmtArea(m2) {
+  if (m2 >= 10000) return (m2/10000).toFixed(2) + ' ha';
+  return Math.round(m2) + ' m²';
+}
+
+function fmtDist(m) {
+  if (m >= 1000) return (m/1000).toFixed(2) + ' km';
+  return Math.round(m) + ' m';
+}
+
+function fmtTime(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return `${m}:${String(s).padStart(2,'0')}`;
+}
+
+function turfPolygon(points) {
+  if (points.length < 3) return null;
+  const coords = points.map(p => [p.lng, p.lat]);
+  coords.push(coords[0]); // close ring
+  try {
+    return turf.polygon([coords]);
+  } catch(e) {
+    return null;
+  }
+}
+
+function polygonAreaM2(points) {
+  const poly = turfPolygon(points);
+  if (!poly) return 0;
+  return Math.abs(turf.area(poly));
+}
+
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return {r,g,b};
+}
+
+// ================================================================
+// PLAYER
+// ================================================================
+const Player = (() => {
+  let id = localStorage.getItem('gpt_pid');
+  if (!id) { id = uid(); localStorage.setItem('gpt_pid', id); }
+  let name = localStorage.getItem('gpt_name') || '';
+  let colorIdx = parseInt(localStorage.getItem('gpt_cidx') || '0');
+  let color = C.COLORS[colorIdx % C.COLORS.length];
+
+  function save() {
+    localStorage.setItem('gpt_name', name);
+    localStorage.setItem('gpt_cidx', String(colorIdx));
+  }
+  return {
+    get id()   { return id; },
+    get name() { return name; },
+    get color(){ return color; },
+    get colorIdx(){ return colorIdx; },
+    set name(v){ name = v; save(); },
+    setColor(idx) { colorIdx = idx; color = C.COLORS[idx % C.COLORS.length]; save(); },
+    isNew() { return !name; },
+  };
+})();
+
+// ================================================================
+// LOCAL TERRITORY STORAGE
+// ================================================================
+const TerritoryDB = (() => {
+  const KEY = 'gpt_territories';
+  function load() {
+    try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch(e) { return {}; }
+  }
+  function save(data) {
+    localStorage.setItem(KEY, JSON.stringify(data));
+  }
+  return {
+    getAll() { return load(); },
+    put(t) { const d = load(); d[t.id] = t; save(d); },
+    remove(id) { const d = load(); delete d[id]; save(d); },
+    clear() { localStorage.removeItem(KEY); },
+  };
+})();
+
+// ================================================================
+// FIREBASE MANAGER
+// ================================================================
+let FB = null;
+
+function initFirebase() {
+  if (!FIREBASE_CONFIG) return false;
+  try {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    const db = firebase.database();
+    const auth = firebase.auth();
+
+    FB = {
+      db, auth,
+      syncPosition(data) {
+        db.ref(`players/${Player.id}`).set({
+          ...data,
+          name: Player.name,
+          color: Player.color,
+          ts: firebase.database.ServerValue.TIMESTAMP,
+        });
+      },
+      removePlayer() {
+        db.ref(`players/${Player.id}`).remove();
+      },
+      syncTerritory(t) {
+        db.ref(`territories/${t.id}`).set({
+          playerId: t.playerId,
+          playerName: t.playerName,
+          playerColor: t.playerColor,
+          points: t.points,
+          area: t.area,
+          createdAt: t.createdAt,
+        });
+      },
+      updateTerritory(id, points, area) {
+        db.ref(`territories/${id}`).update({ points, area });
+      },
+      removeTerritory(id) {
+        db.ref(`territories/${id}`).remove();
+      },
+      onPlayers(cb) {
+        db.ref('players').on('value', snap => {
+          const data = snap.val() || {};
+          cb(data);
+        });
+      },
+      onTerritories(cb) {
+        db.ref('territories').on('value', snap => {
+          const data = snap.val() || {};
+          cb(data);
+        });
+      },
+      signInAnon() {
+        return auth.signInAnonymously();
+      },
+    };
+    return true;
+  } catch(e) {
+    console.warn('Firebase init failed:', e);
+    return false;
+  }
+}
+
+// ================================================================
+// MAP
+// ================================================================
+let map, myMarker, pathLine, startMarker, startCircle;
+const layerGroups = {
+  territories: null,
+  players: null,
+};
+const territoryLayers = new Map(); // id → {polygon, label}
+const playerMarkers = new Map();   // playerId → marker
+
+function initMap() {
+  map = L.map('map', {
+    zoomControl: false,
+    attributionControl: true,
+  }).setView([35.6812, 139.7671], 15);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+    maxZoom: 19,
+  }).addTo(map);
+
+  L.control.zoom({ position: 'topright' }).addTo(map);
+
+  layerGroups.territories = L.layerGroup().addTo(map);
+  layerGroups.players = L.layerGroup().addTo(map);
+}
+
+function setMapCenter(lat, lng) {
+  map.setView([lat, lng], map.getZoom() < 15 ? 17 : map.getZoom());
+}
+
+function updateMyMarker(lat, lng, color) {
+  if (myMarker) {
+    myMarker.setLatLng([lat, lng]);
+  } else {
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="my-player-dot" style="background:${color};"></div>`,
+      iconSize: [18, 18],
+      iconAnchor: [9, 9],
+    });
+    myMarker = L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(layerGroups.players);
+  }
+}
+
+function updateOtherMarker(playerId, lat, lng, color, name) {
+  if (playerId === Player.id) return;
+  if (playerMarkers.has(playerId)) {
+    playerMarkers.get(playerId).setLatLng([lat, lng]);
+  } else {
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="player-dot" style="background:${color};" title="${name}"></div>`,
+      iconSize: [16, 16],
+      iconAnchor: [8, 8],
+    });
+    const m = L.marker([lat, lng], { icon }).addTo(layerGroups.players);
+    m.bindTooltip(name, { permanent: false, className: 'territory-label' });
+    playerMarkers.set(playerId, m);
+  }
+}
+
+function removeOtherMarker(playerId) {
+  if (playerMarkers.has(playerId)) {
+    layerGroups.players.removeLayer(playerMarkers.get(playerId));
+    playerMarkers.delete(playerId);
+  }
+}
+
+function updatePathLine(points, color) {
+  if (pathLine) layerGroups.players.removeLayer(pathLine);
+  if (points.length < 2) { pathLine = null; return; }
+  pathLine = L.polyline(points.map(p => [p.lat, p.lng]), {
+    color,
+    weight: 4,
+    opacity: 0.9,
+    dashArray: '8 6',
+    lineCap: 'round',
+  }).addTo(layerGroups.players);
+}
+
+function showStartMarker(lat, lng, color) {
+  removeStartMarker();
+  const icon = L.divIcon({
+    className: '',
+    html: `<div class="start-marker-icon" style="background:${color};"></div>`,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+  });
+  startMarker = L.marker([lat, lng], { icon, zIndexOffset: 900 }).addTo(layerGroups.players);
+  startCircle = L.circle([lat, lng], {
+    radius: C.CONFIRM_RADIUS,
+    color,
+    fillColor: color,
+    fillOpacity: 0.15,
+    weight: 2,
+    dashArray: '4 3',
+  }).addTo(layerGroups.players);
+}
+
+function removeStartMarker() {
+  if (startMarker) { layerGroups.players.removeLayer(startMarker); startMarker = null; }
+  if (startCircle) { layerGroups.players.removeLayer(startCircle); startCircle = null; }
+}
+
+function addTerritoryLayer(t) {
+  removeTerritoryLayer(t.id);
+  const rgb = hexToRgb(t.playerColor);
+  const isMe = t.playerId === Player.id;
+  const poly = L.polygon(t.points.map(p => [p.lat, p.lng]), {
+    color: t.playerColor,
+    fillColor: t.playerColor,
+    fillOpacity: isMe ? 0.35 : 0.25,
+    weight: isMe ? 3 : 2,
+    opacity: 0.9,
+  }).addTo(layerGroups.territories);
+
+  // Label at centroid
+  const centroid = turf.centroid(turfPolygon(t.points));
+  if (centroid) {
+    const [lng, lat] = centroid.geometry.coordinates;
+    const label = L.marker([lat, lng], {
+      icon: L.divIcon({
+        className: 'territory-label',
+        html: `${t.playerName}<br><small>${fmtArea(t.area)}</small>`,
+        iconAnchor: [50, 16],
+        iconSize: [100, 32],
+      }),
+      interactive: false,
+      zIndexOffset: -100,
+    }).addTo(layerGroups.territories);
+    territoryLayers.set(t.id, { poly, label });
+  } else {
+    territoryLayers.set(t.id, { poly, label: null });
+  }
+
+  poly.on('click', () => {
+    showToast(`${t.playerName}の陣地: ${fmtArea(t.area)}`, isMe ? '' : 'capture');
+  });
+}
+
+function removeTerritoryLayer(id) {
+  if (!territoryLayers.has(id)) return;
+  const { poly, label } = territoryLayers.get(id);
+  layerGroups.territories.removeLayer(poly);
+  if (label) layerGroups.territories.removeLayer(label);
+  territoryLayers.delete(id);
+}
+
+// ================================================================
+// GAME STATE
+// ================================================================
+const State = {
+  recording: false,
+  currentPath: [],
+  startPos: null,
+  totalDistM: 0,
+  totalSteps: 0,
+  totalKcal: 0,
+  recStartTime: null,
+  elapsedSec: 0,
+  timerHandle: null,
+  positionSyncHandle: null,
+  lastGPS: null,
+  gpsAccuracy: null,
+  territories: {}, // id → territory object
+};
+
+// ================================================================
+// TERRITORY LOGIC
+// ================================================================
+function addTerritory(t) {
+  State.territories[t.id] = t;
+  TerritoryDB.put(t);
+  addTerritoryLayer(t);
+  if (FB) FB.syncTerritory(t);
+  updateLeaderboard();
+  updateTopHUD();
+}
+
+function removeTerritory(id) {
+  if (!State.territories[id]) return;
+  delete State.territories[id];
+  TerritoryDB.remove(id);
+  removeTerritoryLayer(id);
+  if (FB) FB.removeTerritory(id);
+  updateLeaderboard();
+  updateTopHUD();
+}
+
+function updateTerritoryPoints(id, newPoints) {
+  if (!State.territories[id]) return;
+  const t = State.territories[id];
+  t.points = newPoints;
+  t.area = polygonAreaM2(newPoints);
+  State.territories[id] = t;
+  TerritoryDB.put(t);
+  removeTerritoryLayer(id);
+  if (t.area >= C.MIN_AREA_M2) {
+    addTerritoryLayer(t);
+  } else {
+    removeTerritory(id);
+    return;
+  }
+  if (FB) FB.updateTerritory(id, newPoints, t.area);
+}
+
+function confirmTerritory(path) {
+  const area = polygonAreaM2(path);
+  if (area < C.MIN_AREA_M2) {
+    showToast('陣地が小さすぎます (最小 ' + C.MIN_AREA_M2 + 'm²)');
+    return false;
+  }
+
+  // Simplify path to reduce point count
+  let simplePts = path;
+  if (path.length > C.SIMPLIFY_THRESHOLD) {
+    const poly = turfPolygon(path);
+    if (poly) {
+      const simple = turf.simplify(poly, { tolerance: C.TERRITORY_SIMPLIFY, highQuality: false });
+      const coords = simple.geometry.coordinates[0];
+      if (coords && coords.length >= 4) {
+        simplePts = coords.slice(0,-1).map(c => ({ lng: c[0], lat: c[1] }));
+      }
+    }
+  }
+
+  const t = {
+    id: uid(),
+    playerId: Player.id,
+    playerName: Player.name,
+    playerColor: Player.color,
+    points: simplePts,
+    area,
+    createdAt: Date.now(),
+  };
+
+  // Territory capture: check overlap with other players' territories
+  let capturedCount = 0;
+  const newPoly = turfPolygon(simplePts);
+  if (newPoly) {
+    for (const [id, existing] of Object.entries(State.territories)) {
+      if (existing.playerId === Player.id) continue;
+      const existingPoly = turfPolygon(existing.points);
+      if (!existingPoly) continue;
+      try {
+        const intersection = turf.intersect(newPoly, existingPoly);
+        if (!intersection) continue;
+        const intersectArea = turf.area(intersection);
+        if (intersectArea < C.MIN_OVERLAP_M2) continue;
+
+        capturedCount++;
+        const difference = turf.difference(existingPoly, newPoly);
+        if (!difference || turf.area(difference) < C.MIN_AREA_M2) {
+          removeTerritory(id);
+        } else {
+          const newCoords = difference.geometry.coordinates[0];
+          const newPoints = newCoords.slice(0,-1).map(c => ({ lng: c[0], lat: c[1] }));
+          updateTerritoryPoints(id, newPoints);
+        }
+      } catch(e) { /* polygon ops can throw on degenerate shapes */ }
+    }
+  }
+
+  addTerritory(t);
+  State.elapsedSec = 0;
+  if (capturedCount > 0) {
+    showToast(`🏴 ${capturedCount}つの陣地を奪取！ +${fmtArea(area)}`, 'capture');
+  } else {
+    showToast(`✅ 陣地確定！ +${fmtArea(area)}`);
+  }
+
+  // Vibrate if supported
+  if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]);
+  return true;
+}
+
+function myTotalArea() {
+  return Object.values(State.territories)
+    .filter(t => t.playerId === Player.id)
+    .reduce((s, t) => s + t.area, 0);
+}
+
+// ================================================================
+// GPS TRACKING
+// ================================================================
+let watchId = null;
+
+function startGPS() {
+  if (watchId !== null) return;
+  watchId = navigator.geolocation.watchPosition(
+    onGPSSuccess,
+    onGPSError,
+    { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
+  );
+}
+
+function stopGPS() {
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+  }
+}
+
+function onGPSSuccess(pos) {
+  const lat = pos.coords.latitude;
+  const lng = pos.coords.longitude;
+  const acc = pos.coords.accuracy;
+  State.gpsAccuracy = acc;
+  State.lastGPS = { lat, lng, acc };
+
+  updateGPSDot(acc);
+  updateMyMarker(lat, lng, Player.color);
+
+  if (!map._initialCentered) {
+    setMapCenter(lat, lng);
+    map._initialCentered = true;
+  }
+
+  if (!State.recording) return;
+
+  // Filter: bad accuracy
+  if (acc > C.GPS_ACCURACY_MAX) return;
+
+  const path = State.currentPath;
+  if (path.length > 0) {
+    const last = path[path.length - 1];
+    const dist = haversine(last.lat, last.lng, lat, lng);
+
+    // Filter: too small movement or GPS jump
+    if (dist < C.GPS_MIN_DIST) return;
+    if (dist > C.GPS_MAX_JUMP) return;
+
+    State.totalDistM += dist;
+    State.totalSteps = Math.floor(State.totalDistM / C.STEP_LENGTH);
+    const hours = State.elapsedSec / 3600;
+    State.totalKcal = Math.floor(C.WALKING_MET * C.WEIGHT_KG * hours);
+    updateStatsHUD();
+
+    // Check approach to start
+    const distToStart = haversine(State.startPos.lat, State.startPos.lng, lat, lng);
+    if (path.length >= C.MIN_POINTS && distToStart <= C.CONFIRM_RADIUS * 3) {
+      updateApproachIndicator(distToStart);
+      if (distToStart <= C.CONFIRM_RADIUS) {
+        // Confirm territory!
+        finishRecording(true);
+        return;
+      }
+    } else {
+      hideApproachIndicator();
+    }
+  }
+
+  path.push({ lat, lng });
+  updatePathLine(path, Player.color);
+}
+
+function onGPSError(err) {
+  const msgs = {
+    1: 'GPS位置情報の許可が必要です',
+    2: 'GPS位置情報を取得できません',
+    3: 'GPS取得がタイムアウトしました',
+  };
+  updateGPSDot(-1, msgs[err.code] || 'GPS エラー');
+}
+
+function updateGPSDot(acc, errMsg) {
+  const dot = document.getElementById('gps-dot');
+  const txt = document.getElementById('gps-text');
+  if (errMsg) {
+    dot.className = 'poor';
+    txt.textContent = errMsg;
+    return;
+  }
+  if (acc <= 10) {
+    dot.className = 'good';
+    txt.textContent = `GPS精度: ±${Math.round(acc)}m (良好)`;
+  } else if (acc <= 25) {
+    dot.className = 'fair';
+    txt.textContent = `GPS精度: ±${Math.round(acc)}m`;
+  } else {
+    dot.className = 'poor';
+    txt.textContent = `GPS精度: ±${Math.round(acc)}m (低下)`;
+  }
+}
+
+// ================================================================
+// RECORDING CONTROLS
+// ================================================================
+function startRecording() {
+  if (!State.lastGPS) { showToast('GPS信号を待っています...'); return; }
+  if (State.lastGPS.acc > C.GPS_ACCURACY_MAX) {
+    showToast('GPS精度が低いです。屋外に出てください。'); return;
+  }
+
+  State.recording = true;
+  State.currentPath = [{ lat: State.lastGPS.lat, lng: State.lastGPS.lng }];
+  State.startPos = { lat: State.lastGPS.lat, lng: State.lastGPS.lng };
+  State.totalDistM = 0;
+  State.totalSteps = 0;
+  State.totalKcal = 0;
+  State.recStartTime = Date.now();
+  State.elapsedSec = 0;
+
+  showStartMarker(State.startPos.lat, State.startPos.lng, Player.color);
+  setMapCenter(State.startPos.lat, State.startPos.lng);
+
+  // Timer
+  State.timerHandle = setInterval(() => {
+    State.elapsedSec++;
+    const hours = State.elapsedSec / 3600;
+    State.totalKcal = Math.floor(C.WALKING_MET * C.WEIGHT_KG * hours);
+    updateStatsHUD();
+  }, 1000);
+
+  // Sync position to Firebase
+  if (FB) {
+    State.positionSyncHandle = setInterval(() => {
+      if (State.lastGPS) {
+        FB.syncPosition({ lat: State.lastGPS.lat, lng: State.lastGPS.lng, recording: true });
+      }
+    }, C.POSITION_SYNC_MS);
+  }
+
+  setRecordBtn('recording');
+  showToast('🚀 記録開始！スタート地点に戻って陣地を確定しよう');
+}
+
+function finishRecording(autoConfirm) {
+  if (!State.recording) return;
+  clearInterval(State.timerHandle);
+  clearInterval(State.positionSyncHandle);
+  State.timerHandle = null;
+  State.positionSyncHandle = null;
+  State.recording = false;
+  removeStartMarker();
+  hideApproachIndicator();
+
+  const path = State.currentPath;
+  if (autoConfirm && path.length >= C.MIN_POINTS) {
+    confirmTerritory(path);
+  } else if (!autoConfirm) {
+    if (path.length >= C.MIN_POINTS) {
+      confirmTerritory(path);
+    } else {
+      showToast('記録ポイントが少なすぎます。もっと歩いてみてください。');
+    }
+  }
+
+  updatePathLine([], Player.color);
+  State.currentPath = [];
+  State.startPos = null;
+  setRecordBtn('idle');
+  updateStatsHUD();
+
+  if (FB && State.lastGPS) {
+    FB.syncPosition({ lat: State.lastGPS.lat, lng: State.lastGPS.lng, recording: false });
+  }
+}
+
+// ================================================================
+// UI HELPERS
+// ================================================================
+function setRecordBtn(state) {
+  const btn = document.getElementById('record-btn');
+  const lbl = document.getElementById('btn-label');
+  const pulse = document.getElementById('btn-pulse');
+  btn.className = 'idle ' + state;
+  if (state === 'recording') {
+    lbl.textContent = '⏹ 記録終了';
+    pulse.style.display = 'block';
+    btn.className = 'recording';
+  } else if (state === 'approaching') {
+    lbl.textContent = '🏁 陣地確定中...';
+    pulse.style.display = 'block';
+    btn.className = 'approaching';
+  } else {
+    lbl.textContent = '🚀 記録開始';
+    pulse.style.display = 'none';
+    btn.className = 'idle';
+  }
+}
+
+function updateApproachIndicator(distM) {
+  const el = document.getElementById('approach-indicator');
+  const ring = document.getElementById('approach-ring');
+  el.style.display = 'flex';
+  ring.textContent = Math.round(distM) + 'm';
+  setRecordBtn('approaching');
+}
+
+function hideApproachIndicator() {
+  document.getElementById('approach-indicator').style.display = 'none';
+  if (State.recording) setRecordBtn('recording');
+}
+
+function updateStatsHUD() {
+  document.getElementById('stat-dist').textContent = fmtDist(State.totalDistM);
+  document.getElementById('stat-steps').textContent = State.totalSteps.toLocaleString();
+  document.getElementById('stat-kcal').textContent = State.totalKcal;
+  document.getElementById('stat-time').textContent = fmtTime(State.elapsedSec);
+}
+
+function updateTopHUD() {
+  const area = myTotalArea();
+  document.getElementById('my-area-label').textContent = fmtArea(area);
+  document.getElementById('player-color-dot').style.background = Player.color;
+  document.getElementById('player-name-label').textContent = Player.name;
+}
+
+let toastTimer = null;
+function showToast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = type ? `show ${type}` : 'show';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = type || ''; }, 3000);
+}
+
+function updateLeaderboard() {
+  const grouped = {};
+  for (const t of Object.values(State.territories)) {
+    if (!grouped[t.playerId]) {
+      grouped[t.playerId] = { name: t.playerName, color: t.playerColor, area: 0 };
+    }
+    grouped[t.playerId].area += t.area;
+  }
+  const sorted = Object.entries(grouped).sort((a,b) => b[1].area - a[1].area);
+  const list = document.getElementById('lb-list');
+  list.innerHTML = '';
+  if (sorted.length === 0) {
+    list.innerHTML = '<div style="color:rgba(255,255,255,.4);text-align:center;padding:40px 16px;font-size:14px;">まだ陣地がありません。<br>歩いて陣地を作ろう！</div>';
+    return;
+  }
+  sorted.forEach(([pid, data], i) => {
+    const div = document.createElement('div');
+    div.className = 'lb-item' + (pid === Player.id ? ' me' : '');
+    div.innerHTML = `
+      <div class="lb-rank">${i+1}</div>
+      <div class="lb-color" style="background:${data.color}"></div>
+      <div class="lb-name">${data.name}${pid === Player.id ? ' (自分)' : ''}</div>
+      <div class="lb-score">${fmtArea(data.area)}</div>
+    `;
+    list.appendChild(div);
+  });
+}
+
+// ================================================================
+// SETUP PANEL
+// ================================================================
+function initSetupPanel() {
+  const picker = document.getElementById('color-picker');
+  C.COLORS.forEach((color, i) => {
+    const sw = document.createElement('div');
+    sw.className = 'color-swatch' + (i === Player.colorIdx ? ' selected' : '');
+    sw.style.background = color;
+    sw.addEventListener('click', () => {
+      picker.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+      sw.classList.add('selected');
+      Player.setColor(i);
+    });
+    picker.appendChild(sw);
+  });
+  document.getElementById('name-input').value = Player.name || '';
+}
+
+function showSetupPanel() {
+  document.getElementById('setup-panel').style.display = 'flex';
+  document.getElementById('top-hud').style.display = 'none';
+  document.getElementById('bottom-hud').style.display = 'none';
+}
+
+function hideSetupPanel() {
+  document.getElementById('setup-panel').style.display = 'none';
+  document.getElementById('top-hud').style.display = 'flex';
+  document.getElementById('bottom-hud').style.display = 'flex';
+}
+
+// ================================================================
+// FIREBASE SYNC
+// ================================================================
+function setupFirebaseSync() {
+  if (!FB) return;
+
+  FB.signInAnon().then(() => {
+    // Sync current position periodically
+    State.positionSyncHandle && clearInterval(State.positionSyncHandle);
+
+    FB.onPlayers(players => {
+      const now = Date.now();
+      // Remove stale markers (inactive > 5 min)
+      for (const [pid] of playerMarkers) {
+        if (!players[pid]) removeOtherMarker(pid);
+      }
+      for (const [pid, data] of Object.entries(players)) {
+        if (pid === Player.id) continue;
+        if (now - data.ts > C.PLAYER_TIMEOUT_MS) { removeOtherMarker(pid); continue; }
+        updateOtherMarker(pid, data.lat, data.lng, data.color, data.name);
+      }
+    });
+
+    FB.onTerritories(territories => {
+      // Sync territories from Firebase
+      const remote = territories || {};
+      // Remove locally non-existent
+      for (const id of Object.keys(State.territories)) {
+        if (!remote[id]) {
+          delete State.territories[id];
+          removeTerritoryLayer(id);
+        }
+      }
+      // Add/update remote territories
+      for (const [id, t] of Object.entries(remote)) {
+        const existing = State.territories[id];
+        if (!existing || existing.area !== t.area) {
+          State.territories[id] = t;
+          removeTerritoryLayer(id);
+          addTerritoryLayer(t);
+        }
+      }
+      updateLeaderboard();
+      updateTopHUD();
+    });
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => FB.removePlayer());
+  }).catch(e => console.warn('Firebase auth failed:', e));
+}
+
+// ================================================================
+// LOAD LOCAL TERRITORIES
+// ================================================================
+function loadLocalTerritories() {
+  const saved = TerritoryDB.getAll();
+  for (const [id, t] of Object.entries(saved)) {
+    State.territories[id] = t;
+    if (t.points && t.points.length >= 3) {
+      addTerritoryLayer(t);
+    }
+  }
+  updateLeaderboard();
+  updateTopHUD();
+}
+
+// ================================================================
+// MAIN INIT
+// ================================================================
+function init() {
+  initMap();
+  initSetupPanel();
+
+  // Load saved territories
+  loadLocalTerritories();
+
+  // Firebase
+  const firebaseOK = initFirebase();
+  if (firebaseOK) {
+    setupFirebaseSync();
+  } else if (!FIREBASE_CONFIG) {
+    // Show hint if no Firebase configured
+    setTimeout(() => {
+      const card = document.getElementById('firebase-card');
+      if (card) card.style.display = 'block';
+    }, 3000);
+  }
+
+  // Show setup or main
+  if (Player.isNew()) {
+    showSetupPanel();
+  } else {
+    hideSetupPanel();
+    updateTopHUD();
+    startGPS();
+  }
+
+  // Periodically sync position to Firebase even when not recording
+  if (FB) {
+    setInterval(() => {
+      if (State.lastGPS) {
+        FB.syncPosition({ lat: State.lastGPS.lat, lng: State.lastGPS.lng, recording: State.recording });
+      }
+    }, C.POSITION_SYNC_MS);
+  }
+
+  document.getElementById('loading').style.display = 'none';
+}
+
+// ================================================================
+// EVENT LISTENERS
+// ================================================================
+
+// Setup form
+document.getElementById('btn-start-game').addEventListener('click', () => {
+  const nameInput = document.getElementById('name-input');
+  const name = nameInput.value.trim() || 'プレイヤー';
+  Player.name = name;
+  hideSetupPanel();
+  updateTopHUD();
+  startGPS();
+  if (FB) {
+    setupFirebaseSync();
+  }
+});
+
+// Name input — allow Enter key
+document.getElementById('name-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btn-start-game').click();
+});
+
+// Record button
+document.getElementById('record-btn').addEventListener('click', () => {
+  if (State.recording) {
+    finishRecording(false);
+  } else {
+    startRecording();
+  }
+});
+
+// Player badge — edit profile
+document.getElementById('player-badge').addEventListener('click', () => {
+  showSetupPanel();
+  // Pre-fill current values
+  document.getElementById('name-input').value = Player.name;
+  const swatches = document.getElementById('color-picker').querySelectorAll('.color-swatch');
+  swatches.forEach((s, i) => s.classList.toggle('selected', i === Player.colorIdx));
+});
+
+// Leaderboard
+document.getElementById('btn-leaderboard').addEventListener('click', () => {
+  document.getElementById('leaderboard-panel').classList.add('open');
+  document.getElementById('overlay').classList.add('show');
+  updateLeaderboard();
+});
+document.getElementById('btn-close-lb').addEventListener('click', () => {
+  document.getElementById('leaderboard-panel').classList.remove('open');
+  document.getElementById('overlay').classList.remove('show');
+});
+document.getElementById('overlay').addEventListener('click', () => {
+  document.getElementById('leaderboard-panel').classList.remove('open');
+  document.getElementById('overlay').classList.remove('show');
+});
+
+// Dismiss Firebase card
+document.getElementById('btn-dismiss-firebase').addEventListener('click', () => {
+  document.getElementById('firebase-card').style.display = 'none';
+});
+
+// Service worker registration
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(e => console.warn('SW reg failed:', e));
+}
+
+// Start when DOM is ready
+window.addEventListener('load', init);
+</script>
+</body>
+</html>
