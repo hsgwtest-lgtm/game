@@ -16,7 +16,7 @@
 //
 // ─────────────────────────────────────────────────────────────────────────────
 
-const firebaseConfig = {
+export const FIREBASE_CONFIG = {
   apiKey: "AIzaSyCETBs5fWk3-1PvFVS1-3E7OnmY5SStjHA",
   authDomain: "nazca-552fe.firebaseapp.com",
   databaseURL: "https://nazca-552fe-default-rtdb.asia-southeast1.firebasedatabase.app",
