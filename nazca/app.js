@@ -173,23 +173,26 @@ function initMap() {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     maxZoom: 19
   }).addTo(map);
-  initCompass();
+  initMapControls();
   startPreLocate();
 }
 
-// ─── Compass ─────────────────────────────────────────────────────────────────
-function initCompass() {
-  map.on('rotate', () => {
-    const b = map.getBearing ? map.getBearing() : 0;
-    document.getElementById('compass-rose').style.transform = `rotate(${b}deg)`;
+// ─── Map buttons (N / locate) — placed in Leaflet's top-left control area ────
+function initMapControls() {
+  const MapBtnsControl = L.Control.extend({
+    options: { position: 'topleft' },
+    onAdd() {
+      const div = L.DomUtil.create('div', 'map-controls-group');
+      div.innerHTML =
+        '<button id="btn-north" title="北を上に">N</button>' +
+        '<button id="btn-locate" title="現在地">📍</button>';
+      L.DomEvent.disableClickPropagation(div);
+      return div;
+    }
   });
+  new MapBtnsControl().addTo(map);
   document.getElementById('btn-north').addEventListener('click', () => {
     if (map.setBearing) map.setBearing(0, { animate: true });
-    document.getElementById('compass-rose').style.transform = 'rotate(0deg)';
-  });
-  document.getElementById('compass-rose').addEventListener('click', () => {
-    if (map.setBearing) map.setBearing(0, { animate: true });
-    document.getElementById('compass-rose').style.transform = 'rotate(0deg)';
   });
   document.getElementById('btn-locate').addEventListener('click', locateUser);
 }
