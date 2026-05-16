@@ -86,10 +86,9 @@ html, body {
   pointer-events: none;
 }
 
-/* ─── Map controls group (N button → compass → locate pin) ─── */
-#map-controls {
-  position: absolute; top: 10px; right: 10px; z-index: 500;
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
+/* ─── Map button controls group (N / locate) — rendered via Leaflet topleft ─── */
+.map-controls-group {
+  display: flex; flex-direction: column; gap: 6px;
 }
 
 /* ─── N button ─── */
@@ -104,39 +103,6 @@ html, body {
   padding: 0; font-family: inherit;
 }
 #btn-north:active { background: rgba(248,113,113,0.15); }
-
-/* ─── Compass ─── */
-#compass-container {
-  width: 54px; height: 54px;
-}
-#compass-rose {
-  width: 54px; height: 54px; border-radius: 50%;
-  background: rgba(6,10,20,0.88);
-  border: 1.5px solid rgba(99,210,255,0.32);
-  position: relative; cursor: pointer;
-  transition: transform 0.15s ease;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-}
-#compass-rose:active { background: rgba(99,210,255,0.12); }
-.cp-needle {
-  position: absolute; top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  display: flex; flex-direction: column; align-items: center;
-  pointer-events: none;
-}
-.cp-needle-n {
-  width: 0; height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-bottom: 16px solid #f87171;
-}
-.cp-needle-s {
-  width: 0; height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-top: 16px solid rgba(226,232,240,0.35);
-  margin-top: 2px;
-}
 
 /* ─── Locate button ─── */
 #btn-locate {
