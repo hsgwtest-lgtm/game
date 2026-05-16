@@ -16,14 +16,15 @@
 //
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const FIREBASE_CONFIG = {
-  apiKey:            'YOUR_API_KEY',
-  authDomain:        'YOUR_PROJECT_ID.firebaseapp.com',
-  databaseURL:       'https://YOUR_PROJECT_ID-default-rtdb.asia-southeast1.firebasedatabase.app/',
-  projectId:         'YOUR_PROJECT_ID',
-  storageBucket:     'YOUR_PROJECT_ID.firebasestorage.app',
-  messagingSenderId: 'YOUR_SENDER_ID',
-  appId:             'YOUR_APP_ID',
+const firebaseConfig = {
+  apiKey: "AIzaSyCETBs5fWk3-1PvFVS1-3E7OnmY5SStjHA",
+  authDomain: "nazca-552fe.firebaseapp.com",
+  databaseURL: "https://nazca-552fe-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "nazca-552fe",
+  storageBucket: "nazca-552fe.firebasestorage.app",
+  messagingSenderId: "12403224283",
+  appId: "1:12403224283:web:9a397fb3597176a6bb26fe",
+  measurementId: "G-DQ9NRX50S2"
 };
 
 // この値が true になると Firebase 機能が有効になります
