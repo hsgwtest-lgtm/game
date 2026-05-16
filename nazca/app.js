@@ -183,6 +183,10 @@ function initCompass() {
     const b = map.getBearing ? map.getBearing() : 0;
     document.getElementById('compass-rose').style.transform = `rotate(${b}deg)`;
   });
+  document.getElementById('btn-north').addEventListener('click', () => {
+    if (map.setBearing) map.setBearing(0, { animate: true });
+    document.getElementById('compass-rose').style.transform = 'rotate(0deg)';
+  });
   document.getElementById('compass-rose').addEventListener('click', () => {
     if (map.setBearing) map.setBearing(0, { animate: true });
     document.getElementById('compass-rose').style.transform = 'rotate(0deg)';
@@ -201,10 +205,13 @@ function startPreLocate() {
         map.setView([lat, lng], 16);
         gotFirst = true;
       }
-      locateDot = L.circleMarker([lat, lng], {
-        radius: 8, color: '#fff', weight: 2,
-        fillColor: '#4fc3f7', fillOpacity: 1,
-        zIndexOffset: 900
+      locateDot = L.marker([lat, lng], {
+        icon: L.divIcon({
+          html: '<div style="width:16px;height:16px;border-radius:50%;background:#4fc3f7;border:2px solid #fff;box-shadow:0 0 8px rgba(79,195,247,0.8)"></div>',
+          iconSize: [16, 16], iconAnchor: [8, 8], className: ''
+        }),
+        zIndexOffset: 900,
+        interactive: false
       }).addTo(map);
     } else {
       locateDot.setLatLng([lat, lng]);
@@ -306,6 +313,7 @@ function bindRecordPanel() {
   document.getElementById('btn-stop').addEventListener('click', stopRecording);
   document.getElementById('btn-save').addEventListener('click', confirmSave);
   document.getElementById('btn-reset').addEventListener('click', resetRecording);
+  document.getElementById('btn-record-post').addEventListener('click', postFromRecord);
 }
 
 function startRecording() {
@@ -437,6 +445,43 @@ function resetRecording() {
   setRecordUI('idle');
 }
 
+async function postFromRecord() {
+  if (!lastSavedId) return;
+
+  const tracks = getTracks();
+  const track  = tracks.find(t => t.id === lastSavedId);
+  if (!track) return;
+
+  const name = getUserName();
+  if (!name) {
+    showToast('記録タブで名前を入力してから投稿してください', 'error');
+    return;
+  }
+
+  if (!IS_FIREBASE_CONFIGURED) {
+    showToast('Firebase が未設定です。nazca/firebase-config.js を編集してください', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btn-record-post');
+  btn.disabled = true;
+  btn.textContent = '送信中…';
+
+  try {
+    await postTrack({ ...track, user: name });
+    track.posted = true;
+    track.user   = name;
+    saveTracks(tracks);
+    showToast('グローバルに投稿しました！', 'success');
+    btn.textContent = '☁ 投稿済み';
+  } catch (e) {
+    console.error('postTrack failed:', e);
+    showToast('投稿に失敗しました: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '☁ 投稿';
+  }
+}
+
 function updateStats() {
   const dist  = calcDistance(currentPath);
   const steps = Math.round(dist * STEPS_PER_KM);
@@ -456,11 +501,12 @@ function setRecordUI(state) {
   const st = document.getElementById('btn-stop');
   const sv = document.getElementById('btn-save');
   const rs = document.getElementById('btn-reset');
+  const rp = document.getElementById('btn-record-post');
   const ti = document.getElementById('track-title-row');
   const ri = document.getElementById('rec-indicator');
 
   // reset all
-  [s, st, sv, rs].forEach(b => b.classList.add('hidden'));
+  [s, st, sv, rs, rp].forEach(b => b.classList.add('hidden'));
   ti.classList.add('hidden');
   ri.classList.add('hidden');
 
@@ -476,6 +522,9 @@ function setRecordUI(state) {
   } else if (state === 'saved') {
     s.classList.remove('hidden');
     rs.classList.remove('hidden');
+    rp.classList.remove('hidden');
+    rp.disabled = false;
+    rp.textContent = '☁ 投稿';
   }
 }
 
@@ -587,11 +636,16 @@ function selectGalleryTrack(track) {
 
 function renderGalleryDetailStats(track) {
   document.getElementById('gallery-detail-stats').innerHTML =
-    `<strong>${esc(track.title)}</strong><br>` +
+    `<div id="gallery-title-line">` +
+    `<strong>${esc(track.title)}</strong>` +
+    `<button id="btn-edit-title" class="gallery-edit-title-btn">✏ 編集</button>` +
+    `</div>` +
     `📏 ${track.stats.distance} km &nbsp;` +
     `👣 ${Math.round(track.stats.distance * STEPS_PER_KM).toLocaleString('ja-JP')} 歩 &nbsp;` +
     `🔥 ${track.stats.calories} kcal<br>` +
     `🕐 ${formatTimeRange(track)}${track.posted ? ' &nbsp;☁ 投稿済み' : ''}`;
+
+  document.getElementById('btn-edit-title').addEventListener('click', () => startEditTitle(track));
 
   const btn = document.getElementById('btn-gallery-post');
   if (track.posted) {
@@ -601,6 +655,54 @@ function renderGalleryDetailStats(track) {
     btn.disabled = false;
     btn.textContent = '☁ 投稿';
   }
+}
+
+function startEditTitle(track) {
+  const titleLine = document.getElementById('gallery-title-line');
+  if (!titleLine) return;
+  const current = track.title;
+  titleLine.innerHTML = '';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = current;
+  input.maxLength = 30;
+  input.autocomplete = 'off';
+  input.className = 'gallery-title-input';
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.textContent = '✓';
+  confirmBtn.className = 'gallery-title-confirm-btn';
+
+  titleLine.appendChild(input);
+  titleLine.appendChild(confirmBtn);
+  input.focus();
+  input.select();
+
+  let done = false;
+  const commit = () => {
+    if (done) return; done = true;
+    const newTitle = input.value.trim() || current;
+    if (newTitle !== current) {
+      const tracks = getTracks();
+      const t = tracks.find(t => t.id === track.id);
+      if (t) { t.title = newTitle; saveTracks(tracks); }
+      track.title = newTitle;
+      if (selectedGalleryTrack && selectedGalleryTrack.id === track.id) {
+        selectedGalleryTrack.title = newTitle;
+      }
+      showToast('作品名を変更しました', 'success');
+      renderGalleryList();
+    }
+    renderGalleryDetailStats(track);
+  };
+
+  confirmBtn.addEventListener('click', commit);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { done = true; renderGalleryDetailStats(track); }
+  });
+  input.addEventListener('blur', () => setTimeout(commit, 150));
 }
 
 async function postFromGallery(id) {
