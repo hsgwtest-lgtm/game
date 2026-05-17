@@ -1,6 +1,6 @@
 'use strict';
 
-import { IS_FIREBASE_CONFIGURED, postTrack, subscribeToTracks } from './firebase.js';
+import { IS_FIREBASE_CONFIGURED, postTrack, subscribeToTracks, deleteTrack } from './firebase.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const LS_KEY       = 'nazca_tracks';
@@ -132,6 +132,11 @@ let lastSavedId     = null;
 let locateDot       = null;
 let preLocateWatchId = null;
 
+// Bearing lock
+let bearingLocked        = false;
+let orientationHandler   = null;
+let bearingEventName     = null;
+
 // Layers owned by gallery / global mode
 let galleryLayers = [];
 let globalLayers  = [];
@@ -160,6 +165,7 @@ function init() {
   bindGlobalPanel();
   document.getElementById('btn-stop-replay').addEventListener('click', stopReplay);
   initUserName();
+  initConfirmDialog();
   switchMode('record');
 }
 
@@ -167,7 +173,8 @@ function init() {
 function initMap() {
   map = L.map('map', {
     center: [35.681, 139.767], zoom: 13, zoomControl: true,
-    rotate: true, touchRotate: true, bearing: 0
+    rotate: true, touchRotate: true, bearing: 0,
+    renderer: L.canvas()
   });
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -177,15 +184,16 @@ function initMap() {
   startPreLocate();
 }
 
-// ─── Map buttons (N / locate) — placed in Leaflet's top-left control area ────
+// ─── Map buttons (N / locate / bearing-lock) — placed in Leaflet's top-left control area ────
 function initMapControls() {
   const MapBtnsControl = L.Control.extend({
     options: { position: 'topleft' },
     onAdd() {
       const div = L.DomUtil.create('div', 'map-controls-group');
       div.innerHTML =
-        '<button id="btn-north" title="北を上に">N</button>' +
-        '<button id="btn-locate" title="現在地">📍</button>';
+        '<button id="btn-north"        title="北を上に">N</button>' +
+        '<button id="btn-locate"       title="現在地">📍</button>' +
+        '<button id="btn-bearing-lock" title="方位固定">🧭</button>';
       L.DomEvent.disableClickPropagation(div);
       return div;
     }
@@ -195,6 +203,7 @@ function initMapControls() {
     if (map.setBearing) map.setBearing(0, { animate: true });
   });
   document.getElementById('btn-locate').addEventListener('click', locateUser);
+  document.getElementById('btn-bearing-lock').addEventListener('click', toggleBearingLock);
 }
 
 // ─── Pre-start GPS locate ─────────────────────────────────────────────────────
@@ -252,7 +261,56 @@ function locateUser() {
   }
 }
 
-// ─── Navigation ───────────────────────────────────────────────────────────────
+// ─── Bearing lock ─────────────────────────────────────────────────────────────
+async function toggleBearingLock() {
+  if (bearingLocked) {
+    bearingLocked = false;
+    if (orientationHandler && bearingEventName) {
+      window.removeEventListener(bearingEventName, orientationHandler, true);
+      orientationHandler = null;
+      bearingEventName   = null;
+    }
+    document.getElementById('btn-bearing-lock').classList.remove('active');
+    return;
+  }
+
+  // iOS 13+ requires permission
+  if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+    try {
+      const perm = await DeviceOrientationEvent.requestPermission();
+      if (perm !== 'granted') {
+        showToast('コンパスの使用を許可してください', 'error');
+        return;
+      }
+    } catch (e) {
+      showToast('コンパスの使用を許可してください', 'error');
+      return;
+    }
+  }
+
+  bearingLocked = true;
+  document.getElementById('btn-bearing-lock').classList.add('active');
+
+  orientationHandler = e => {
+    let heading = null;
+    if (e.webkitCompassHeading !== undefined && e.webkitCompassHeading !== null) {
+      heading = e.webkitCompassHeading;
+    } else if (e.alpha !== null) {
+      heading = (360 - e.alpha) % 360;
+    }
+    if (heading !== null && map.setBearing) {
+      map.setBearing(heading, { animate: false });
+    }
+  };
+
+  bearingEventName = ('ondeviceorientationabsolute' in window)
+    ? 'deviceorientationabsolute'
+    : 'deviceorientation';
+  window.addEventListener(bearingEventName, orientationHandler, true);
+}
+
+
 function bindNav() {
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => switchMode(btn.dataset.mode));
@@ -314,6 +372,7 @@ function switchMode(mode) {
 function bindRecordPanel() {
   document.getElementById('btn-start').addEventListener('click', startRecording);
   document.getElementById('btn-stop').addEventListener('click', stopRecording);
+  document.getElementById('btn-resume').addEventListener('click', resumeRecording);
   document.getElementById('btn-save').addEventListener('click', confirmSave);
   document.getElementById('btn-reset').addEventListener('click', resetRecording);
   document.getElementById('btn-record-post').addEventListener('click', postFromRecord);
@@ -502,6 +561,7 @@ function updateStats() {
 function setRecordUI(state) {
   const s  = document.getElementById('btn-start');
   const st = document.getElementById('btn-stop');
+  const rv = document.getElementById('btn-resume');
   const sv = document.getElementById('btn-save');
   const rs = document.getElementById('btn-reset');
   const rp = document.getElementById('btn-record-post');
@@ -509,7 +569,7 @@ function setRecordUI(state) {
   const ri = document.getElementById('rec-indicator');
 
   // reset all
-  [s, st, sv, rs, rp].forEach(b => b.classList.add('hidden'));
+  [s, st, rv, sv, rs, rp].forEach(b => b.classList.add('hidden'));
   ti.classList.add('hidden');
   ri.classList.add('hidden');
 
@@ -520,6 +580,8 @@ function setRecordUI(state) {
     ri.classList.remove('hidden');
   } else if (state === 'stopped') {
     sv.classList.remove('hidden');
+    rs.classList.remove('hidden');
+    rv.classList.remove('hidden');
     ti.classList.remove('hidden');
     document.getElementById('track-title-input').value = '';
   } else if (state === 'saved') {
@@ -529,6 +591,24 @@ function setRecordUI(state) {
     rp.disabled = false;
     rp.textContent = '☁ 投稿';
   }
+}
+
+function resumeRecording() {
+  if (isRecording || currentPath.length === 0) return;
+  if (!navigator.geolocation) {
+    showToast('このデバイスはGPSに対応していません', 'error');
+    return;
+  }
+
+  isRecording = true;
+
+  // Hide locate dot while recording
+  if (locateDot && map.hasLayer(locateDot)) map.removeLayer(locateDot);
+
+  setRecordUI('recording');
+  showToast('GPS取得中…', 'info');
+
+  watchId = navigator.geolocation.watchPosition(onGPSUpdate, onGPSError, GPS_OPTIONS);
 }
 
 // ─── Mode B — My Gallery ──────────────────────────────────────────────────────
@@ -799,6 +879,36 @@ function bindGlobalPanel() {
       startReplay(selectedGlobalTrack.path, color);
     }
   });
+
+  document.getElementById('btn-global-delete').addEventListener('click', () => {
+    if (!selectedGlobalTrack) return;
+    showConfirmDialog(
+      'この地上絵をグローバル鑑賞から削除すると、誰も見ることができなくなります。\n本当に削除しますか？',
+      () => deleteGlobalTrack(selectedGlobalTrack)
+    );
+  });
+}
+
+async function deleteGlobalTrack(track) {
+  if (IS_FIREBASE_CONFIGURED) {
+    try {
+      await deleteTrack(track.id);
+    } catch (e) {
+      showToast('削除に失敗しました: ' + e.message, 'error');
+      return;
+    }
+  } else {
+    // Remove from mock / locally-posted cache
+    cachedGlobalTracks = cachedGlobalTracks.filter(t => t.id !== track.id);
+  }
+
+  stopReplay();
+  globalLayers.forEach(l => map.removeLayer(l)); globalLayers = [];
+  selectedGlobalTrack = null;
+  showGlobalListView();
+  renderGlobalList();
+  renderGlobalMap();
+  showToast('削除しました', 'info');
 }
 
 function showGlobalListView() {
@@ -1090,4 +1200,33 @@ function showToast(msg, type = 'info') {
   toast.textContent = msg;
   tc.appendChild(toast);
   setTimeout(() => toast.remove(), 3100);
+}
+
+// ─── Confirm Dialog ───────────────────────────────────────────────────────────
+let _confirmOkHandler = null;
+
+function initConfirmDialog() {
+  document.getElementById('confirm-dialog-cancel').addEventListener('click', closeConfirmDialog);
+  document.getElementById('confirm-dialog-overlay').addEventListener('click', closeConfirmDialog);
+}
+
+function closeConfirmDialog() {
+  document.getElementById('confirm-dialog').classList.add('hidden');
+}
+
+function showConfirmDialog(msg, onOk) {
+  const dialog = document.getElementById('confirm-dialog');
+  document.getElementById('confirm-dialog-msg').textContent = msg;
+  dialog.classList.remove('hidden');
+
+  const okBtn = document.getElementById('confirm-dialog-ok');
+  // Remove any previous handler before attaching a new one
+  if (_confirmOkHandler) {
+    okBtn.removeEventListener('click', _confirmOkHandler);
+  }
+  _confirmOkHandler = () => {
+    closeConfirmDialog();
+    onOk();
+  };
+  okBtn.addEventListener('click', _confirmOkHandler, { once: true });
 }

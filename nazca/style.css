@@ -117,14 +117,34 @@ html, body {
 }
 #btn-locate:active { background: rgba(99,210,255,0.18); }
 
+/* ─── Bearing lock button ─── */
+#btn-bearing-lock {
+  width: 36px; height: 36px; border-radius: 8px;
+  background: rgba(6,10,20,0.88);
+  border: 1.5px solid rgba(99,210,255,0.32);
+  color: #e2e8f0; font-size: 17px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: background 0.15s, border-color 0.15s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  padding: 0;
+}
+#btn-bearing-lock:active { background: rgba(248,113,113,0.18); }
+#btn-bearing-lock.active {
+  background: rgba(248,113,113,0.22);
+  border-color: rgba(248,113,113,0.6);
+}
+
 /* Track map label */
 .track-label {
-  background: rgba(6,10,20,0.88);
+  background: rgba(6,10,20,0.55);
   border: 1.5px solid;
   padding: 4px 8px;
   border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
   line-height: 1.5;
   text-align: center;
@@ -405,3 +425,32 @@ html, body {
 }
 
 .hidden { display: none !important; }
+
+/* ═══ Confirm Dialog ═══ */
+#confirm-dialog {
+  position: fixed; inset: 0; z-index: 99999;
+  display: flex; align-items: center; justify-content: center;
+}
+#confirm-dialog-overlay {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+}
+#confirm-dialog-box {
+  position: relative; z-index: 1;
+  background: rgba(6,10,20,0.97);
+  border: 1px solid rgba(248,113,113,0.4);
+  border-radius: 14px;
+  padding: 20px 22px 16px;
+  max-width: 300px;
+  margin: 0 20px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+#confirm-dialog-msg {
+  font-size: 13px; color: #e2e8f0;
+  line-height: 1.65; margin-bottom: 16px;
+  white-space: pre-line;
+}
+#confirm-dialog-buttons {
+  display: flex; gap: 8px; justify-content: flex-end;
+}
