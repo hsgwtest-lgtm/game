@@ -14,7 +14,7 @@ const SDK_BASE = 'https://www.gstatic.com/firebasejs/10.12.2';
 
 // ─── Firebase シングルトン ───────────────────────────────────────────────────
 let _db = null;
-let _fbRef, _fbPush, _fbGet, _fbOnValue;
+let _fbRef, _fbPush, _fbGet, _fbOnValue, _fbRemove;
 
 async function ensureFirebase() {
   if (_db) return _db;
@@ -26,12 +26,12 @@ async function ensureFirebase() {
   }
 
   const { initializeApp, getApps } = await import(`${SDK_BASE}/firebase-app.js`);
-  const { getDatabase, ref, push, get, onValue } =
+  const { getDatabase, ref, push, get, onValue, remove } =
     await import(`${SDK_BASE}/firebase-database.js`);
 
   const app = getApps().length > 0 ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
   _db    = getDatabase(app);
-  _fbRef = ref; _fbPush = push; _fbGet = get; _fbOnValue = onValue;
+  _fbRef = ref; _fbPush = push; _fbGet = get; _fbOnValue = onValue; _fbRemove = remove;
   return _db;
 }
 
@@ -68,6 +68,16 @@ export async function postTrack(track) {
   };
 
   await _fbPush(_fbRef(db, 'tracks'), entry);
+}
+
+/**
+ * 指定IDのトラックを削除する
+ * @param {string} id  Firebase のキー (deserializeTrack で設定された id)
+ * @returns {Promise<void>}
+ */
+export async function deleteTrack(id) {
+  const db = await ensureFirebase();
+  await _fbRemove(_fbRef(db, `tracks/${id}`));
 }
 
 /**

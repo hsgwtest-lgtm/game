@@ -63,10 +63,11 @@
       </div>
     </div>
     <div id="record-controls">
-      <button id="btn-start" class="action-btn primary-btn">▶ スタート</button>
-      <button id="btn-stop"  class="action-btn danger-btn  hidden">■ ストップ</button>
-      <button id="btn-save"  class="action-btn primary-btn hidden">💾 保存</button>
-      <button id="btn-reset" class="action-btn secondary-btn hidden">↺ リセット</button>
+      <button id="btn-start"  class="action-btn primary-btn">▶ スタート</button>
+      <button id="btn-stop"   class="action-btn danger-btn  hidden">■ ストップ</button>
+      <button id="btn-resume" class="action-btn accent-btn  hidden">▶ 再開</button>
+      <button id="btn-save"   class="action-btn primary-btn hidden">💾 保存</button>
+      <button id="btn-reset"  class="action-btn secondary-btn hidden">↺ リセット</button>
       <button id="btn-record-post" class="action-btn accent-btn hidden">☁ 投稿</button>
     </div>
     <div id="track-title-row" class="hidden">
@@ -107,6 +108,7 @@
       <div id="global-detail-controls">
         <button id="btn-global-back"   class="action-btn secondary-btn">← 一覧</button>
         <button id="btn-global-replay" class="action-btn accent-btn">▶ タイムラプス</button>
+        <button id="btn-global-delete" class="action-btn danger-btn icon-btn">🗑</button>
       </div>
     </div>
   </div>
@@ -131,6 +133,18 @@
 
 <!-- Toast -->
 <div id="toast-container"></div>
+
+<!-- Confirm Dialog -->
+<div id="confirm-dialog" class="hidden">
+  <div id="confirm-dialog-overlay"></div>
+  <div id="confirm-dialog-box">
+    <p id="confirm-dialog-msg"></p>
+    <div id="confirm-dialog-buttons">
+      <button id="confirm-dialog-cancel" class="action-btn secondary-btn">キャンセル</button>
+      <button id="confirm-dialog-ok"     class="action-btn danger-btn">削除する</button>
+    </div>
+  </div>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
