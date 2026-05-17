@@ -1091,7 +1091,7 @@ function renderGlobalMap() {
     const midPt = track.path[Math.floor(track.path.length / 2)];
     const label = L.marker([midPt[0], midPt[1]], {
       icon: L.divIcon({
-        html: `<div class="track-label" style="border-color:${color};color:${color}">${esc(trunc8(track.user))} ${esc(trunc8(track.title))}</div>`,
+        html: `<div class="track-label" style="border-color:${color};color:${color}">${esc(trunc8(track.user))}<br>${esc(trunc8(track.title))}</div>`,
         iconSize: [1, 1], iconAnchor: [0, 0], className: ''
       }),
       interactive: false, zIndexOffset: 200
@@ -1127,7 +1127,7 @@ function selectGlobalTrack(track, idx) {
       const midPt = t.path[Math.floor(t.path.length / 2)];
       const label = L.marker([midPt[0], midPt[1]], {
         icon: L.divIcon({
-          html: `<div class="track-label" style="border-color:${color};color:${color}">${esc(trunc8(t.user))} ${esc(trunc8(t.title))}</div>`,
+          html: `<div class="track-label" style="border-color:${color};color:${color}">${esc(trunc8(t.user))}<br>${esc(trunc8(t.title))}</div>`,
           iconSize: [1, 1], iconAnchor: [0, 0], className: ''
         }),
         interactive: false, zIndexOffset: 300
