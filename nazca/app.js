@@ -191,9 +191,18 @@ function initMapControls() {
     onAdd() {
       const div = L.DomUtil.create('div', 'map-controls-group');
       div.innerHTML =
-        '<button id="btn-north"        title="北を上に">N</button>' +
-        '<button id="btn-locate"       title="現在地">📍</button>' +
-        '<button id="btn-bearing-lock" title="方位固定">🧭</button>';
+        '<button id="btn-north" class="map-ctrl-btn" title="北を上に">' +
+          '<span class="map-ctrl-icon">↑N</span>' +
+          '<span class="map-ctrl-label">北向き</span>' +
+        '</button>' +
+        '<button id="btn-locate" class="map-ctrl-btn" title="現在地へ">' +
+          '<span class="map-ctrl-icon">📍</span>' +
+          '<span class="map-ctrl-label">現在地</span>' +
+        '</button>' +
+        '<button id="btn-bearing-lock" class="map-ctrl-btn" title="コンパス方向に追従">' +
+          '<span class="map-ctrl-icon">🧭</span>' +
+          '<span class="map-ctrl-label">コンパス</span>' +
+        '</button>';
       L.DomEvent.disableClickPropagation(div);
       return div;
     }
@@ -863,6 +872,13 @@ function exitGlobalMode() {
 }
 
 function bindGlobalPanel() {
+  document.getElementById('btn-global-show-all').addEventListener('click', () => {
+    stopReplay();
+    globalLayers.forEach(l => map.removeLayer(l)); globalLayers = [];
+    selectedGlobalTrack = null;
+    renderGlobalMap();
+  });
+
   document.getElementById('btn-global-back').addEventListener('click', () => {
     stopReplay();
     globalLayers.forEach(l => map.removeLayer(l)); globalLayers = [];
@@ -1082,6 +1098,10 @@ function startReplay(path, color) {
     }
     drawn.push([path[i][0], path[i][1]]);
     replayPolyline.setLatLngs(drawn);
+    const pt = L.latLng(path[i][0], path[i][1]);
+    if (!map.getBounds().contains(pt)) {
+      map.panTo(pt, { animate: false });
+    }
     i++;
 
     if (i < path.length) {
