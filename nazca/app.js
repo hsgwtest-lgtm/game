@@ -192,16 +192,13 @@ function initMapControls() {
       const div = L.DomUtil.create('div', 'map-controls-group');
       div.innerHTML =
         '<button id="btn-north" class="map-ctrl-btn" title="北を上に">' +
-          '<span class="map-ctrl-icon">↑N</span>' +
-          '<span class="map-ctrl-label">北向き</span>' +
+          '<span class="map-ctrl-icon">N</span>' +
         '</button>' +
         '<button id="btn-locate" class="map-ctrl-btn" title="現在地へ">' +
           '<span class="map-ctrl-icon">📍</span>' +
-          '<span class="map-ctrl-label">現在地</span>' +
         '</button>' +
         '<button id="btn-bearing-lock" class="map-ctrl-btn" title="コンパス方向に追従">' +
           '<span class="map-ctrl-icon">🧭</span>' +
-          '<span class="map-ctrl-label">コンパス</span>' +
         '</button>';
       L.DomEvent.disableClickPropagation(div);
       return div;
@@ -1007,7 +1004,7 @@ function renderGlobalMap() {
     const midPt = track.path[Math.floor(track.path.length / 2)];
     const label = L.marker([midPt[0], midPt[1]], {
       icon: L.divIcon({
-        html: `<div class="track-label" style="border-color:${color};color:${color}">${esc(track.user)}<br>${esc(track.title)}</div>`,
+        html: `<div class="track-label" style="border-color:${color};color:${color}">${esc(trunc8(track.user))} ${esc(trunc8(track.title))}</div>`,
         iconSize: [1, 1], iconAnchor: [0, 0], className: ''
       }),
       interactive: false, zIndexOffset: 200
@@ -1043,7 +1040,7 @@ function selectGlobalTrack(track, idx) {
       const midPt = t.path[Math.floor(t.path.length / 2)];
       const label = L.marker([midPt[0], midPt[1]], {
         icon: L.divIcon({
-          html: `<div class="track-label" style="border-color:${color};color:${color}">${esc(t.user)}<br>${esc(t.title)}</div>`,
+          html: `<div class="track-label" style="border-color:${color};color:${color}">${esc(trunc8(t.user))} ${esc(trunc8(t.title))}</div>`,
           iconSize: [1, 1], iconAnchor: [0, 0], className: ''
         }),
         interactive: false, zIndexOffset: 300
@@ -1211,6 +1208,11 @@ function esc(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function trunc8(str) {
+  const s = String(str);
+  return s.length > 8 ? s.slice(0, 8) + '…' : s;
 }
 
 function showToast(msg, type = 'info') {
