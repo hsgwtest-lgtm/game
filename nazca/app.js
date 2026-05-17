@@ -306,9 +306,9 @@ function locateUser() {
 }
 
 // ─── Compass 3-mode cycle ─────────────────────────────────────────────────────
-// Mode 0: default  – needle tracks map rotation, no device listening
-// Mode 1: heading  – needle tracks device heading, map stays fixed (amber button)
-// Mode 2: follow   – map AND needle rotate with device heading (red button)
+// Mode 0: default      – needle tracks map rotation, no device listening
+// Mode 1: heading      – needle tracks device heading, map stays fixed (amber button)
+// Mode 2: bearing lock – map AND needle rotate with device heading (red button)
 async function cycleCompassMode() {
   // Clean up any active device orientation listener
   if (orientationHandler && bearingEventName) {
