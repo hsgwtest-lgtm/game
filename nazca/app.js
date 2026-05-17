@@ -952,7 +952,7 @@ function bindGlobalPanel() {
     }
     try {
       await likeTrack(selectedGlobalTrack.id);
-      showToast('いいね！しました ❤️', 'success');
+      showToast('いいね！しました ☆', 'success');
     } catch (e) {
       showToast('いいね！に失敗しました: ' + e.message, 'error');
     }
@@ -1047,7 +1047,7 @@ function renderGlobalList() {
       <div class="track-color-dot" style="background:${color}"></div>
       <div class="track-item-info">
         <div class="track-item-title">${esc(track.title)}</div>
-        <div class="track-item-sub">${esc(track.user)} · ${track.stats.distance} km · ${track.date} · ❤️ ${track.likes || 0}</div>
+        <div class="track-item-sub">${esc(track.user)} · ${track.stats.distance} km · ${track.date} · ☆ ${track.likes || 0}</div>
       </div>
       <span class="track-item-chevron">›</span>`;
     item.addEventListener('click', () => selectGlobalTrack(track, i));
@@ -1127,7 +1127,7 @@ function selectGlobalTrack(track, idx) {
   document.getElementById('global-detail-info').innerHTML =
     `<strong>${esc(track.title)}</strong><br>` +
     `👤 ${esc(track.user)} &nbsp; 🕐 ${formatTimeRange(track)}<br>` +
-    `📏 ${track.stats.distance} km &nbsp; 🔥 ${track.stats.calories} kcal &nbsp; ❤️ ${track.likes || 0}`;
+    `📏 ${track.stats.distance} km &nbsp; 🔥 ${track.stats.calories} kcal &nbsp; ☆ ${track.likes || 0}`;
 
   document.getElementById('global-like-count').textContent = track.likes || 0;
 
@@ -1480,11 +1480,39 @@ function bindArtGalleryPanel() {
     }
     try {
       await likeTrack(selectedArtTrack.id);
-      showToast('いいね！しました ❤️', 'success');
+      showToast('いいね！しました ☆', 'success');
     } catch (e) {
       showToast('いいね！に失敗しました: ' + e.message, 'error');
     }
   });
+
+  document.getElementById('btn-art-delete').addEventListener('click', () => {
+    if (!selectedArtTrack) return;
+    showConfirmDialog(
+      'この地上絵をアートギャラリーから削除すると、誰も見ることができなくなります。\n本当に削除しますか？',
+      () => deleteArtTrack(selectedArtTrack)
+    );
+  });
+}
+
+async function deleteArtTrack(track) {
+  if (IS_FIREBASE_CONFIGURED) {
+    try {
+      await deleteTrack(track.id);
+    } catch (e) {
+      showToast('削除に失敗しました: ' + e.message, 'error');
+      return;
+    }
+  } else {
+    cachedArtTracks = cachedArtTracks.filter(t => t.id !== track.id);
+  }
+
+  stopCanvasReplay();
+  hideArtCanvasOverlay();
+  selectedArtTrack = null;
+  showArtGalleryListView();
+  renderArtGalleryList();
+  showToast('削除しました', 'info');
 }
 
 function showArtGalleryListView() {
@@ -1549,7 +1577,7 @@ function renderArtGalleryList() {
     info.className = 'art-list-info';
     info.innerHTML =
       `<div class="track-item-title">${esc(track.title)}</div>` +
-      `<div class="track-item-sub">${esc(track.user)} · ${track.date} · ❤️ ${track.likes || 0}</div>`;
+      `<div class="track-item-sub">${esc(track.user)} · ${track.date} · ☆ ${track.likes || 0}</div>`;
 
     const chevron = document.createElement('span');
     chevron.className = 'track-item-chevron';
@@ -1585,7 +1613,7 @@ function selectArtTrack(track, idx) {
   document.getElementById('art-gallery-detail-info').innerHTML =
     `<strong>${esc(track.title)}</strong><br>` +
     `👤 ${esc(track.user)} &nbsp; 📅 ${track.date}<br>` +
-    `📏 ${track.stats.distance} km &nbsp; 🔥 ${track.stats.calories} kcal &nbsp; ❤️ ${track.likes || 0}`;
+    `📏 ${track.stats.distance} km &nbsp; 🔥 ${track.stats.calories} kcal &nbsp; ☆ ${track.likes || 0}`;
 
   document.getElementById('art-like-count').textContent = track.likes || 0;
 
