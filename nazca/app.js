@@ -1,6 +1,6 @@
 'use strict';
 
-import { IS_FIREBASE_CONFIGURED, postTrack, subscribeToTracks, deleteTrack } from './firebase.js';
+import { IS_FIREBASE_CONFIGURED, postTrack, subscribeToTracks, deleteTrack, likeTrack } from './firebase.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const LS_KEY       = 'nazca_tracks';
@@ -146,13 +146,22 @@ let globalUnsubscribe  = null;
 let cachedGlobalTracks = [];
 let globalTracksLoaded = false;
 
+// Art gallery — Firebase subscription handle & track cache
+let artGalleryUnsubscribe = null;
+let cachedArtTracks       = [];
+let artGalleryLoaded      = false;
+
 // Selected tracks for detail view
 let selectedGalleryTrack = null;
 let selectedGlobalTrack  = null;
+let selectedArtTrack     = null;
 
 // Replay state
 let replayTimer    = null;
 let replayPolyline = null;
+
+// Canvas replay state
+let canvasReplayTimer = null;
 
 // ─── Bootstrap ────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', init);
@@ -163,7 +172,12 @@ function init() {
   bindRecordPanel();
   bindGalleryPanel();
   bindGlobalPanel();
-  document.getElementById('btn-stop-replay').addEventListener('click', stopReplay);
+  bindArtGalleryPanel();
+  bindPostPreviewModal();
+  document.getElementById('btn-stop-replay').addEventListener('click', () => {
+    stopReplay();
+    stopCanvasReplay();
+  });
   initUserName();
   initConfirmDialog();
   switchMode('record');
@@ -416,6 +430,7 @@ function switchMode(mode) {
   }
 
   stopReplay();
+  stopCanvasReplay();
   currentMode = mode;
 
   // Nav highlight
@@ -427,15 +442,17 @@ function switchMode(mode) {
   document.getElementById('panel-record').classList.toggle('hidden', mode !== 'record');
   document.getElementById('panel-gallery').classList.toggle('hidden', mode !== 'gallery');
   document.getElementById('panel-global').classList.toggle('hidden', mode !== 'global');
+  document.getElementById('panel-art-gallery').classList.toggle('hidden', mode !== 'artgallery');
 
   // Header label
-  const LABELS = { record: '記録モード', gallery: 'マイ鑑賞', global: 'グローバル鑑賞' };
+  const LABELS = { record: '記録モード', gallery: 'マイ鑑賞', global: 'グローバル鑑賞', artgallery: 'アートギャラリー' };
   document.getElementById('header-mode-label').textContent = LABELS[mode] || '';
 
   // Manage map layers
   galleryLayers.forEach(l => map.removeLayer(l)); galleryLayers = [];
   globalLayers.forEach(l => map.removeLayer(l));  globalLayers = [];
   exitGlobalMode();
+  exitArtGalleryMode();
 
   if (mode === 'record') {
     // Re-display active recording polyline/marker if any
@@ -457,6 +474,8 @@ function switchMode(mode) {
     renderGalleryMap();
   } else if (mode === 'global') {
     enterGlobalMode();
+  } else if (mode === 'artgallery') {
+    enterArtGalleryMode();
   }
 }
 
@@ -599,41 +618,14 @@ function resetRecording() {
   setRecordUI('idle');
 }
 
-async function postFromRecord() {
+function postFromRecord() {
   if (!lastSavedId) return;
 
   const tracks = getTracks();
   const track  = tracks.find(t => t.id === lastSavedId);
   if (!track) return;
 
-  const name = getUserName();
-  if (!name) {
-    showToast('記録タブで名前を入力してから投稿してください', 'error');
-    return;
-  }
-
-  if (!IS_FIREBASE_CONFIGURED) {
-    showToast('Firebase が未設定です。nazca/firebase-config.js を編集してください', 'error');
-    return;
-  }
-
-  const btn = document.getElementById('btn-record-post');
-  btn.disabled = true;
-  btn.textContent = '送信中…';
-
-  try {
-    await postTrack({ ...track, user: name });
-    track.posted = true;
-    track.user   = name;
-    saveTracks(tracks);
-    showToast('グローバルに投稿しました！', 'success');
-    btn.textContent = '☁ 投稿済み';
-  } catch (e) {
-    console.error('postTrack failed:', e);
-    showToast('投稿に失敗しました: ' + e.message, 'error');
-    btn.disabled = false;
-    btn.textContent = '☁ 投稿';
-  }
+  openPostPreview(track);
 }
 
 function updateStats() {
@@ -880,41 +872,14 @@ function startEditTitle(track) {
   input.addEventListener('blur', () => setTimeout(commit, 150));
 }
 
-async function postFromGallery(id) {
+function postFromGallery(id) {
   const tracks = getTracks();
   const track  = tracks.find(t => t.id === id);
   if (!track) return;
 
-  const name = getUserName();
-  if (!name) {
-    showToast('記録タブで名前を入力してから投稿してください', 'error');
-    return;
-  }
-
-  if (!IS_FIREBASE_CONFIGURED) {
-    showToast('Firebase が未設定です。nazca/firebase-config.js を編集してください', 'error');
-    return;
-  }
-
-  const btn = document.getElementById('btn-gallery-post');
-  btn.disabled = true;
-  btn.textContent = '送信中…';
-
-  try {
-    await postTrack({ ...track, user: name });
-    track.posted = true;
-    track.user   = name;
-    saveTracks(tracks);
-    selectedGalleryTrack = track;
-    renderGalleryDetailStats(track);
-    showToast('グローバルに投稿しました！', 'success');
-  } catch (e) {
-    console.error('postTrack failed:', e);
-    showToast('投稿に失敗しました: ' + e.message, 'error');
-    btn.disabled = false;
-    btn.textContent = '☁ 投稿';
-  }
+  openPostPreview(track);
 }
+
 
 // ─── Mode C — Global Gallery ──────────────────────────────────────────────────
 function enterGlobalMode() {
@@ -973,9 +938,23 @@ function bindGlobalPanel() {
 
   document.getElementById('btn-global-replay').addEventListener('click', () => {
     if (selectedGlobalTrack) {
-      const idx   = getGlobalTracks().findIndex(t => t.id === selectedGlobalTrack.id);
+      const idx   = getGlobalMapTracks().findIndex(t => t.id === selectedGlobalTrack.id);
       const color = trackColor(selectedGlobalTrack.user, idx);
       startReplay(selectedGlobalTrack.path, color);
+    }
+  });
+
+  document.getElementById('btn-global-like').addEventListener('click', async () => {
+    if (!selectedGlobalTrack) return;
+    if (!IS_FIREBASE_CONFIGURED) {
+      showToast('Firebase が未設定です', 'error');
+      return;
+    }
+    try {
+      await likeTrack(selectedGlobalTrack.id);
+      showToast('いいね！しました ❤️', 'success');
+    } catch (e) {
+      showToast('いいね！に失敗しました: ' + e.message, 'error');
     }
   });
 
@@ -1023,8 +1002,12 @@ function getGlobalTracks() {
   return cachedGlobalTracks;
 }
 
+function getGlobalMapTracks() {
+  return cachedGlobalTracks.filter(t => !t.mapHidden);
+}
+
 function renderGlobalList() {
-  const tracks    = getGlobalTracks();
+  const tracks    = getGlobalMapTracks();
   const container = document.getElementById('global-list');
   container.innerHTML = '';
 
@@ -1064,7 +1047,7 @@ function renderGlobalList() {
       <div class="track-color-dot" style="background:${color}"></div>
       <div class="track-item-info">
         <div class="track-item-title">${esc(track.title)}</div>
-        <div class="track-item-sub">${esc(track.user)} · ${track.stats.distance} km · ${track.date}</div>
+        <div class="track-item-sub">${esc(track.user)} · ${track.stats.distance} km · ${track.date} · ❤️ ${track.likes || 0}</div>
       </div>
       <span class="track-item-chevron">›</span>`;
     item.addEventListener('click', () => selectGlobalTrack(track, i));
@@ -1075,7 +1058,7 @@ function renderGlobalList() {
 function renderGlobalMap() {
   globalLayers.forEach(l => map.removeLayer(l)); globalLayers = [];
 
-  const tracks   = getGlobalTracks();
+  const tracks   = getGlobalMapTracks();
   const allLatLng = [];
 
   tracks.forEach((track, i) => {
@@ -1109,7 +1092,7 @@ function selectGlobalTrack(track, idx) {
   // Highlight selected, dim others
   globalLayers.forEach(l => map.removeLayer(l)); globalLayers = [];
 
-  const tracks = getGlobalTracks();
+  const tracks = getGlobalMapTracks();
   tracks.forEach((t, i) => {
     const selected = t.id === track.id;
     const color = trackColor(t.user, i);
@@ -1144,7 +1127,9 @@ function selectGlobalTrack(track, idx) {
   document.getElementById('global-detail-info').innerHTML =
     `<strong>${esc(track.title)}</strong><br>` +
     `👤 ${esc(track.user)} &nbsp; 🕐 ${formatTimeRange(track)}<br>` +
-    `📏 ${track.stats.distance} km &nbsp; 🔥 ${track.stats.calories} kcal`;
+    `📏 ${track.stats.distance} km &nbsp; 🔥 ${track.stats.calories} kcal &nbsp; ❤️ ${track.likes || 0}`;
+
+  document.getElementById('global-like-count').textContent = track.likes || 0;
 
   showGlobalDetailView();
 }
@@ -1218,7 +1203,396 @@ function stopReplay() {
   document.getElementById('replay-overlay').classList.add('hidden');
 }
 
-// ─── LocalStorage helpers ─────────────────────────────────────────────────────
+// ─── Canvas Art Rendering ─────────────────────────────────────────────────────
+
+/**
+ * GPS パスを Canvas 座標配列に変換する（回転・正規化済み）
+ * @param {Array} path     GPS 点の配列 [lat, lng, ts]
+ * @param {number} rotationDeg  回転角度（度）
+ * @param {number} W       Canvas 幅
+ * @param {number} H       Canvas 高さ
+ * @returns {{x:number,y:number}[]}
+ */
+function pathToCanvasCoords(path, rotationDeg, W, H) {
+  if (!path || path.length < 2) return [];
+  const centerLat = path.reduce((s, p) => s + p[0], 0) / path.length;
+  const R_DEG = Math.PI / 180;
+  const DEG2M = 6371000 * R_DEG;
+  const points = path.map(p => ({
+    x:  (p[1] - path[0][1]) * Math.cos(centerLat * R_DEG) * DEG2M,
+    y: -(p[0] - path[0][0]) * DEG2M   // y 軸は北が上なので反転
+  }));
+
+  // バウンディングボックス中心を基準に回転
+  const xs = points.map(p => p.x), ys = points.map(p => p.y);
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+  const rad  = rotationDeg * R_DEG;
+  const cosA = Math.cos(rad), sinA = Math.sin(rad);
+  const rotated = points.map(p => ({
+    x: (p.x - cx) * cosA - (p.y - cy) * sinA + cx,
+    y: (p.x - cx) * sinA + (p.y - cy) * cosA + cy
+  }));
+
+  // Canvas 座標に正規化（padding 10%）
+  const rXs = rotated.map(p => p.x), rYs = rotated.map(p => p.y);
+  const minX = Math.min(...rXs), maxX = Math.max(...rXs);
+  const minY = Math.min(...rYs), maxY = Math.max(...rYs);
+  const range = Math.max(maxX - minX, maxY - minY) || 1;
+  const pad   = 0.1;
+  return rotated.map(p => ({
+    x: ((p.x - minX) / range * (1 - pad * 2) + pad) * W,
+    y: ((p.y - minY) / range * (1 - pad * 2) + pad) * H
+  }));
+}
+
+/**
+ * Canvas に GPS 軌跡アートを描画する
+ * @param {HTMLCanvasElement} canvas
+ * @param {Array}  path        GPS 点の配列
+ * @param {number} rotationDeg 回転角度（度）
+ * @param {string} color       線の色
+ */
+function renderArtOnCanvas(canvas, path, rotationDeg, color = MY_COLOR) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#060a14';
+  ctx.fillRect(0, 0, W, H);
+  if (!path || path.length < 2) return;
+
+  const coords = pathToCanvasCoords(path, rotationDeg, W, H);
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = Math.max(2, W / 80);
+  ctx.lineJoin    = 'round';
+  ctx.lineCap     = 'round';
+  ctx.beginPath();
+  coords.forEach((p, i) => {
+    i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
+  });
+  ctx.stroke();
+}
+
+/**
+ * Canvas 上でタイムラプス再生する
+ */
+function startCanvasReplay(canvas, path, rotationDeg, color) {
+  stopCanvasReplay();
+  if (!path || path.length < 2) return;
+
+  const coords = pathToCanvasCoords(path, rotationDeg, canvas.width, canvas.height);
+  const ctx    = canvas.getContext('2d');
+  ctx.fillStyle = '#060a14';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = Math.max(2, canvas.width / 80);
+  ctx.lineJoin    = 'round';
+  ctx.lineCap     = 'round';
+
+  document.getElementById('replay-overlay').classList.remove('hidden');
+
+  let i = 1;
+  function step() {
+    if (i < coords.length) {
+      ctx.beginPath();
+      ctx.moveTo(coords[i - 1].x, coords[i - 1].y);
+      ctx.lineTo(coords[i].x, coords[i].y);
+      ctx.stroke();
+      i++;
+      let delay = 120;
+      if (i < coords.length && path[i] && path[i][2] && path[i - 1][2]) {
+        delay = Math.max(REPLAY_MIN, Math.min(REPLAY_MAX, (path[i][2] - path[i - 1][2]) / REPLAY_SPEED));
+      }
+      canvasReplayTimer = setTimeout(step, delay);
+    } else {
+      canvasReplayTimer = null;
+      document.getElementById('replay-overlay').classList.add('hidden');
+    }
+  }
+  step();
+}
+
+function stopCanvasReplay() {
+  if (canvasReplayTimer !== null) { clearTimeout(canvasReplayTimer); canvasReplayTimer = null; }
+  document.getElementById('replay-overlay').classList.add('hidden');
+}
+
+// ─── Post Preview Modal ───────────────────────────────────────────────────────
+
+function bindPostPreviewModal() {
+  document.getElementById('btn-post-cancel').addEventListener('click', closePostPreview);
+  document.getElementById('post-preview-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('post-preview-modal')) closePostPreview();
+  });
+}
+
+/**
+ * 投稿前プレビューモーダルを開く
+ * @param {object} track  ローカル保存済みトラック
+ */
+function openPostPreview(track) {
+  const name = getUserName();
+  if (!name) {
+    showToast('記録タブで名前を入力してから投稿してください', 'error');
+    return;
+  }
+  if (!IS_FIREBASE_CONFIGURED) {
+    showToast('Firebase が未設定です。nazca/firebase-config.js を編集してください', 'error');
+    return;
+  }
+
+  const canvas     = document.getElementById('art-preview-canvas');
+  const slider     = document.getElementById('rotation-slider');
+  const valueLabel = document.getElementById('rotation-value');
+  const confirmBtn = document.getElementById('btn-post-confirm');
+
+  // Reset modal state
+  slider.value         = 0;
+  valueLabel.textContent = '0';
+  confirmBtn.disabled  = false;
+  confirmBtn.textContent = '☁ 投稿する';
+  document.querySelector('input[name="post-dest"][value="map"]').checked = true;
+
+  const redraw = () => renderArtOnCanvas(canvas, track.path, Number(slider.value));
+  redraw();
+
+  slider.oninput = () => {
+    valueLabel.textContent = slider.value;
+    redraw();
+  };
+
+  confirmBtn.onclick = () => {
+    const dest = document.querySelector('input[name="post-dest"]:checked').value;
+    doPost(track, { rotation: Number(slider.value), dest, userName: name });
+  };
+
+  document.getElementById('post-preview-modal').classList.remove('hidden');
+}
+
+function closePostPreview() {
+  document.getElementById('post-preview-modal').classList.add('hidden');
+}
+
+/**
+ * Firebase に投稿する（投稿先・回転角度を反映）
+ */
+async function doPost(track, opts) {
+  const { rotation = 0, dest = 'map', userName } = opts;
+  const confirmBtn = document.getElementById('btn-post-confirm');
+  confirmBtn.disabled  = true;
+  confirmBtn.textContent = '送信中…';
+
+  try {
+    const baseEntry = { ...track, user: userName };
+    if (dest === 'map' || dest === 'both') {
+      // Map posts use rotation:0 — the geographic coordinates already encode direction;
+      // user-specified rotation only applies to canvas-based art gallery rendering.
+      await postTrack({ ...baseEntry, mapHidden: false, rotation: 0 });
+    }
+    if (dest === 'gallery' || dest === 'both') {
+      await postTrack({ ...baseEntry, mapHidden: true, rotation });
+    }
+
+    // Update local record as posted
+    const tracks = getTracks();
+    const t = tracks.find(x => x.id === track.id);
+    if (t) { t.posted = true; t.user = userName; saveTracks(tracks); }
+    if (selectedGalleryTrack && selectedGalleryTrack.id === track.id) {
+      selectedGalleryTrack.posted = true;
+      selectedGalleryTrack.user   = userName;
+    }
+
+    closePostPreview();
+    showToast('投稿しました！', 'success');
+
+    // Update relevant UI buttons
+    if (currentMode === 'record') {
+      const btn = document.getElementById('btn-record-post');
+      btn.textContent = '☁ 投稿済み';
+      btn.disabled    = true;
+    } else if (currentMode === 'gallery' && selectedGalleryTrack && selectedGalleryTrack.id === track.id) {
+      renderGalleryDetailStats(selectedGalleryTrack);
+    }
+  } catch (e) {
+    console.error('doPost failed:', e);
+    showToast('投稿に失敗しました: ' + e.message, 'error');
+    confirmBtn.disabled  = false;
+    confirmBtn.textContent = '☁ 投稿する';
+  }
+}
+
+// ─── Mode D — Art Gallery ─────────────────────────────────────────────────────
+
+function enterArtGalleryMode() {
+  cachedArtTracks    = [];
+  artGalleryLoaded   = false;
+  selectedArtTrack   = null;
+
+  showArtGalleryListView();
+  renderArtGalleryList();
+
+  if (IS_FIREBASE_CONFIGURED) {
+    artGalleryUnsubscribe = subscribeToTracks((tracks, err) => {
+      if (err) {
+        showToast('アートギャラリーの取得に失敗しました', 'error');
+        return;
+      }
+      artGalleryLoaded = true;
+      cachedArtTracks  = tracks.filter(t => t.mapHidden);
+      if (currentMode === 'artgallery' && !selectedArtTrack) renderArtGalleryList();
+    });
+  } else {
+    artGalleryLoaded = true;
+    cachedArtTracks  = [];  // Firebase なしではアートギャラリー投稿不可
+    renderArtGalleryList();
+  }
+}
+
+function exitArtGalleryMode() {
+  if (artGalleryUnsubscribe) { artGalleryUnsubscribe(); artGalleryUnsubscribe = null; }
+  stopCanvasReplay();
+  hideArtCanvasOverlay();
+  selectedArtTrack = null;
+}
+
+function bindArtGalleryPanel() {
+  document.getElementById('btn-art-back').addEventListener('click', () => {
+    stopCanvasReplay();
+    hideArtCanvasOverlay();
+    selectedArtTrack = null;
+    showArtGalleryListView();
+    renderArtGalleryList();
+  });
+
+  document.getElementById('btn-art-replay').addEventListener('click', () => {
+    if (!selectedArtTrack) return;
+    const canvas = document.getElementById('art-detail-canvas');
+    const idx    = cachedArtTracks.findIndex(t => t.id === selectedArtTrack.id);
+    const color  = trackColor(selectedArtTrack.user, idx);
+    startCanvasReplay(canvas, selectedArtTrack.path, selectedArtTrack.rotation || 0, color);
+  });
+
+  document.getElementById('btn-art-like').addEventListener('click', async () => {
+    if (!selectedArtTrack) return;
+    if (!IS_FIREBASE_CONFIGURED) {
+      showToast('Firebase が未設定です', 'error');
+      return;
+    }
+    try {
+      await likeTrack(selectedArtTrack.id);
+      showToast('いいね！しました ❤️', 'success');
+    } catch (e) {
+      showToast('いいね！に失敗しました: ' + e.message, 'error');
+    }
+  });
+}
+
+function showArtGalleryListView() {
+  document.getElementById('art-gallery-list-view').classList.remove('hidden');
+  document.getElementById('art-gallery-detail-view').classList.add('hidden');
+}
+
+function showArtGalleryDetailView() {
+  document.getElementById('art-gallery-list-view').classList.add('hidden');
+  document.getElementById('art-gallery-detail-view').classList.remove('hidden');
+}
+
+function showArtCanvasOverlay() {
+  document.getElementById('art-canvas-overlay').classList.remove('hidden');
+}
+
+function hideArtCanvasOverlay() {
+  document.getElementById('art-canvas-overlay').classList.add('hidden');
+}
+
+function renderArtGalleryList() {
+  const container = document.getElementById('art-gallery-list');
+  container.innerHTML = '';
+
+  if (!IS_FIREBASE_CONFIGURED) {
+    const banner = document.createElement('div');
+    banner.className = 'firebase-notice';
+    banner.textContent = '⚠️ Firebase 未設定 — アートギャラリーは投稿機能が使えません';
+    container.appendChild(banner);
+  }
+
+  if (IS_FIREBASE_CONFIGURED && !artGalleryLoaded) {
+    container.innerHTML += `
+      <div class="empty-state">
+        <span class="empty-icon">🎨</span>
+        <span class="empty-text">読み込み中…</span>
+      </div>`;
+    return;
+  }
+
+  if (cachedArtTracks.length === 0) {
+    container.innerHTML += `
+      <div class="empty-state">
+        <span class="empty-icon">🎨</span>
+        <span class="empty-text">まだアート作品がありません</span>
+        <span class="empty-sub">投稿時に「アートギャラリー」を選択しましょう</span>
+      </div>`;
+    return;
+  }
+
+  cachedArtTracks.forEach((track, i) => {
+    const color = trackColor(track.user, i);
+    const item  = document.createElement('div');
+    item.className = 'art-list-item';
+
+    const thumb = document.createElement('canvas');
+    thumb.width  = 52;
+    thumb.height = 52;
+    thumb.className = 'art-list-thumb';
+
+    const info = document.createElement('div');
+    info.className = 'art-list-info';
+    info.innerHTML =
+      `<div class="track-item-title">${esc(track.title)}</div>` +
+      `<div class="track-item-sub">${esc(track.user)} · ${track.date} · ❤️ ${track.likes || 0}</div>`;
+
+    const chevron = document.createElement('span');
+    chevron.className = 'track-item-chevron';
+    chevron.textContent = '›';
+
+    item.appendChild(thumb);
+    item.appendChild(info);
+    item.appendChild(chevron);
+
+    renderArtOnCanvas(thumb, track.path, track.rotation || 0, color);
+    item.addEventListener('click', () => selectArtTrack(track, i));
+    container.appendChild(item);
+  });
+}
+
+function selectArtTrack(track, idx) {
+  selectedArtTrack = track;
+
+  // Size the detail canvas to fit the map container
+  const mapContainer = document.getElementById('map-container');
+  const W = mapContainer.clientWidth  || 320;
+  const H = mapContainer.clientHeight || 320;
+  const size = Math.round(Math.min(W, H) * 0.88);
+
+  const canvas = document.getElementById('art-detail-canvas');
+  canvas.width  = size;
+  canvas.height = size;
+
+  const color = trackColor(track.user, idx);
+  renderArtOnCanvas(canvas, track.path, track.rotation || 0, color);
+  showArtCanvasOverlay();
+
+  document.getElementById('art-gallery-detail-info').innerHTML =
+    `<strong>${esc(track.title)}</strong><br>` +
+    `👤 ${esc(track.user)} &nbsp; 📅 ${track.date}<br>` +
+    `📏 ${track.stats.distance} km &nbsp; 🔥 ${track.stats.calories} kcal &nbsp; ❤️ ${track.likes || 0}`;
+
+  document.getElementById('art-like-count').textContent = track.likes || 0;
+
+  showArtGalleryDetailView();
+}
+
+
 function getTracks() {
   try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); }
   catch { return []; }

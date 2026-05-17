@@ -14,7 +14,7 @@ const SDK_BASE = 'https://www.gstatic.com/firebasejs/10.12.2';
 
 // ─── Firebase シングルトン ───────────────────────────────────────────────────
 let _db = null;
-let _fbRef, _fbPush, _fbGet, _fbOnValue, _fbRemove;
+let _fbRef, _fbPush, _fbGet, _fbOnValue, _fbRemove, _fbUpdate, _fbIncrement;
 
 async function ensureFirebase() {
   if (_db) return _db;
@@ -26,12 +26,14 @@ async function ensureFirebase() {
   }
 
   const { initializeApp, getApps } = await import(`${SDK_BASE}/firebase-app.js`);
-  const { getDatabase, ref, push, get, onValue, remove } =
+  const { getDatabase, ref, push, get, onValue, remove, update, increment } =
     await import(`${SDK_BASE}/firebase-database.js`);
 
   const app = getApps().length > 0 ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
-  _db    = getDatabase(app);
-  _fbRef = ref; _fbPush = push; _fbGet = get; _fbOnValue = onValue; _fbRemove = remove;
+  _db          = getDatabase(app);
+  _fbRef       = ref; _fbPush = push; _fbGet = get; _fbOnValue = onValue; _fbRemove = remove;
+  _fbUpdate    = update;
+  _fbIncrement = increment;
   return _db;
 }
 
@@ -65,6 +67,9 @@ export async function postTrack(track) {
     startTime: track.startTime || null,
     endTime:   track.endTime   || null,
     postedAt:  Date.now(),
+    mapHidden: track.mapHidden || false,
+    rotation:  track.rotation  || 0,
+    likes:     0,
   };
 
   await _fbPush(_fbRef(db, 'tracks'), entry);
@@ -81,10 +86,15 @@ export async function deleteTrack(id) {
 }
 
 /**
- * トラック一覧をリアルタイム購読する
- * @param {(tracks: Array, err?: Error) => void} callback
- * @returns {() => void} 購読解除関数
+ * トラックのいいね数をアトミックに +1 する
+ * @param {string} id  Firebase のキー
+ * @returns {Promise<void>}
  */
+export async function likeTrack(id) {
+  const db = await ensureFirebase();
+  await _fbUpdate(_fbRef(db, `tracks/${id}`), { likes: _fbIncrement(1) });
+}
+
 export function subscribeToTracks(callback) {
   let unsubFn = () => {};
 
