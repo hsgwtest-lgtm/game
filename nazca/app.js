@@ -184,7 +184,7 @@ function initMap() {
   startPreLocate();
 }
 
-// ─── Map buttons (N / locate / bearing-lock) — placed in Leaflet's top-left control area ────
+// ─── Map buttons (N / locate) — placed in Leaflet's top-left control area ────
 function initMapControls() {
   const MapBtnsControl = L.Control.extend({
     options: { position: 'topleft' },
@@ -196,20 +196,57 @@ function initMapControls() {
         '</button>' +
         '<button id="btn-locate" class="map-ctrl-btn" title="現在地へ">' +
           '<span class="map-ctrl-icon">📍</span>' +
-        '</button>' +
-        '<button id="btn-bearing-lock" class="map-ctrl-btn" title="コンパス方向に追従">' +
-          '<span class="map-ctrl-icon">🧭</span>' +
         '</button>';
       L.DomEvent.disableClickPropagation(div);
       return div;
     }
   });
   new MapBtnsControl().addTo(map);
+
+  // Compass widget — top-right: rotating needle + bearing-lock toggle
+  const CompassControl = L.Control.extend({
+    options: { position: 'topright' },
+    onAdd() {
+      const div = L.DomUtil.create('div', 'map-compass-wrap');
+      div.innerHTML =
+        '<button id="btn-compass" class="map-compass-btn" title="コンパス / 方位ロック">' +
+          '<svg viewBox="0 0 32 32" width="30" height="30">' +
+            '<circle cx="16" cy="16" r="14.5" fill="none"' +
+              ' stroke="rgba(99,210,255,0.18)" stroke-width="1"/>' +
+            '<g id="compass-rose">' +
+              '<polygon points="16,4 18.2,14.5 16,12.5 13.8,14.5" fill="#f87171"/>' +
+              '<polygon points="16,28 18.2,17.5 16,19.5 13.8,17.5"' +
+                ' fill="rgba(226,232,240,0.35)"/>' +
+              '<circle cx="16" cy="16" r="2" fill="rgba(226,232,240,0.55)"/>' +
+            '</g>' +
+          '</svg>' +
+        '</button>';
+      L.DomEvent.disableClickPropagation(div);
+      return div;
+    }
+  });
+  new CompassControl().addTo(map);
+
   document.getElementById('btn-north').addEventListener('click', () => {
     if (map.setBearing) map.setBearing(0, { animate: true });
+    updateCompassWidget(0);
   });
   document.getElementById('btn-locate').addEventListener('click', locateUser);
-  document.getElementById('btn-bearing-lock').addEventListener('click', toggleBearingLock);
+  document.getElementById('btn-compass').addEventListener('click', toggleBearingLock);
+
+  // Keep compass in sync when the map is rotated by pinch gesture
+  map.on('rotate', () => {
+    const b = (map.getBearing ? map.getBearing() : map._bearing) || 0;
+    updateCompassWidget(b);
+  });
+}
+
+// ─── Compass widget rotation ──────────────────────────────────────────────────
+let _compassRoseEl = null;
+function updateCompassWidget(bearing) {
+  if (!_compassRoseEl) _compassRoseEl = document.getElementById('compass-rose');
+  if (!_compassRoseEl) return;
+  _compassRoseEl.style.transform = 'rotate(' + (-bearing) + 'deg)';
 }
 
 // ─── Pre-start GPS locate ─────────────────────────────────────────────────────
@@ -276,7 +313,7 @@ async function toggleBearingLock() {
       orientationHandler = null;
       bearingEventName   = null;
     }
-    document.getElementById('btn-bearing-lock').classList.remove('active');
+    document.getElementById('btn-compass').classList.remove('active');
     return;
   }
 
@@ -296,17 +333,20 @@ async function toggleBearingLock() {
   }
 
   bearingLocked = true;
-  document.getElementById('btn-bearing-lock').classList.add('active');
+  document.getElementById('btn-compass').classList.add('active');
 
   orientationHandler = e => {
     let heading = null;
     if (e.webkitCompassHeading !== undefined && e.webkitCompassHeading !== null) {
-      heading = e.webkitCompassHeading;
+      // webkitCompassHeading: degrees clockwise from true north (0=N, 90=E).
+      // Negate so the map rotates in the correct direction.
+      heading = (360 - e.webkitCompassHeading) % 360;
     } else if (e.alpha !== null) {
       heading = (360 - e.alpha) % 360;
     }
     if (heading !== null && map.setBearing) {
       map.setBearing(heading, { animate: false });
+      updateCompassWidget(heading);
     }
   };
 
