@@ -133,6 +133,10 @@ html, body {
   background: rgba(248,113,113,0.18);
   border-color: rgba(248,113,113,0.6);
 }
+.map-compass-btn.heading {
+  background: rgba(251,191,36,0.18);
+  border-color: rgba(251,191,36,0.6);
+}
 #compass-rose {
   transition: transform 0.12s linear;
   transform-origin: 16px 16px;
