@@ -234,11 +234,13 @@ function initMapControls() {
   document.getElementById('btn-locate').addEventListener('click', locateUser);
   document.getElementById('btn-compass').addEventListener('click', cycleCompassMode);
 
-  // Keep compass in sync when the map is rotated by pinch gesture (mode 0 only)
-  map.on('rotate', () => {
+  // Keep compass in sync when the map is rotated by pinch gesture (mode 0 only).
+  // Listen to both 'rotate' and 'move' to get real-time, per-frame updates.
+  map.on('rotate move', () => {
     if (compassMode !== 0) return;
     const b = (map.getBearing ? map.getBearing() : map._bearing) || 0;
-    updateCompassWidget(b);
+    // Negate so the needle rotates in the same direction as the map.
+    updateCompassWidget(-b);
   });
 }
 
@@ -324,8 +326,13 @@ async function cycleCompassMode() {
     // Return to default: reset compass to current map bearing
     compassMode = 0;
     btn.classList.remove('active', 'heading');
+    // Re-enable map interaction in case we're leaving fixed mode (mode 1)
+    map.dragging.enable();
+    if (map.touchZoom) map.touchZoom.enable();
+    if (map.scrollWheelZoom) map.scrollWheelZoom.enable();
     const b = (map.getBearing ? map.getBearing() : map._bearing) || 0;
-    updateCompassWidget(b);
+    // Negate so the needle rotates in the same direction as the map.
+    updateCompassWidget(-b);
     return;
   }
 
@@ -350,13 +357,31 @@ async function cycleCompassMode() {
     // Heading indicator: compass needle follows device, map stays fixed
     btn.classList.remove('active');
     btn.classList.add('heading');
+    // Disable all map panning/zooming so the map cannot be moved by touch
+    map.dragging.disable();
+    if (map.touchZoom) map.touchZoom.disable();
+    if (map.scrollWheelZoom) map.scrollWheelZoom.disable();
   } else {
     // Bearing lock: map rotates with device heading
     btn.classList.remove('heading');
     btn.classList.add('active');
+    // Re-enable map interaction (in case we came from fixed mode)
+    map.dragging.enable();
+    if (map.touchZoom) map.touchZoom.enable();
+    if (map.scrollWheelZoom) map.scrollWheelZoom.enable();
   }
 
+  // Skip the first few orientation readings which are often unreliable at launch.
+  // Declared here (inside cycleCompassMode) so the counter resets on every mode activation.
+  let orientationWarmupCount = 0;
+  const ORIENTATION_WARMUP = 5;
+
   orientationHandler = e => {
+    // Discard the initial burst of unreliable readings
+    if (orientationWarmupCount < ORIENTATION_WARMUP) {
+      orientationWarmupCount++;
+      return;
+    }
     let heading = null;
     if (e.webkitCompassHeading !== undefined && e.webkitCompassHeading !== null) {
       // webkitCompassHeading: degrees clockwise from true north (0=N, 90=E).
