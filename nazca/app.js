@@ -132,10 +132,10 @@ let lastSavedId     = null;
 let locateDot       = null;
 let preLocateWatchId = null;
 
-// Bearing lock
-let bearingLocked        = false;
-let orientationHandler   = null;
-let bearingEventName     = null;
+// Compass mode (0 = default, 1 = heading indicator, 2 = bearing lock)
+let compassMode        = 0;
+let orientationHandler = null;
+let bearingEventName   = null;
 
 // Layers owned by gallery / global mode
 let galleryLayers = [];
@@ -232,10 +232,11 @@ function initMapControls() {
     updateCompassWidget(0);
   });
   document.getElementById('btn-locate').addEventListener('click', locateUser);
-  document.getElementById('btn-compass').addEventListener('click', toggleBearingLock);
+  document.getElementById('btn-compass').addEventListener('click', cycleCompassMode);
 
-  // Keep compass in sync when the map is rotated by pinch gesture
+  // Keep compass in sync when the map is rotated by pinch gesture (mode 0 only)
   map.on('rotate', () => {
+    if (compassMode !== 0) return;
     const b = (map.getBearing ? map.getBearing() : map._bearing) || 0;
     updateCompassWidget(b);
   });
@@ -246,7 +247,7 @@ let _compassRoseEl = null;
 function updateCompassWidget(bearing) {
   if (!_compassRoseEl) _compassRoseEl = document.getElementById('compass-rose');
   if (!_compassRoseEl) return;
-  _compassRoseEl.style.transform = 'rotate(' + (-bearing) + 'deg)';
+  _compassRoseEl.style.transform = 'rotate(' + bearing + 'deg)';
 }
 
 // ─── Pre-start GPS locate ─────────────────────────────────────────────────────
@@ -304,20 +305,31 @@ function locateUser() {
   }
 }
 
-// ─── Bearing lock ─────────────────────────────────────────────────────────────
-async function toggleBearingLock() {
-  if (bearingLocked) {
-    bearingLocked = false;
-    if (orientationHandler && bearingEventName) {
-      window.removeEventListener(bearingEventName, orientationHandler, true);
-      orientationHandler = null;
-      bearingEventName   = null;
-    }
-    document.getElementById('btn-compass').classList.remove('active');
+// ─── Compass 3-mode cycle ─────────────────────────────────────────────────────
+// Mode 0: default  – needle tracks map rotation, no device listening
+// Mode 1: heading  – needle tracks device heading, map stays fixed (amber button)
+// Mode 2: follow   – map AND needle rotate with device heading (red button)
+async function cycleCompassMode() {
+  // Clean up any active device orientation listener
+  if (orientationHandler && bearingEventName) {
+    window.removeEventListener(bearingEventName, orientationHandler, true);
+    orientationHandler = null;
+    bearingEventName   = null;
+  }
+
+  const btn = document.getElementById('btn-compass');
+  const nextMode = (compassMode + 1) % 3;
+
+  if (nextMode === 0) {
+    // Return to default: reset compass to current map bearing
+    compassMode = 0;
+    btn.classList.remove('active', 'heading');
+    const b = (map.getBearing ? map.getBearing() : map._bearing) || 0;
+    updateCompassWidget(b);
     return;
   }
 
-  // iOS 13+ requires permission
+  // Modes 1 & 2 require device orientation — request iOS permission once
   if (typeof DeviceOrientationEvent !== 'undefined' &&
       typeof DeviceOrientationEvent.requestPermission === 'function') {
     try {
@@ -332,21 +344,30 @@ async function toggleBearingLock() {
     }
   }
 
-  bearingLocked = true;
-  document.getElementById('btn-compass').classList.add('active');
+  compassMode = nextMode;
+
+  if (compassMode === 1) {
+    // Heading indicator: compass needle follows device, map stays fixed
+    btn.classList.remove('active');
+    btn.classList.add('heading');
+  } else {
+    // Bearing lock: map rotates with device heading
+    btn.classList.remove('heading');
+    btn.classList.add('active');
+  }
 
   orientationHandler = e => {
     let heading = null;
     if (e.webkitCompassHeading !== undefined && e.webkitCompassHeading !== null) {
-      // webkitCompassHeading: degrees clockwise from true north (0=N, 90=E).
-      // Negate so the map rotates in the correct direction.
-      heading = (360 - e.webkitCompassHeading) % 360;
+      heading = e.webkitCompassHeading;
     } else if (e.alpha !== null) {
       heading = (360 - e.alpha) % 360;
     }
-    if (heading !== null && map.setBearing) {
+    if (heading === null) return;
+
+    updateCompassWidget(heading);
+    if (compassMode === 2 && map.setBearing) {
       map.setBearing(heading, { animate: false });
-      updateCompassWidget(heading);
     }
   };
 
@@ -355,7 +376,6 @@ async function toggleBearingLock() {
     : 'deviceorientation';
   window.addEventListener(bearingEventName, orientationHandler, true);
 }
-
 
 function bindNav() {
   document.querySelectorAll('.nav-btn').forEach(btn => {
