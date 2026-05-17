@@ -173,8 +173,7 @@ function init() {
 function initMap() {
   map = L.map('map', {
     center: [35.681, 139.767], zoom: 13, zoomControl: true,
-    rotate: true, touchRotate: true, bearing: 0,
-    renderer: L.canvas()
+    rotate: true, touchRotate: true, bearing: 0
   });
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
