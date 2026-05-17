@@ -247,7 +247,7 @@ let _compassRoseEl = null;
 function updateCompassWidget(bearing) {
   if (!_compassRoseEl) _compassRoseEl = document.getElementById('compass-rose');
   if (!_compassRoseEl) return;
-  _compassRoseEl.style.transform = 'rotate(' + bearing + 'deg)';
+  _compassRoseEl.style.transform = 'rotate(' + (-bearing) + 'deg)';
 }
 
 // ─── Pre-start GPS locate ─────────────────────────────────────────────────────
@@ -359,7 +359,9 @@ async function cycleCompassMode() {
   orientationHandler = e => {
     let heading = null;
     if (e.webkitCompassHeading !== undefined && e.webkitCompassHeading !== null) {
-      heading = e.webkitCompassHeading;
+      // webkitCompassHeading: degrees clockwise from true north (0=N, 90=E).
+      // Negate so the map rotates in the correct direction.
+      heading = (360 - e.webkitCompassHeading) % 360;
     } else if (e.alpha !== null) {
       heading = (360 - e.alpha) % 360;
     }
