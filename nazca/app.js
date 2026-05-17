@@ -181,6 +181,18 @@ function initMap() {
   }).addTo(map);
   initMapControls();
   startPreLocate();
+
+  // leaflet-rotate applies a CSS matrix transform to the map pane mid-pinch-gesture
+  // to animate bearing changes, but the SVG renderer only re-projects its path
+  // pixel-coordinates on 'viewreset' (end of gesture).  During the gesture the
+  // paths therefore keep their pre-gesture pixel coordinates while being carried
+  // by the CSS transform, causing them to appear to "slide" with the old shape
+  // and orientation.  Forcing _reset() on every 'rotate' event recalculates path
+  // pixel-coordinates and the SVG container transform for the updated bearing so
+  // that polylines stay aligned with the map tiles throughout the gesture.
+  map.on('rotate', function () {
+    if (map._renderer) map._renderer._reset();
+  });
 }
 
 // ─── Map buttons (N / locate) — placed in Leaflet's top-left control area ────
