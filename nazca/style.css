@@ -129,7 +129,13 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 .map-compass-btn:active { background: rgba(99,210,255,0.14); }
-.map-compass-btn.active {
+/* 固定モード: yellow/amber border */
+.map-compass-btn.mode-fixed {
+  background: rgba(251,191,36,0.18);
+  border-color: rgba(251,191,36,0.7);
+}
+/* iPhoneに追従モード: red border (keeps previous feel) */
+.map-compass-btn.mode-iphone {
   background: rgba(248,113,113,0.18);
   border-color: rgba(248,113,113,0.6);
 }
