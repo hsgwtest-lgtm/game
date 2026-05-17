@@ -190,6 +190,11 @@ function initMap() {
   // and orientation.  Forcing _reset() on every 'rotate' event recalculates path
   // pixel-coordinates and the SVG container transform for the updated bearing so
   // that polylines stay aligned with the map tiles throughout the gesture.
+  //
+  // Note: _renderer and _reset() are Leaflet internal APIs.  Leaflet 1.9.x has
+  // no public method that triggers only the renderer's recalculation without also
+  // reloading tiles (map.fire('viewreset') would do both).  If a future Leaflet
+  // version exposes a public equivalent this call should be updated.
   map.on('rotate', function () {
     if (map._renderer) map._renderer._reset();
   });
