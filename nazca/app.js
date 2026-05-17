@@ -133,8 +133,9 @@ let locateDot       = null;
 let preLocateWatchId = null;
 
 // Bearing lock
-let bearingLocked       = false;
-let orientationHandler  = null;
+let bearingLocked        = false;
+let orientationHandler   = null;
+let bearingEventName     = null;
 
 // Layers owned by gallery / global mode
 let galleryLayers = [];
@@ -264,10 +265,10 @@ function locateUser() {
 async function toggleBearingLock() {
   if (bearingLocked) {
     bearingLocked = false;
-    if (orientationHandler) {
-      window.removeEventListener('deviceorientationabsolute', orientationHandler, true);
-      window.removeEventListener('deviceorientation', orientationHandler, true);
+    if (orientationHandler && bearingEventName) {
+      window.removeEventListener(bearingEventName, orientationHandler, true);
       orientationHandler = null;
+      bearingEventName   = null;
     }
     document.getElementById('btn-bearing-lock').classList.remove('active');
     return;
@@ -295,9 +296,7 @@ async function toggleBearingLock() {
     let heading = null;
     if (e.webkitCompassHeading !== undefined && e.webkitCompassHeading !== null) {
       heading = e.webkitCompassHeading;
-    } else if (e.absolute && e.alpha !== null) {
-      heading = (360 - e.alpha) % 360;
-    } else if (!e.absolute && e.alpha !== null) {
+    } else if (e.alpha !== null) {
       heading = (360 - e.alpha) % 360;
     }
     if (heading !== null && map.setBearing) {
@@ -305,12 +304,10 @@ async function toggleBearingLock() {
     }
   };
 
-  const hasAbsolute = 'ondeviceorientationabsolute' in window;
-  if (hasAbsolute) {
-    window.addEventListener('deviceorientationabsolute', orientationHandler, true);
-  } else {
-    window.addEventListener('deviceorientation', orientationHandler, true);
-  }
+  bearingEventName = ('ondeviceorientationabsolute' in window)
+    ? 'deviceorientationabsolute'
+    : 'deviceorientation';
+  window.addEventListener(bearingEventName, orientationHandler, true);
 }
 
 
@@ -1206,6 +1203,8 @@ function showToast(msg, type = 'info') {
 }
 
 // ─── Confirm Dialog ───────────────────────────────────────────────────────────
+let _confirmOkHandler = null;
+
 function initConfirmDialog() {
   document.getElementById('confirm-dialog-cancel').addEventListener('click', closeConfirmDialog);
   document.getElementById('confirm-dialog-overlay').addEventListener('click', closeConfirmDialog);
@@ -1221,13 +1220,13 @@ function showConfirmDialog(msg, onOk) {
   dialog.classList.remove('hidden');
 
   const okBtn = document.getElementById('confirm-dialog-ok');
-  const handler = () => {
-    okBtn.removeEventListener('click', handler);
+  // Remove any previous handler before attaching a new one
+  if (_confirmOkHandler) {
+    okBtn.removeEventListener('click', _confirmOkHandler);
+  }
+  _confirmOkHandler = () => {
     closeConfirmDialog();
     onOk();
   };
-  // Remove any previous listener by cloning
-  const newOkBtn = okBtn.cloneNode(true);
-  okBtn.parentNode.replaceChild(newOkBtn, okBtn);
-  newOkBtn.addEventListener('click', handler);
+  okBtn.addEventListener('click', _confirmOkHandler, { once: true });
 }
