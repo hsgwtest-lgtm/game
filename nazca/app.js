@@ -1300,7 +1300,7 @@ function startCanvasReplay(canvas, path, rotationDeg, color) {
       ctx.stroke();
       i++;
       let delay = 120;
-      if (i < path.length && path[i] && path[i][2] && path[i - 1][2]) {
+      if (i < coords.length && path[i] && path[i][2] && path[i - 1][2]) {
         delay = Math.max(REPLAY_MIN, Math.min(REPLAY_MAX, (path[i][2] - path[i - 1][2]) / REPLAY_SPEED));
       }
       canvasReplayTimer = setTimeout(step, delay);
@@ -1385,6 +1385,8 @@ async function doPost(track, opts) {
   try {
     const baseEntry = { ...track, user: userName };
     if (dest === 'map' || dest === 'both') {
+      // Map posts use rotation:0 — the geographic coordinates already encode direction;
+      // user-specified rotation only applies to canvas-based art gallery rendering.
       await postTrack({ ...baseEntry, mapHidden: false, rotation: 0 });
     }
     if (dest === 'gallery' || dest === 'both') {
