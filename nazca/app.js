@@ -132,8 +132,8 @@ let lastSavedId     = null;
 let locateDot       = null;
 let preLocateWatchId = null;
 
-// Bearing lock
-let bearingLocked        = false;
+// Compass mode: 0=地図に追従, 1=固定, 2=iPhoneに追従
+let compassMode          = 0;
 let orientationHandler   = null;
 let bearingEventName     = null;
 
@@ -232,7 +232,7 @@ function initMapControls() {
     updateCompassWidget(0);
   });
   document.getElementById('btn-locate').addEventListener('click', locateUser);
-  document.getElementById('btn-compass').addEventListener('click', toggleBearingLock);
+  document.getElementById('btn-compass').addEventListener('click', cycleCompassMode);
 
   // Keep compass in sync when the map is rotated by pinch gesture
   map.on('rotate', () => {
@@ -304,56 +304,91 @@ function locateUser() {
   }
 }
 
-// ─── Bearing lock ─────────────────────────────────────────────────────────────
-async function toggleBearingLock() {
-  if (bearingLocked) {
-    bearingLocked = false;
-    if (orientationHandler && bearingEventName) {
-      window.removeEventListener(bearingEventName, orientationHandler, true);
-      orientationHandler = null;
-      bearingEventName   = null;
-    }
-    document.getElementById('btn-compass').classList.remove('active');
-    return;
+// ─── Compass mode cycle: 0=地図に追従 → 1=固定 → 2=iPhoneに追従 → 0 ───────────
+function _stopOrientationTracking() {
+  if (orientationHandler && bearingEventName) {
+    window.removeEventListener(bearingEventName, orientationHandler, true);
+    orientationHandler = null;
+    bearingEventName   = null;
+  }
+}
+
+function _applyCompassModeClass() {
+  const btn = document.getElementById('btn-compass');
+  btn.classList.remove('mode-fixed', 'mode-iphone');
+  if (compassMode === 1) btn.classList.add('mode-fixed');
+  if (compassMode === 2) btn.classList.add('mode-iphone');
+}
+
+function _enterFixedMode() {
+  compassMode = 1;
+  if (map.touchRotate) map.touchRotate.disable();
+  _applyCompassModeClass();
+}
+
+async function cycleCompassMode() {
+  const nextMode = (compassMode + 1) % 3;
+
+  // ── Tear down current mode ──────────────────────────────────────────────
+  if (compassMode === 1) {
+    // Leave 固定: re-enable touch rotation
+    if (map.touchRotate) map.touchRotate.enable();
+  } else if (compassMode === 2) {
+    // Leave iPhoneに追従: stop listening
+    _stopOrientationTracking();
   }
 
-  // iOS 13+ requires permission
-  if (typeof DeviceOrientationEvent !== 'undefined' &&
-      typeof DeviceOrientationEvent.requestPermission === 'function') {
-    try {
-      const perm = await DeviceOrientationEvent.requestPermission();
-      if (perm !== 'granted') {
+  // ── Enter next mode ─────────────────────────────────────────────────────
+  if (nextMode === 1) {
+    // 固定: lock bearing at current value, disable 2-finger rotation
+    _enterFixedMode();
+
+  } else if (nextMode === 2) {
+    // iPhoneに追従: request permission then start tracking
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+      try {
+        const perm = await DeviceOrientationEvent.requestPermission();
+        if (perm !== 'granted') {
+          showToast('コンパスの使用を許可してください', 'error');
+          _enterFixedMode();
+          return;
+        }
+      } catch (e) {
         showToast('コンパスの使用を許可してください', 'error');
+        _enterFixedMode();
         return;
       }
-    } catch (e) {
-      showToast('コンパスの使用を許可してください', 'error');
-      return;
     }
+
+    compassMode = 2;
+    _applyCompassModeClass();
+
+    orientationHandler = e => {
+      let heading = null;
+      if (e.webkitCompassHeading !== undefined && e.webkitCompassHeading !== null) {
+        // webkitCompassHeading: degrees clockwise from true north (0=N, 90=E).
+        // Negate so the map rotates in the correct direction.
+        heading = (360 - e.webkitCompassHeading) % 360;
+      } else if (e.alpha !== null) {
+        heading = (360 - e.alpha) % 360;
+      }
+      if (heading !== null && map.setBearing) {
+        map.setBearing(heading, { animate: false });
+        updateCompassWidget(heading);
+      }
+    };
+
+    bearingEventName = ('ondeviceorientationabsolute' in window)
+      ? 'deviceorientationabsolute'
+      : 'deviceorientation';
+    window.addEventListener(bearingEventName, orientationHandler, true);
+
+  } else {
+    // 地図に追従 (mode 0): just follow the map passively
+    compassMode = 0;
+    _applyCompassModeClass();
   }
-
-  bearingLocked = true;
-  document.getElementById('btn-compass').classList.add('active');
-
-  orientationHandler = e => {
-    let heading = null;
-    if (e.webkitCompassHeading !== undefined && e.webkitCompassHeading !== null) {
-      // webkitCompassHeading: degrees clockwise from true north (0=N, 90=E).
-      // Negate so the map rotates in the correct direction.
-      heading = (360 - e.webkitCompassHeading) % 360;
-    } else if (e.alpha !== null) {
-      heading = (360 - e.alpha) % 360;
-    }
-    if (heading !== null && map.setBearing) {
-      map.setBearing(heading, { animate: false });
-      updateCompassWidget(heading);
-    }
-  };
-
-  bearingEventName = ('ondeviceorientationabsolute' in window)
-    ? 'deviceorientationabsolute'
-    : 'deviceorientation';
-  window.addEventListener(bearingEventName, orientationHandler, true);
 }
 
 
