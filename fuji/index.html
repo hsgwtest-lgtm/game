@@ -1192,10 +1192,10 @@ function init() {
   }
 }
 
-let _resizeTimer;
+let resizeTimer;
 window.addEventListener('resize', () => {
-  clearTimeout(_resizeTimer);
-  _resizeTimer = setTimeout(() => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
