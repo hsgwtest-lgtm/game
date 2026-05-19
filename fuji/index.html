@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#020010">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="富士登山2026">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>富士登山 2026 🗻</title>
+
+<style>
+:root {
+  --bg:      #020010;
+  --cyan:    #00f5ff;
+  --orange:  #ff6b35;
+  --gold:    #ffd700;
+  --green:   #00ff88;
+  --magenta: #ff00aa;
+  --snow:    #dde8ff;
+  --card:    rgba(2,0,20,0.78);
+  --border:  rgba(0,245,255,0.14);
+  --text:    #e8f4ff;
+  --muted:   rgba(200,230,255,0.55);
+  --safe-top:    env(safe-area-inset-top,0px);
+  --safe-bottom: env(safe-area-inset-bottom,0px);
+  --glow-c: 0 0 8px #00f5ff88,0 0 28px #00f5ff22;
+  --glow-o: 0 0 8px #ff6b3588,0 0 24px #ff6b3522;
+  --glow-g: 0 0 8px #ffd70088,0 0 24px #ffd70022;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system,'Hiragino Sans','Yu Gothic','Noto Sans JP',sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+a { text-decoration: none; color: inherit; }
+button { font-family: inherit; border: none; cursor: pointer; }
+
+/* ── Three.js canvas ── */
+#three-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ── Plan HUD ── */
+#plan-hud {
+  position: fixed;
+  top: calc(var(--safe-top) + 14px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  gap: 6px;
+  background: rgba(2,0,20,0.65);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 5px 6px;
+}
+.plan-btn {
+  padding: 6px 18px;
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  background: transparent;
+  transition: all 0.35s ease;
+  letter-spacing: 0.3px;
+}
+.plan-btn.active {
+  background: rgba(255,107,53,0.2);
+  color: var(--orange);
+  box-shadow: var(--glow-o);
+}
+
+/* ── Sky HUD ── */
+#sky-hud {
+  position: fixed;
+  top: calc(var(--safe-top) + 14px);
+  right: 16px;
+  z-index: 20;
+  background: rgba(2,0,20,0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 7px 13px;
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+#sky-hud .dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--orange);
+  box-shadow: 0 0 6px var(--orange);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
+
+/* ── App shell ── */
+#app { position: relative; z-index: 1; }
+
+/* ── Hero ── */
+#hero {
+  height: 100dvh;
+  min-height: 580px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+.hero-grad {
+  background: linear-gradient(to top,rgba(2,0,16,.96) 0%,rgba(2,0,16,.45) 55%,transparent 100%);
+  padding: 48px 20px 36px;
+  padding-bottom: max(36px, calc(var(--safe-bottom) + 24px));
+}
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,107,53,.16);
+  border: 1px solid rgba(255,107,53,.3);
+  border-radius: 100px;
+  padding: 5px 14px;
+  font-size: 12px;
+  color: var(--orange);
+  margin-bottom: 14px;
+  letter-spacing: .4px;
+  pointer-events: auto;
+}
+.hero-title {
+  font-size: clamp(54px,15vw,88px);
+  font-weight: 900;
+  line-height: .92;
+  background: linear-gradient(145deg,#fff 0%,var(--gold) 45%,var(--orange) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 6px;
+}
+.hero-sub {
+  font-size: clamp(17px,4.5vw,25px);
+  font-weight: 300;
+  color: rgba(255,255,255,.72);
+  margin-bottom: 18px;
+  letter-spacing: 1px;
+}
+.hero-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 26px; }
+.hero-pill {
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.11);
+  border-radius: 100px;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: rgba(255,255,255,.82);
+}
+.scroll-hint {
+  display: flex; align-items: center; gap: 8px;
+  color: rgba(255,255,255,.32);
+  font-size: 12px;
+}
+.bounce { animation: bounce 2s ease-in-out infinite; }
+@keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(7px)} }
+
+/* ── Sections ── */
+.section {
+  padding: 0 14px 52px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+.section-header {
+  display: flex; align-items: center; gap: 10px;
+  padding-top: 44px; margin-bottom: 20px;
+}
+.section-icon {
+  width: 40px; height: 40px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0;
+}
+.section-title { font-size: 22px; font-weight: 800; letter-spacing: -.3px; }
+
+/* ── Glass card ── */
+.card {
+  background: var(--card);
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  overflow: hidden;
+}
+
+/* ── Plan tabs ── */
+.plan-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+.plan-tab {
+  padding: 14px 10px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.04);
+  color: var(--muted);
+  border-radius: 16px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .3s ease;
+  text-align: center;
+  line-height: 1.55;
+}
+.plan-tab.active {
+  background: linear-gradient(135deg,var(--orange),#e85d10);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 4px 20px rgba(255,107,53,.35);
+}
+
+/* ── Timeline ── */
+.timeline { display: none; }
+.timeline.active { display: block; }
+.tl-wrap { position: relative; padding: 8px 0; }
+.tl-line {
+  position: absolute; left: 28px; top: 0; bottom: 0; width: 2px;
+  background: linear-gradient(to bottom,transparent 0%,rgba(255,107,53,.5) 10%,
+    rgba(255,215,0,.4) 50%,rgba(0,245,255,.4) 90%,transparent 100%);
+}
+.tl-item {
+  display: flex; gap: 14px;
+  padding: 8px 0;
+  position: relative;
+  opacity: 0; transform: translateX(-12px);
+  transition: opacity .5s ease,transform .5s ease;
+  cursor: pointer;
+  user-select: none;
+}
+.tl-item.in { opacity: 1; transform: translateX(0); }
+.tl-dot {
+  width: 42px; height: 42px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0; z-index: 1;
+  border: 2px solid rgba(255,255,255,.08);
+  transition: box-shadow .4s,border-color .4s;
+}
+.tl-item.active-wp .tl-dot {
+  box-shadow: 0 0 0 4px rgba(255,107,53,.35);
+  border-color: var(--orange);
+}
+.tl-body {
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 17px;
+  padding: 13px 15px;
+  flex: 1;
+  transition: background .4s,border-color .4s;
+}
+.tl-item.active-wp .tl-body {
+  background: rgba(255,107,53,.1);
+  border-color: rgba(255,107,53,.28);
+}
+.tl-time { font-size: 11px; color: var(--muted); margin-bottom: 3px; font-variant-numeric: tabular-nums; }
+.tl-loc { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+.tl-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+.tl-tag {
+  font-size: 11px; color: var(--muted);
+  background: rgba(255,255,255,.07);
+  padding: 3px 8px; border-radius: 6px;
+  display: flex; align-items: center; gap: 3px;
+}
+.tl-memo { font-size: 12px; color: var(--muted); line-height: 1.55; }
+
+/* ── Temperature table ── */
+.temp-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead th {
+  background: rgba(255,255,255,.05);
+  padding: 10px 12px; text-align: left;
+  font-size: 11px; color: var(--muted);
+  font-weight: 600; letter-spacing: .4px;
+}
+tbody td { padding: 11px 12px; border-bottom: 1px solid rgba(255,255,255,.05); vertical-align: middle; }
+tbody tr:last-child td { border-bottom: none; }
+.alt-name { font-weight: 700; font-size: 13px; }
+.alt-place { font-size: 11px; color: var(--muted); }
+.bar-wrap { height: 4px; background: rgba(255,255,255,.08); border-radius: 2px; margin-top: 4px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg,var(--cyan),#6c5ce7); }
+.temp-day { color: #fdcb6e; font-weight: 600; }
+.temp-night { color: #74b9ff; font-weight: 600; }
+
+/* ── Checklist ── */
+.prog-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+.prog-label { font-size: 13px; color: var(--muted); }
+.prog-count { font-size: 13px; font-weight: 700; color: var(--orange); }
+.prog-track { height: 6px; background: rgba(255,255,255,.08); border-radius: 3px; overflow: hidden; }
+.prog-fill { height: 100%; background: linear-gradient(90deg,var(--orange),var(--gold)); border-radius: 3px; transition: width .4s ease; }
+.cat-title {
+  font-size: 14px; font-weight: 700;
+  padding: 14px 16px 8px;
+  color: rgba(255,255,255,.9);
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.cl-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 13px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.05);
+  cursor: pointer; transition: background .18s; user-select: none;
+}
+.cl-item:last-child { border-bottom: none; }
+.cl-item:active { background: rgba(255,255,255,.04); }
+.cl-box {
+  width: 24px; height: 24px; flex-shrink: 0;
+  border-radius: 8px; border: 2px solid rgba(255,255,255,.2);
+  display: flex; align-items: center; justify-content: center;
+  transition: all .2s; margin-top: 1px;
+}
+.cl-item.checked .cl-box { background: var(--orange); border-color: var(--orange); }
+.cl-check {
+  width: 11px; height: 7px;
+  border-left: 2.5px solid #fff; border-bottom: 2.5px solid #fff;
+  transform: rotate(-45deg) scale(0) translateY(-1px); transition: transform .2s;
+}
+.cl-item.checked .cl-check { transform: rotate(-45deg) scale(1) translateY(-1px); }
+.cl-info { flex: 1; }
+.cl-name { font-size: 14px; font-weight: 600; margin-bottom: 2px; transition: color .2s; }
+.cl-item.checked .cl-name { color: var(--muted); text-decoration: line-through; }
+.cl-note { font-size: 11px; color: var(--muted); line-height: 1.4; }
+.star-badge { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 5px; flex-shrink: 0; margin-top: 3px; }
+.s3 { background: rgba(255,107,53,.18); color: #ff8c42; }
+.s2 { background: rgba(0,245,255,.12); color: var(--cyan); }
+.s1 { background: rgba(255,255,255,.08); color: var(--muted); }
+.reset-btn {
+  width: 100%; margin-top: 14px; padding: 14px;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 16px; color: var(--muted);
+  font-size: 14px; cursor: pointer; transition: background .2s;
+}
+.reset-btn:active { background: rgba(255,255,255,.09); }
+
+/* ── AMS ── */
+.ams-box {
+  background: rgba(255,107,53,.09);
+  border: 1px solid rgba(255,107,53,.22);
+  border-radius: 16px; padding: 16px;
+  margin-bottom: 14px; font-size: 13px;
+  color: rgba(255,255,255,.8); line-height: 1.7;
+}
+.ams-rule {
+  background: rgba(255,107,53,.15);
+  border: 1px solid rgba(255,107,53,.4);
+  border-radius: 14px; padding: 16px;
+  text-align: center; font-size: 15px;
+  font-weight: 700; color: var(--orange); line-height: 1.55;
+}
+.info-ul { list-style: none; }
+.info-li {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 11px 16px; border-bottom: 1px solid rgba(255,255,255,.05);
+  font-size: 13px; line-height: 1.55;
+}
+.info-li:last-child { border-bottom: none; }
+.info-ico { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+/* ── Access ── */
+.access-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 15px 16px; border-bottom: 1px solid rgba(255,255,255,.05);
+}
+.access-row:last-child { border-bottom: none; }
+.access-chip {
+  font-size: 12px; font-weight: 700; padding: 4px 10px;
+  border-radius: 8px; white-space: nowrap;
+}
+.ac-from { background: rgba(108,92,231,.22); border: 1px solid rgba(108,92,231,.35); color: #b2a8ff; }
+.ac-mid  { background: rgba(255,215,0,.15);  border: 1px solid rgba(255,215,0,.3);   color: var(--gold); }
+.ac-to   { background: rgba(0,245,255,.12);  border: 1px solid rgba(0,245,255,.25);  color: var(--cyan); }
+.ac-arr { color: var(--muted); font-size: 14px; }
+.ac-meta { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+/* ── Emergency ── */
+.em-item {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,.06);
+  cursor: pointer; text-decoration: none; color: inherit;
+  transition: background .18s;
+}
+.em-item:last-child { border-bottom: none; }
+.em-item:active { background: rgba(255,255,255,.04); }
+.em-icon {
+  width: 44px; height: 44px; border-radius: 14px; flex-shrink: 0;
+  background: rgba(255,107,53,.13);
+  display: flex; align-items: center; justify-content: center; font-size: 22px;
+}
+.em-name { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+.em-contact { font-size: 13px; color: var(--muted); }
+.em-arr { margin-left: auto; color: var(--muted); font-size: 18px; }
+
+/* ── Hint box ── */
+.hint-box {
+  background: rgba(0,245,255,.06);
+  border: 1px solid rgba(0,245,255,.16);
+  border-radius: 14px; padding: 13px 15px;
+  font-size: 13px; color: rgba(255,255,255,.72);
+  line-height: 1.65; margin-top: 12px;
+}
+
+/* ── Footer ── */
+footer {
+  text-align: center;
+  padding: 36px 20px;
+  padding-bottom: max(36px,calc(var(--safe-bottom) + 24px));
+  color: rgba(255,255,255,.22); font-size: 12px; line-height: 1.7;
+}
+.footer-mountain { font-size: 32px; margin-bottom: 8px; }
+
+/* ── Reveal animation ── */
+.reveal { opacity: 0; transform: translateY(18px); transition: opacity .55s ease,transform .55s ease; }
+.reveal.in { opacity: 1; transform: translateY(0); }
+
+/* ── Corner accents (bioluminescent) ── */
+.corner { position: fixed; width: 28px; height: 28px; z-index: 5; pointer-events: none; opacity: .4; }
+.corner-tl { top: 0; left: 0;  border-top: 1px solid var(--cyan); border-left:  1px solid var(--cyan); }
+.corner-tr { top: 0; right: 0; border-top: 1px solid var(--cyan); border-right: 1px solid var(--cyan); }
+.corner-bl { bottom: 0; left: 0;  border-bottom: 1px solid var(--magenta); border-left:  1px solid var(--magenta); }
+.corner-br { bottom: 0; right: 0; border-bottom: 1px solid var(--magenta); border-right: 1px solid var(--magenta); }
+
+/* Vignette */
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 2;
+  background: radial-gradient(ellipse at center,transparent 55%,rgba(0,0,12,.55) 100%);
+}
+</style>
+</head>
+<body>
+
+<canvas id="three-canvas"></canvas>
+
+<div id="plan-hud">
+  <button class="plan-btn active" id="btn-plan-a" onclick="setPlan('A')">🌙 Plan A</button>
+  <button class="plan-btn" id="btn-plan-b" onclick="setPlan('B')">☀️ Plan B</button>
+</div>
+
+<div id="sky-hud">
+  <div class="dot"></div>
+  <span id="sky-label">深夜 · Plan A</span>
+</div>
+
+<div class="corner corner-tl"></div>
+<div class="corner corner-tr"></div>
+<div class="corner corner-bl"></div>
+<div class="corner corner-br"></div>
+
+<div id="app">
+
+<!-- ═══════════ HERO ═══════════ -->
+<section id="hero">
+  <div class="hero-grad">
+    <div class="hero-badge">🗻 吉田ルート · 星観荘泊 · 3名</div>
+    <h1 class="hero-title">富士登山</h1>
+    <p class="hero-sub">2026年 7月26日〜27日</p>
+    <div class="hero-pills">
+      <span class="hero-pill">👥 26歳 × 3名</span>
+      <span class="hero-pill">🏨 星観荘 2,305m</span>
+      <span class="hero-pill">⛰️ 山頂 3,776m</span>
+      <span class="hero-pill">💴 通行料 4,000円/人</span>
+    </div>
+    <div class="scroll-hint">
+      <span>スクロールして詳細を確認</span>
+      <span class="bounce">↓</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ PLAN ═══════════ -->
+<section class="section" id="plan-sec">
+  <div class="section-header reveal">
+    <div class="section-icon" style="background:rgba(255,107,53,.15)">📅</div>
+    <h2 class="section-title">登山プラン</h2>
+  </div>
+
+  <div class="plan-tabs reveal">
+    <button class="plan-tab active" id="tab-A" onclick="switchPlan('A')">
+      🌙 Plan A<br><small style="font-weight:400;opacity:.8">深夜1時出発・ご来光</small>
+    </button>
+    <button class="plan-tab" id="tab-B" onclick="switchPlan('B')">
+      ☀️ Plan B<br><small style="font-weight:400;opacity:.8">朝5時出発・安全重視</small>
+    </button>
+  </div>
+
+  <div id="tl-A" class="timeline active card">
+    <div class="tl-wrap">
+      <div class="tl-line"></div>
+      <div id="items-A"></div>
+    </div>
+  </div>
+  <div id="tl-B" class="timeline card">
+    <div class="tl-wrap">
+      <div class="tl-line"></div>
+      <div id="items-B"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ TEMPERATURE ═══════════ -->
+<section class="section">
+  <div class="section-header reveal">
+    <div class="section-icon" style="background:rgba(0,245,255,.12)">🌡️</div>
+    <h2 class="section-title">気温の目安（7月）</h2>
+  </div>
+  <div class="card reveal">
+    <div class="temp-wrap">
+      <table>
+        <thead>
+          <tr><th>標高・場所</th><th>昼間</th><th>深夜(A)</th></tr>
+        </thead>
+        <tbody id="temp-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="hint-box reveal">
+    💡 標高100mごとに約<strong style="color:var(--cyan)">0.6℃</strong>低下。
+    風速1mごとにさらに<strong style="color:var(--cyan)">1℃</strong>体感が下がります。
+  </div>
+</section>
+
+<!-- ═══════════ CHECKLIST ═══════════ -->
+<section class="section" id="check-sec">
+  <div class="section-header reveal">
+    <div class="section-icon" style="background:rgba(108,92,231,.15)">🎒</div>
+    <h2 class="section-title">持ち物チェックリスト</h2>
+  </div>
+  <div class="reveal" style="margin-bottom:16px">
+    <div class="prog-row">
+      <span class="prog-label">準備状況</span>
+      <span class="prog-count" id="prog-txt">0 / 0</span>
+    </div>
+    <div class="prog-track"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+  </div>
+  <div id="cl-container"></div>
+  <button class="reset-btn reveal" onclick="resetChecklist()">↺ リセット</button>
+</section>
+
+<!-- ═══════════ PRE-CLIMB ═══════════ -->
+<section class="section">
+  <div class="section-header reveal">
+    <div class="section-icon" style="background:rgba(253,203,110,.15)">📋</div>
+    <h2 class="section-title">登山前日チェック</h2>
+  </div>
+  <div class="card reveal" id="pre-container"></div>
+</section>
+
+<!-- ═══════════ AMS ═══════════ -->
+<section class="section">
+  <div class="section-header reveal">
+    <div class="section-icon" style="background:rgba(255,107,53,.15)">⚠️</div>
+    <h2 class="section-title">高山病について</h2>
+  </div>
+  <div class="ams-box reveal">
+    高山病は<strong>体力・年齢に関係なく誰にでも</strong>起こりうる。
+    3名とも初心者に近いため特に注意が必要です。
+  </div>
+  <div class="card reveal" style="margin-bottom:14px">
+    <ul class="info-ul" id="ams-list"></ul>
+  </div>
+  <div class="ams-rule reveal">🚨 1名でも症状が出たら<br>3名全員で即下山</div>
+</section>
+
+<!-- ═══════════ ACCESS ═══════════ -->
+<section class="section">
+  <div class="section-header reveal">
+    <div class="section-icon" style="background:rgba(108,92,231,.15)">🚌</div>
+    <h2 class="section-title">アクセス</h2>
+  </div>
+  <div class="card reveal">
+    <div class="access-row">
+      <span class="access-chip ac-from">新宿</span>
+      <span class="ac-arr">→</span>
+      <span class="access-chip ac-mid">富士山駅</span>
+      <span class="ac-arr">→</span>
+      <span class="access-chip ac-to">五合目</span>
+      <span class="ac-meta">🚌 約3.5h · ¥5,100</span>
+    </div>
+    <div class="access-row">
+      <span class="access-chip ac-from">五合目</span>
+      <span class="ac-arr">→</span>
+      <span class="access-chip ac-to">富士山駅</span>
+      <span class="ac-arr">→</span>
+      <span class="access-chip ac-mid">新宿</span>
+      <span class="ac-meta">🚌 下山後バス</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ EMERGENCY ═══════════ -->
+<section class="section">
+  <div class="section-header reveal">
+    <div class="section-icon" style="background:rgba(255,107,53,.15)">🆘</div>
+    <h2 class="section-title">緊急連絡先</h2>
+  </div>
+  <div class="card reveal">
+    <a class="em-item" href="tel:0555730110">
+      <div class="em-icon">🚁</div>
+      <div>
+        <div class="em-name">山梨県警察 山岳救助隊</div>
+        <div class="em-contact">0555-73-0110</div>
+      </div>
+      <div class="em-arr">›</div>
+    </a>
+    <a class="em-item" href="tel:0555246516">
+      <div class="em-icon">⛑️</div>
+      <div>
+        <div class="em-name">六合目安全指導センター</div>
+        <div class="em-contact">0555-24-6516</div>
+      </div>
+      <div class="em-arr">›</div>
+    </a>
+    <a class="em-item" href="https://seikanso.jp/" target="_blank">
+      <div class="em-icon">🏨</div>
+      <div>
+        <div class="em-name">星観荘</div>
+        <div class="em-contact">seikanso.jp</div>
+      </div>
+      <div class="em-arr">›</div>
+    </a>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-mountain">🗻</div>
+  富士登山 2026年7月26日〜27日<br>
+  吉田ルート · 星観荘泊 · 3名<br>
+  <span style="color:rgba(0,245,255,.3)">安全第一で楽しい登山を</span>
+</footer>
+
+</div><!-- #app -->
+
+<script src="https://unpkg.com/three@0.163.0/build/three.min.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════
+   DATA
+═══════════════════════════════════════════════════════ */
+const PLAN_DATA = {
+  A: [
+    { time:'22:00', loc:'新宿 集合・バス乗車', icon:'🚌', routeT:-1, tags:['高速バス','¥3,000/人'], memo:'新宿駅南口 集合。バスで河口湖へ' },
+    { time:'00:30', loc:'河口湖 → 五合目へ', icon:'🚌', routeT:-1, tags:['タクシー/シャトル'], memo:'五合目まで移動。仮眠・準備' },
+    { time:'01:30', loc:'五合目 出発 ⛰️', icon:'⛰️', routeT:0.00, tags:['標高2,305m','通行料¥4,000'], memo:'ヘッドライト装備で出発' },
+    { time:'02:20', loc:'六合目 安全指導センター', icon:'🏠', routeT:0.06, tags:['標高2,390m','休憩5分'], memo:'体調確認・ペース確認' },
+    { time:'04:00', loc:'七合目', icon:'🏔️', routeT:0.49, tags:['標高3,030m'], memo:'岩場が続く。ゆっくり慎重に' },
+    { time:'05:30', loc:'本八合目 星観荘 🏨', icon:'🏨', routeT:0.74, tags:['標高3,400m','宿泊'], memo:'チェックイン。少し仮眠。ご来光を待つ' },
+    { time:'07:00', loc:'九合目', icon:'🌄', routeT:0.88, tags:['標高3,600m'], memo:'頂上まであと少し！高山病に注意' },
+    { time:'08:30', loc:'富士山頂 ご来光 🎊', icon:'🗻', routeT:1.00, tags:['標高3,776m','最高地点'], memo:'剣ヶ峰・浅間大社奥宮へ。お鉢巡りも' },
+    { time:'10:00', loc:'下山開始', icon:'⬇️', routeT:1.00, tags:['吉田口下山道'], memo:'下山道は別ルート。膝への負担に注意' },
+    { time:'13:30', loc:'五合目 下山完了', icon:'🎉', routeT:0.00, tags:['完登！'], memo:'温泉・食事でリカバリー' },
+  ],
+  B: [
+    { time:'04:00', loc:'新宿 発 (夜行バス)', icon:'🚌', routeT:-1, tags:['高速バス','¥3,000/人'], memo:'前日夜発の便に乗車' },
+    { time:'07:00', loc:'五合目 到着・準備', icon:'⛰️', routeT:0.00, tags:['標高2,305m','朝食'], memo:'到着後に朝食・体慣らし (30分)' },
+    { time:'08:00', loc:'五合目 出発', icon:'🥾', routeT:0.00, tags:['通行料¥4,000'], memo:'明るい昼間に出発。視界良好' },
+    { time:'09:00', loc:'六合目 安全指導センター', icon:'🏠', routeT:0.06, tags:['標高2,390m'], memo:'体調確認・休憩10分' },
+    { time:'11:30', loc:'七合目', icon:'🏔️', routeT:0.49, tags:['標高3,030m'], memo:'ここからペースを落として慎重に' },
+    { time:'13:30', loc:'本八合目', icon:'🏕️', routeT:0.74, tags:['標高3,400m','昼食'], memo:'昼食・休憩。体力を温存する' },
+    { time:'15:00', loc:'九合目', icon:'🌤️', routeT:0.88, tags:['標高3,600m'], memo:'空気が薄い。深呼吸しながら進む' },
+    { time:'16:30', loc:'富士山頂 到着 🎊', icon:'🗻', routeT:1.00, tags:['標高3,776m'], memo:'剣ヶ峰まで足を延ばそう' },
+    { time:'17:30', loc:'下山開始', icon:'⬇️', routeT:1.00, tags:['日没前に'], memo:'明るいうちに下山開始。安全第一' },
+    { time:'21:00', loc:'五合目 下山完了 🎉', icon:'🎉', routeT:0.00, tags:['完登！'], memo:'お疲れ様！温泉で疲れを癒そう' },
+  ]
+};
+
+const TEMP_DATA = [
+  { alt:'2,305m', place:'五合目', day:16, night:9,  cold:5 },
+  { alt:'2,390m', place:'六合目', day:15, night:8,  cold:4 },
+  { alt:'3,030m', place:'七合目', day:12, night:5,  cold:1 },
+  { alt:'3,400m', place:'本八合目', day:9, night:2, cold:-2 },
+  { alt:'3,600m', place:'九合目', day:7,  night:0,  cold:-4 },
+  { alt:'3,776m', place:'山頂',   day:5,  night:-2, cold:-6 },
+];
+
+const CHECKLIST = [
+  { cat:'必須装備', items:[
+    { n:'レインウェア（上下）', note:'突然の雨・風対策。ゴアテックス推奨', p:3 },
+    { n:'ヘッドライト + 予備電池', note:'Plan A必須。電池切れに注意', p:3 },
+    { n:'防寒着（フリース or ダウン）', note:'山頂は真夏でも氷点下になることも', p:3 },
+    { n:'トレッキングシューズ', note:'ハイカット推奨。岩場に対応', p:3 },
+    { n:'トレッキングポール', note:'下山時の膝負担を大幅軽減', p:3 },
+  ]},
+  { cat:'行動食・飲料', items:[
+    { n:'水 (1.5〜2L)', note:'山小屋で買えるが高い (¥500〜)', p:3 },
+    { n:'行動食 (3〜4食分)', note:'おにぎり・チョコ・アルファ米など', p:2 },
+    { n:'スポーツドリンク', note:'電解質補給。塩分タブレットも有効', p:2 },
+  ]},
+  { cat:'衛生・応急', items:[
+    { n:'日焼け止め SPF50+', note:'高地は紫外線が強い (標高+1000mで+10%)', p:2 },
+    { n:'酔い止め・高山病薬', note:'ダイアモックス（要処方）検討', p:3 },
+    { n:'絆創膏・ブリスター対策', note:'靴擦れ防止テープも', p:2 },
+    { n:'ゴミ袋 (黒)', note:'清掃協力。山ではゴミ捨て不可', p:1 },
+  ]},
+  { cat:'山小屋・宿泊', items:[
+    { n:'星観荘 予約確認済み', note:'seikanso.jp チェックイン確認を', p:3 },
+    { n:'耳栓・アイマスク', note:'山小屋は相部屋・早起きの人多数', p:1 },
+    { n:'現金 ¥20,000+', note:'山小屋はカード不可の場合あり', p:2 },
+  ]},
+];
+
+const PRE_DATA = [
+  { ico:'💤', text:'前日は十分な睡眠をとる（7〜8時間目標）' },
+  { ico:'🍚', text:'炭水化物を多めに摂取しエネルギーを蓄える' },
+  { ico:'🚫', text:'アルコールは控える（脱水・高山病リスク増大）' },
+  { ico:'📱', text:'天気予報を再確認（山頂の風速・気温）' },
+  { ico:'🔦', text:'ヘッドライトの電池残量・レインウェアのパッキング確認' },
+  { ico:'💊', text:'高山病薬 / 痛み止めなど薬の確認' },
+  { ico:'📞', text:'緊急連絡先を3名で共有しておく' },
+];
+
+const AMS_DATA = [
+  { ico:'🤕', text:'頭痛 — 最初のサイン。無理せず休憩' },
+  { ico:'🤢', text:'吐き気・嘔吐 — 下山のサイン' },
+  { ico:'😵', text:'めまい・ふらつき — 即座に休憩' },
+  { ico:'😴', text:'強い眠気・倦怠感 — 動けなくなる前に下山' },
+  { ico:'💧', text:'水分をこまめに補給（500ml/2h目安）' },
+  { ico:'🐢', text:'ゆっくり登る（20〜30分歩いて5〜10分休憩）' },
+];
+
+/* ═══════════════════════════════════════════════════════
+   RENDER CONTENT
+═══════════════════════════════════════════════════════ */
+let activePlan = 'A';
+let activeWpA = 2, activeWpB = 0;
+
+function renderTimeline(plan) {
+  const data = PLAN_DATA[plan];
+  const container = document.getElementById('items-' + plan);
+  container.innerHTML = '';
+  data.forEach((item, i) => {
+    const div = document.createElement('div');
+    div.className = 'tl-item' + (i === (plan === 'A' ? activeWpA : activeWpB) ? ' active-wp' : '');
+    div.dataset.plan = plan;
+    div.dataset.idx = i;
+    div.dataset.routeT = item.routeT;
+    div.innerHTML = `
+      <div class="tl-dot" style="background:rgba(255,107,53,.1)">${item.icon}</div>
+      <div class="tl-body">
+        <div class="tl-time">${item.time}</div>
+        <div class="tl-loc">${item.loc}</div>
+        ${item.tags.length ? `<div class="tl-tags">${item.tags.map(t=>`<span class="tl-tag">${t}</span>`).join('')}</div>` : ''}
+        ${item.memo ? `<div class="tl-memo">${item.memo}</div>` : ''}
+      </div>`;
+    div.addEventListener('click', () => onTimelineTap(plan, i, item.routeT));
+    container.appendChild(div);
+  });
+}
+
+function onTimelineTap(plan, idx, routeT) {
+  // Update active waypoint
+  if (plan === 'A') activeWpA = idx;
+  else activeWpB = idx;
+
+  // Highlight active item
+  document.querySelectorAll(`#items-${plan} .tl-item`).forEach((el, i) => {
+    el.classList.toggle('active-wp', i === idx);
+  });
+
+  // Move 3D marker (routeT: -1 means pre-mountain, 0-1 on route)
+  if (routeT >= 0) {
+    targetMarkerT = routeT;
+  }
+}
+
+function renderTemperature() {
+  const tbody = document.getElementById('temp-tbody');
+  tbody.innerHTML = '';
+  TEMP_DATA.forEach(row => {
+    const pct = (row.alt.replace(/[^0-9]/g,'') - 2305) / (3776 - 2305) * 100;
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td>
+          <div class="alt-name">${row.alt}</div>
+          <div class="alt-place">${row.place}</div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:${Math.max(20,100-pct*.6)}%"></div></div>
+        </td>
+        <td class="temp-day">${row.day}℃</td>
+        <td class="temp-night">${row.night > 0 ? row.night : row.night}℃ (体感${row.cold}℃)</td>
+      </tr>`);
+  });
+}
+
+function renderChecklist() {
+  const saved = JSON.parse(localStorage.getItem('fuji-cl') || '{}');
+  const container = document.getElementById('cl-container');
+  container.innerHTML = '';
+  CHECKLIST.forEach(cat => {
+    const block = document.createElement('div');
+    block.className = 'card reveal';
+    block.style.marginBottom = '14px';
+    block.innerHTML = `<div class="cat-title">${cat.cat}</div>`;
+    cat.items.forEach(item => {
+      const key = item.n;
+      const checked = saved[key] || false;
+      const div = document.createElement('div');
+      div.className = 'cl-item' + (checked ? ' checked' : '');
+      div.innerHTML = `
+        <div class="cl-box"><div class="cl-check"></div></div>
+        <div class="cl-info">
+          <div class="cl-name">${item.n}</div>
+          <div class="cl-note">${item.note}</div>
+        </div>
+        <div class="star-badge s${item.p}">★${item.p}</div>`;
+      div.addEventListener('click', () => {
+        div.classList.toggle('checked');
+        const s = JSON.parse(localStorage.getItem('fuji-cl') || '{}');
+        s[key] = div.classList.contains('checked');
+        localStorage.setItem('fuji-cl', JSON.stringify(s));
+        updateProgress();
+      });
+      block.appendChild(div);
+    });
+    container.appendChild(block);
+  });
+  updateProgress();
+}
+
+function updateProgress() {
+  const items = document.querySelectorAll('#cl-container .cl-item');
+  const total = items.length;
+  const done = document.querySelectorAll('#cl-container .cl-item.checked').length;
+  document.getElementById('prog-txt').textContent = `${done} / ${total}`;
+  document.getElementById('prog-fill').style.width = total ? (done / total * 100) + '%' : '0%';
+}
+
+function resetChecklist() {
+  localStorage.removeItem('fuji-cl');
+  renderChecklist();
+  document.querySelectorAll('.reveal').forEach(el => {
+    if (document.getElementById('cl-container').contains(el)) {
+      el.classList.remove('in');
+      setTimeout(() => el.classList.add('in'), 50);
+    }
+  });
+}
+
+function renderPreClimb() {
+  const container = document.getElementById('pre-container');
+  container.innerHTML = '<ul class="info-ul">' +
+    PRE_DATA.map(d => `<li class="info-li"><span class="info-ico">${d.ico}</span><span>${d.text}</span></li>`).join('') +
+    '</ul>';
+}
+
+function renderAMS() {
+  document.getElementById('ams-list').innerHTML =
+    AMS_DATA.map(d => `<li class="info-li"><span class="info-ico">${d.ico}</span><span>${d.text}</span></li>`).join('');
+}
+
+function switchPlan(p) {
+  activePlan = p;
+  document.getElementById('tab-A').classList.toggle('active', p === 'A');
+  document.getElementById('tab-B').classList.toggle('active', p === 'B');
+  document.getElementById('tl-A').classList.toggle('active', p === 'A');
+  document.getElementById('tl-B').classList.toggle('active', p === 'B');
+  // Also switch sky
+  setPlan(p);
+}
+
+/* ═══════════════════════════════════════════════════════
+   THREE.JS SCENE
+═══════════════════════════════════════════════════════ */
+const canvas = document.getElementById('three-canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = false;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200);
+camera.position.set(0, 3.2, 13);
+camera.lookAt(0, 2.5, 0);
+
+/* ── Mountain Profile ── */
+// [height (scene units, 0=base, 5=summit), radius]
+// Mt Fuji: base ~1400m, summit 3776m, range 2376m → scale 5/2376 = 0.002104 u/m
+const MPROF = [
+  [0.0, 9.0], [0.5, 8.2], [1.0, 7.3], [1.5, 6.5],
+  [1.9, 5.8], [2.5, 4.8], [3.1, 4.0], [3.6, 3.2],
+  [4.0, 2.6], [4.4, 2.0], [4.65, 1.5], [4.85, 0.9],
+  [5.0, 0.4],
+];
+function mpRadius(y) {
+  for (let i = 0; i < MPROF.length - 1; i++) {
+    const [y0,r0] = MPROF[i], [y1,r1] = MPROF[i+1];
+    if (y >= y0 && y <= y1) return r0 + (r1-r0)*(y-y0)/(y1-y0);
+  }
+  return MPROF[MPROF.length-1][1];
+}
+
+/* ── Mountain Mesh ── */
+const mtPoints = MPROF.map(([y,r]) => new THREE.Vector2(r, y));
+const mtGeo = new THREE.LatheGeometry(mtPoints, 72);
+const mtMat = new THREE.MeshStandardMaterial({
+  color: 0x3a3530, roughness: 0.92, metalness: 0.05,
+  emissive: 0x001122, emissiveIntensity: 0.0,
+});
+const mountain = new THREE.Mesh(mtGeo, mtMat);
+scene.add(mountain);
+
+const SNOW_Y = 4.4; // ~3500m
+const snowMat = new THREE.MeshStandardMaterial({
+  color: 0xdde8ff, roughness: 0.6, metalness: 0.05,
+  emissive: 0x8899cc, emissiveIntensity: 0.08,
+});
+/* ── Snow Cap ── */
+// Build snow mesh for upper mountain (above ~3500m)
+const snowPts = [];
+for (let i = 0; i < MPROF.length; i++) {
+  if (MPROF[i][0] >= SNOW_Y) snowPts.push(new THREE.Vector2(MPROF[i][1] + 0.01, MPROF[i][0]));
+}
+if (snowPts.length > 1) {
+  const snowG2 = new THREE.LatheGeometry(snowPts, 72);
+  const snowMesh = new THREE.Mesh(snowG2, snowMat);
+  scene.add(snowMesh);
+}
+
+/* ── Yoshida Route ──
+   Route goes from 5th station (y≈1.9) to summit (y=5.0)
+   at a fixed azimuth angle θ = π/10 (18°)
+*/
+const ROUTE_ANGLE = Math.PI / 10;
+const ROUTE_START_Y = 1.9;
+const routePoints3D = [];
+const ROUTE_STEPS = 48;
+for (let i = 0; i <= ROUTE_STEPS; i++) {
+  const t = i / ROUTE_STEPS;
+  const y = ROUTE_START_Y + (5.0 - ROUTE_START_Y) * t;
+  const r = mpRadius(y) + 0.07; // slight outward offset
+  routePoints3D.push(new THREE.Vector3(
+    r * Math.sin(ROUTE_ANGLE),
+    y,
+    r * Math.cos(ROUTE_ANGLE)
+  ));
+}
+const routeCurve = new THREE.CatmullRomCurve3(routePoints3D);
+
+const routeGeo = new THREE.TubeGeometry(routeCurve, 120, 0.028, 8, false);
+const routeMat = new THREE.MeshBasicMaterial({ color: 0xff6b35 });
+const routeTube = new THREE.Mesh(routeGeo, routeMat);
+scene.add(routeTube);
+
+/* ── Route glow (slightly larger, semi-transparent) ── */
+const routeGlowGeo = new THREE.TubeGeometry(routeCurve, 120, 0.055, 8, false);
+const routeGlowMat = new THREE.MeshBasicMaterial({
+  color: 0xff8040, transparent: true, opacity: 0.25,
+});
+scene.add(new THREE.Mesh(routeGlowGeo, routeGlowMat));
+
+/* ── Marker ── */
+const markerGeo = new THREE.SphereGeometry(0.14, 16, 16);
+const markerMat = new THREE.MeshStandardMaterial({
+  color: 0xff8840, emissive: 0xff6b35, emissiveIntensity: 1.8, roughness: 0.3,
+});
+const marker = new THREE.Mesh(markerGeo, markerMat);
+// Marker glow sphere
+const markerGlowGeo = new THREE.SphereGeometry(0.28, 16, 16);
+const markerGlowMat = new THREE.MeshBasicMaterial({
+  color: 0xff6b35, transparent: true, opacity: 0.22,
+});
+const markerGlow = new THREE.Mesh(markerGlowGeo, markerGlowMat);
+const markerGroup = new THREE.Group();
+markerGroup.add(marker);
+markerGroup.add(markerGlow);
+scene.add(markerGroup);
+// Point light on marker
+const markerLight = new THREE.PointLight(0xff6b35, 1.5, 3.5);
+scene.add(markerLight);
+
+let markerT = 0.0;       // current t on routeCurve (0=5th station,1=summit)
+let targetMarkerT = 0.0; // target t
+
+function updateMarker() {
+  const pt = routeCurve.getPoint(markerT);
+  markerGroup.position.copy(pt);
+  markerLight.position.copy(pt);
+}
+updateMarker();
+
+/* ── Stars ── */
+const STAR_COUNT = 2000;
+const starPositions = new Float32Array(STAR_COUNT * 3);
+for (let i = 0; i < STAR_COUNT; i++) {
+  const θ = Math.random() * Math.PI * 2;
+  const φ = Math.acos(2 * Math.random() - 1);
+  const r = 40 + Math.random() * 30;
+  starPositions[i*3]   = r * Math.sin(φ) * Math.cos(θ);
+  starPositions[i*3+1] = r * Math.sin(φ) * Math.sin(θ);
+  starPositions[i*3+2] = r * Math.cos(φ);
+}
+const starGeo = new THREE.BufferGeometry();
+starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.28, sizeAttenuation: true, transparent: true });
+const stars = new THREE.Points(starGeo, starMat);
+scene.add(stars);
+
+/* ── Moon ── */
+const moonGeo = new THREE.SphereGeometry(0.9, 32, 32);
+const moonMat = new THREE.MeshStandardMaterial({
+  color: 0xe8eedd, roughness: 0.85, metalness: 0.0,
+  emissive: 0x99aacc, emissiveIntensity: 0.45,
+});
+const moon = new THREE.Mesh(moonGeo, moonMat);
+moon.position.set(9, 13, -12);
+scene.add(moon);
+
+// Moon glow
+const moonGlowGeo = new THREE.SphereGeometry(1.4, 16, 16);
+const moonGlowMat = new THREE.MeshBasicMaterial({ color: 0x8899cc, transparent: true, opacity: 0.18 });
+moon.add(new THREE.Mesh(moonGlowGeo, moonGlowMat));
+
+/* ── Sun ── */
+const sunGeo = new THREE.SphereGeometry(1.3, 32, 32);
+const sunMat = new THREE.MeshStandardMaterial({
+  color: 0xffee88, roughness: 0.5,
+  emissive: 0xffcc44, emissiveIntensity: 2.5,
+});
+const sun = new THREE.Mesh(sunGeo, sunMat);
+sun.position.set(-11, 14, -9);
+scene.add(sun);
+
+// Sun glow
+const sunGlowGeo = new THREE.SphereGeometry(2.0, 16, 16);
+const sunGlowMat = new THREE.MeshBasicMaterial({ color: 0xffcc44, transparent: true, opacity: 0.12 });
+sun.add(new THREE.Mesh(sunGlowGeo, sunGlowMat));
+
+/* ── Lights ── */
+const ambient = new THREE.AmbientLight(0x111133, 0.5);
+scene.add(ambient);
+
+const moonLight = new THREE.PointLight(0x7788bb, 0.9, 80);
+moonLight.position.copy(moon.position);
+scene.add(moonLight);
+
+const sunLight = new THREE.DirectionalLight(0xffeedd, 2.2);
+sunLight.position.copy(sun.position);
+scene.add(sunLight);
+
+/* ── Fog ── */
+scene.fog = new THREE.Fog(0x020010, 22, 75);
+
+/* ── Bioluminescent ground mist ── */
+// (Subtle glow ring at base of mountain)
+const mistGeo = new THREE.TorusGeometry(8.5, 0.8, 8, 40);
+const mistMat = new THREE.MeshBasicMaterial({ color: 0x002244, transparent: true, opacity: 0.25 });
+const mist = new THREE.Mesh(mistGeo, mistMat);
+mist.rotation.x = Math.PI / 2;
+mist.position.y = 0.1;
+scene.add(mist);
+
+/* ═══════════════════════════════════════════════════════
+   PLAN A/B TRANSITION
+═══════════════════════════════════════════════════════ */
+let nightFactor = 1.0;   // 1=night (Plan A), 0=day (Plan B)
+let targetNight = 1.0;
+
+const C_NIGHT_BG  = new THREE.Color(0x010008);
+const C_DAY_BG    = new THREE.Color(0x4488bb);
+const C_NIGHT_AMB = new THREE.Color(0x0d0d22);
+const C_DAY_AMB   = new THREE.Color(0x336688);
+const C_NIGHT_MT  = new THREE.Color(0x3a3530);
+const C_DAY_MT    = new THREE.Color(0x5c5048);
+const C_NIGHT_FOG = new THREE.Color(0x010008);
+const C_DAY_FOG   = new THREE.Color(0x336688);
+
+const colorTmp = new THREE.Color();
+
+function applyNightFactor(n) {
+  // Background
+  colorTmp.lerpColors(C_DAY_BG, C_NIGHT_BG, n);
+  renderer.setClearColor(colorTmp);
+  scene.fog.color.lerpColors(C_DAY_FOG, C_NIGHT_FOG, n);
+
+  // Ambient
+  ambient.color.lerpColors(C_DAY_AMB, C_NIGHT_AMB, n);
+  ambient.intensity = 0.5 + (1.0 - n) * 0.6;
+
+  // Mountain colour
+  mtMat.color.lerpColors(C_DAY_MT, C_NIGHT_MT, n);
+  mtMat.emissiveIntensity = n * 0.06;
+
+  // Stars
+  starMat.opacity = n;
+  stars.visible = n > 0.01;
+
+  // Moon / Sun
+  moon.visible = n > 0.02;
+  moonLight.intensity = n * 0.9;
+
+  sun.visible = n < 0.98;
+  sunLight.intensity = (1.0 - n) * 2.2;
+
+  // Route glow colour
+  const rc = n > 0.5 ? 0xff6b35 : 0xffd700;
+  routeMat.color.setHex(rc);
+  routeGlowMat.color.setHex(rc);
+  markerMat.emissive.setHex(rc);
+
+  // Mist glow
+  mist.material.opacity = n * 0.28;
+}
+
+function setPlan(p) {
+  targetNight = p === 'A' ? 1.0 : 0.0;
+  document.getElementById('btn-plan-a').classList.toggle('active', p === 'A');
+  document.getElementById('btn-plan-b').classList.toggle('active', p === 'B');
+  document.getElementById('sky-label').textContent = p === 'A' ? '深夜 · Plan A' : '昼間 · Plan B';
+}
+
+/* ═══════════════════════════════════════════════════════
+   ANIMATION LOOP
+═══════════════════════════════════════════════════════ */
+let animTime = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  animTime += 0.00025;
+
+  // Slow camera orbit
+  camera.position.x = Math.sin(animTime) * 13;
+  camera.position.z = Math.cos(animTime) * 13;
+  camera.position.y = 3.2 + Math.sin(animTime * 0.4) * 0.4;
+  camera.lookAt(0, 2.7, 0);
+
+  // Lerp night factor
+  nightFactor += (targetNight - nightFactor) * 0.04;
+  applyNightFactor(nightFactor);
+
+  // Lerp marker along route
+  markerT += (targetMarkerT - markerT) * 0.05;
+  updateMarker();
+
+  // Pulse marker glow
+  const pulse = 0.18 + 0.08 * Math.sin(animTime * 80);
+  markerGlowMat.opacity = pulse;
+  markerLight.intensity = 1.5 + 0.8 * Math.sin(animTime * 80);
+
+  // Slowly rotate stars
+  stars.rotation.y = animTime * 0.04;
+
+  renderer.render(scene, camera);
+}
+
+/* ═══════════════════════════════════════════════════════
+   SCROLL REVEAL
+═══════════════════════════════════════════════════════ */
+const io = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('in'); });
+}, { threshold: 0.12 });
+
+/* ═══════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════ */
+function init() {
+  renderTimeline('A');
+  renderTimeline('B');
+  renderTemperature();
+  renderChecklist();
+  renderPreClimb();
+  renderAMS();
+  applyNightFactor(1.0);
+
+  // Observe reveal elements
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  // Animate timeline items in
+  document.querySelectorAll('.tl-item').forEach((el, i) => {
+    setTimeout(() => el.classList.add('in'), i * 60);
+  });
+
+  animate();
+
+  // Service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+init();
+</script>
+</body>
+</html>

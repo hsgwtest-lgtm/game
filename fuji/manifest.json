@@ -1,0 +1,19 @@
+{
+  "name": "富士登山 2026",
+  "short_name": "富士登山",
+  "description": "2026年7月26-27日 富士登山プラン — 吉田ルート / 星観荘泊",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#020010",
+  "theme_color": "#020010",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
