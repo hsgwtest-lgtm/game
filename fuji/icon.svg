@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#020010"/>
+      <stop offset="100%" stop-color="#0a0128"/>
+    </linearGradient>
+    <linearGradient id="mountain" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#dde8ff"/>
+      <stop offset="25%" stop-color="#9090a0"/>
+      <stop offset="65%" stop-color="#5c4a3a"/>
+      <stop offset="100%" stop-color="#2a3a28"/>
+    </linearGradient>
+    <radialGradient id="moonglow" cx="75%" cy="20%" r="18%">
+      <stop offset="0%" stop-color="#8899cc" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#8899cc" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="routeglow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ff6b35" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#ff6b35" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="512" height="512" fill="url(#sky)" rx="80"/>
+  <!-- Moon glow -->
+  <ellipse cx="385" cy="100" rx="55" ry="55" fill="url(#moonglow)"/>
+  <!-- Moon -->
+  <circle cx="385" cy="100" r="28" fill="#d8e4f0" opacity="0.92"/>
+  <!-- Stars -->
+  <g fill="#ffffff">
+    <circle cx="80"  cy="70"  r="2"   opacity="0.8"/>
+    <circle cx="150" cy="40"  r="1.5" opacity="0.7"/>
+    <circle cx="210" cy="80"  r="1"   opacity="0.6"/>
+    <circle cx="300" cy="35"  r="1.5" opacity="0.8"/>
+    <circle cx="440" cy="60"  r="2"   opacity="0.7"/>
+    <circle cx="460" cy="130" r="1.5" opacity="0.6"/>
+    <circle cx="100" cy="140" r="1"   opacity="0.5"/>
+    <circle cx="50"  cy="180" r="1.5" opacity="0.6"/>
+    <circle cx="480" cy="180" r="1"   opacity="0.5"/>
+  </g>
+  <!-- Mountain silhouette -->
+  <path d="M20 440 L195 200 L240 260 L256 180 L272 260 L317 200 L492 440 Z" fill="url(#mountain)"/>
+  <!-- Snow cap -->
+  <path d="M240 260 L256 180 L272 260 L264 248 L256 210 L248 248 Z" fill="#dde8ff" opacity="0.95"/>
+  <!-- Yoshida route glow (line on right side) -->
+  <path d="M272 260 L282 230 L288 205 L272 190" stroke="#ff6b35" stroke-width="2.5" fill="none" opacity="0.8" stroke-linecap="round"/>
+  <!-- Route marker -->
+  <circle cx="288" cy="205" r="4" fill="#ff6b35" opacity="0.9"/>
+  <circle cx="288" cy="205" r="7" fill="#ff6b35" opacity="0.25"/>
+  <!-- Bioluminescent base mist -->
+  <ellipse cx="256" cy="440" rx="200" ry="12" fill="#002244" opacity="0.3"/>
+</svg>
