@@ -6,30 +6,43 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#000008">
+<meta name="theme-color" content="#000010">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>3D Life · GRID</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+
+<!-- Three.js r152 via ES module importmap -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/"
+  }
+}
+</script>
+
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --cyan:    #00f5ff;  --magenta: #ff00aa;
+  --cyan:    #00f5ff;  --magenta: #ff00cc;
   --green:   #00ff88;  --yellow:  #ffe040;
-  --red:     #ff3333;  --bg:      #000008;
-  --panel:   rgba(0,4,18,0.85);
-  --border:  rgba(0,245,255,0.22);
+  --red:     #ff3366;  --violet:  #cc88ff;
+  --bg:      #000010;
+  --panel:   rgba(0,4,20,0.88);
+  --border:  rgba(0,245,255,0.20);
   --text:    #9de8ff;
-  --glow-c: 0 0 8px #00f5ff99,0 0 28px #00f5ff33;
-  --glow-m: 0 0 8px #ff00aa99,0 0 28px #ff00aa33;
-  --glow-g: 0 0 8px #00ff8899,0 0 28px #00ff8833;
-  --glow-y: 0 0 8px #ffe04099,0 0 20px #ffe04033;
-  --safe-top:    env(safe-area-inset-top,0px);
-  --safe-bottom: env(safe-area-inset-bottom,0px);
+  --glow-c:  0 0 8px #00f5ff99, 0 0 28px #00f5ff44;
+  --glow-m:  0 0 8px #ff00cc99, 0 0 28px #ff00cc33;
+  --glow-g:  0 0 8px #00ff8899, 0 0 28px #00ff8833;
+  --glow-y:  0 0 8px #ffe04099, 0 0 22px #ffe04033;
+  --glow-v:  0 0 8px #cc88ff88, 0 0 22px #cc88ff33;
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
-html,body {
+html, body {
   background: var(--bg); color: var(--text);
   font-family: 'Share Tech Mono', monospace;
   overflow: hidden; width: 100%; height: 100%;
@@ -39,156 +52,194 @@ html,body {
 }
 #canvas-container { position: fixed; inset: 0; }
 canvas { display: block; width: 100% !important; height: 100% !important; }
-/* scanlines */
+
+/* Scanlines */
 body::after {
-  content:''; position:fixed; inset:0; pointer-events:none; z-index:8;
-  background: repeating-linear-gradient(0deg,transparent,transparent 2px,
-    rgba(0,0,0,0.05) 2px,rgba(0,0,0,0.05) 4px);
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 8;
+  background: repeating-linear-gradient(0deg, transparent, transparent 3px,
+    rgba(0,0,0,0.035) 3px, rgba(0,0,0,0.035) 4px);
 }
-/* vignette */
+/* Vignette */
 body::before {
-  content:''; position:fixed; inset:0; pointer-events:none; z-index:7;
-  background: radial-gradient(ellipse at center,transparent 50%,rgba(0,0,10,0.6) 100%);
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 7;
+  background: radial-gradient(ellipse at center, transparent 42%, rgba(0,0,18,0.72) 100%);
 }
 
 /* ── HUD top ─────────────────────────────────────────────── */
 #hud-top {
-  position:fixed; top:0; left:0; right:0;
-  padding: calc(var(--safe-top) + 12px) 18px 14px;
-  display:flex; align-items:flex-start; justify-content:space-between;
-  background: linear-gradient(180deg,rgba(0,0,20,0.92) 0%,transparent 100%);
-  z-index:20; pointer-events:none;
+  position: fixed; top: 0; left: 0; right: 0;
+  padding: calc(var(--safe-top) + 10px) 16px 12px;
+  display: flex; align-items: flex-start; justify-content: space-between;
+  background: linear-gradient(180deg, rgba(0,0,22,0.95) 0%, transparent 100%);
+  z-index: 20; pointer-events: none;
 }
 .title {
-  font-family:'Orbitron',monospace;
-  font-size:clamp(13px,3.5vw,20px); font-weight:900;
-  letter-spacing:.3em; color:var(--cyan); text-shadow:var(--glow-c); line-height:1.1;
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(12px, 3.2vw, 19px); font-weight: 900;
+  letter-spacing: .32em; color: var(--cyan); text-shadow: var(--glow-c);
+  line-height: 1.1;
 }
-.title-sub { font-size:.5em; color:rgba(0,245,255,0.4); letter-spacing:.12em; display:block; margin-top:3px; }
-.stats-grid { display:grid; grid-template-columns:repeat(3,auto); gap:4px 18px; text-align:right; }
-.stat { display:flex; flex-direction:column; }
-.stat-label { font-size:clamp(7px,1.5vw,9px); color:rgba(160,232,255,0.38); letter-spacing:.12em; margin-bottom:1px; }
-.stat-value { font-size:clamp(10px,2.2vw,13px); color:var(--cyan); text-shadow:var(--glow-c); letter-spacing:.06em; }
-.stat-value.g { color:var(--green);  text-shadow:var(--glow-g); }
-.stat-value.y { color:var(--yellow); text-shadow:var(--glow-y); }
+.title-sub {
+  font-size: .5em; color: rgba(0,245,255,0.32); letter-spacing: .11em;
+  display: block; margin-top: 2px; font-weight: 400;
+}
+.stats-grid {
+  display: grid; grid-template-columns: repeat(3, auto); gap: 4px 16px;
+  text-align: right;
+}
+.stat { display: flex; flex-direction: column; }
+.stat-label { font-size: clamp(7px, 1.4vw, 9px); color: rgba(160,232,255,0.32); letter-spacing: .12em; margin-bottom: 1px; }
+.stat-value { font-size: clamp(10px, 2vw, 13px); color: var(--cyan); text-shadow: var(--glow-c); letter-spacing: .06em; }
+.stat-value.g { color: var(--green);  text-shadow: var(--glow-g); }
+.stat-value.y { color: var(--yellow); text-shadow: var(--glow-y); }
 
-/* ── Slice HUD & mode badge ──────────────────────────────── */
-#slice-hud {
-  position:fixed; left:50%; top:calc(var(--safe-top) + 66px);
-  transform:translateX(-50%);
-  z-index:25; pointer-events:none;
-  font-family:'Orbitron',monospace;
-  font-size:clamp(9px,2.5vw,12px); letter-spacing:.25em;
-  color:var(--yellow); text-shadow:var(--glow-y);
-  background:rgba(0,4,18,0.82); border:1px solid rgba(255,224,64,0.32);
-  border-radius:3px; padding:5px 14px;
-  opacity:0; transition:opacity .45s ease; white-space:nowrap;
+/* ── Sub-badges row ──────────────────────────────────────── */
+#badge-row {
+  position: fixed; top: calc(var(--safe-top) + 60px); left: 0; right: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 14px; z-index: 25; pointer-events: none;
 }
-#slice-hud.visible { opacity:1; }
-#mode-badge {
-  position:fixed; right:18px; top:calc(var(--safe-top) + 66px);
-  z-index:25; pointer-events:none;
-  font-family:'Orbitron',monospace;
-  font-size:clamp(8px,2vw,11px); letter-spacing:.22em; font-weight:700;
-  padding:4px 10px; border-radius:3px;
-  border:1px solid rgba(0,245,255,0.35);
-  color:var(--cyan); text-shadow:var(--glow-c);
-  background:rgba(0,4,18,0.82);
-  transition:border-color .4s,color .4s,text-shadow .4s;
+.badge {
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(7px, 1.7vw, 10px); letter-spacing: .18em; font-weight: 700;
+  padding: 3px 9px; border-radius: 3px;
+  background: rgba(0,4,20,0.88);
 }
-#mode-badge.mode-2d { color:var(--yellow); text-shadow:var(--glow-y); border-color:rgba(255,224,64,0.45); }
+.badge-rule  { border: 1px solid rgba(0,255,136,0.30); color: var(--green);  text-shadow: var(--glow-g); }
+.badge-slice { border: 1px solid rgba(255,224,64,0.32); color: var(--yellow); text-shadow: var(--glow-y); opacity: 0; transition: opacity .4s; }
+.badge-slice.visible { opacity: 1; }
+.badge-mode  { border: 1px solid rgba(0,245,255,0.32); color: var(--cyan);   text-shadow: var(--glow-c); }
+.badge-mode.mode-2d  { border-color: rgba(255,224,64,0.45); color: var(--yellow); text-shadow: var(--glow-y); }
 
-/* ── Legends ─────────────────────────────────────────────── */
+/* ── Legend (age) ────────────────────────────────────────── */
 #legend {
-  position:fixed; left:12px; top:50%; transform:translateY(-50%);
-  z-index:20; pointer-events:none;
-  display:flex; flex-direction:column; align-items:center; gap:6px;
-  transition:opacity .4s;
+  position: fixed; left: 10px; top: 50%; transform: translateY(-50%);
+  z-index: 20; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  transition: opacity .4s;
 }
-#legend.hide { opacity:0; }
-.legend-title { font-size:8px; color:rgba(160,232,255,0.38); letter-spacing:.15em;
-  writing-mode:vertical-rl; transform:rotate(180deg); margin-bottom:4px; }
-.legend-bar { width:8px; height:90px; border-radius:4px;
-  background:linear-gradient(to top,#0044ff 0%,#00aaff 20%,#00ff88 45%,#ffee00 68%,#ff8800 85%,#ff2200 100%);
-  box-shadow:0 0 10px rgba(0,200,255,0.25); border:1px solid rgba(255,255,255,0.1); }
-.legend-labels { display:flex; flex-direction:column; align-items:center; gap:0; font-size:7px; letter-spacing:.1em; }
-.lbl-new { color:#5599ff; } .lbl-mid { color:var(--green); } .lbl-ancient { color:var(--red); }
-.legend-sep { height:28px; }
-#legend-density {
-  position:fixed; right:12px; top:50%; transform:translateY(-50%);
-  z-index:20; pointer-events:none;
-  display:flex; flex-direction:column; align-items:center; gap:5px;
-  transition:opacity .4s;
+#legend.hide { opacity: 0; pointer-events: none; }
+.legend-title {
+  font-size: 7px; color: rgba(160,232,255,0.32); letter-spacing: .14em;
+  writing-mode: vertical-rl; transform: rotate(180deg); margin-bottom: 2px;
 }
-#legend-density.hide { opacity:0; }
-.density-title { font-size:8px; color:rgba(160,232,255,0.38); letter-spacing:.12em;
-  writing-mode:vertical-rl; transform:rotate(180deg); margin-bottom:4px; }
-.density-bar { width:8px; height:70px; border-radius:4px;
-  background:linear-gradient(to top,rgba(255,255,255,0.08) 0%,rgba(255,255,255,0.5) 50%,rgba(255,255,255,0.95) 100%);
-  border:1px solid rgba(255,255,255,0.1); }
-.density-labels { display:flex; flex-direction:column; align-items:center; gap:0;
-  font-size:7px; color:rgba(160,232,255,0.5); letter-spacing:.1em; }
-.density-sep { height:22px; }
+.legend-bar {
+  width: 7px; height: 82px; border-radius: 4px;
+  background: linear-gradient(to top,
+    #ff1166 0%, #ff8800 22%, #ffe000 45%, #00ff88 67%, #00aaff 85%, #ffffff 100%);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 0 12px rgba(0,200,255,0.18);
+}
+.legend-labels {
+  display: flex; flex-direction: column; align-items: center;
+  font-size: 6px; letter-spacing: .08em; gap: 0;
+}
+.lbl-new { color: #aaeeff; } .lbl-mid { color: var(--green); } .lbl-old { color: #ff3366; }
+.legend-sep { height: 24px; }
 
 /* ── Controls ────────────────────────────────────────────── */
 #controls {
-  position:fixed; bottom:0; left:0; right:0;
-  padding:12px 16px calc(var(--safe-bottom) + 14px);
-  display:flex; align-items:center; justify-content:center;
-  flex-wrap:wrap; gap:8px 10px;
-  background:linear-gradient(0deg,rgba(0,0,20,0.96) 0%,transparent 100%);
-  z-index:20;
+  position: fixed; bottom: 0; left: 0; right: 0;
+  padding: 10px 14px calc(var(--safe-bottom) + 12px);
+  display: flex; align-items: center; justify-content: center;
+  flex-wrap: wrap; gap: 6px 8px;
+  background: linear-gradient(0deg, rgba(0,0,22,0.97) 0%, transparent 100%);
+  z-index: 20;
 }
 .btn {
-  font-family:'Share Tech Mono',monospace;
-  font-size:clamp(9px,2.2vw,12px); letter-spacing:.1em;
-  padding:8px 15px;
-  background:var(--panel); border:1px solid var(--border);
-  color:var(--cyan); border-radius:3px; cursor:pointer;
-  transition:background .15s,border-color .15s,box-shadow .15s,color .12s;
-  outline:none; -webkit-tap-highlight-color:transparent;
-  min-width:72px; text-align:center;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: clamp(9px, 2vw, 11px); letter-spacing: .09em;
+  padding: 7px 13px;
+  background: var(--panel); border: 1px solid var(--border);
+  color: var(--cyan); border-radius: 3px; cursor: pointer;
+  transition: background .15s, border-color .15s, box-shadow .15s, color .12s;
+  outline: none; -webkit-tap-highlight-color: transparent;
+  min-width: 66px; text-align: center;
 }
-.btn:hover,.btn:active { background:rgba(0,245,255,0.12); border-color:var(--cyan); box-shadow:var(--glow-c); color:#fff; }
-.btn.active { background:rgba(0,245,255,0.15); border-color:rgba(0,245,255,0.6); box-shadow:var(--glow-c); color:#fff; }
-.btn.danger { color:var(--magenta); border-color:rgba(255,0,170,0.25); }
-.btn.danger:hover,.btn.danger:active { background:rgba(255,0,170,0.12); border-color:var(--magenta); box-shadow:var(--glow-m); color:#fff; }
-.btn.success { color:var(--green); border-color:rgba(0,255,136,0.25); }
-.btn.success:hover,.btn.success:active { background:rgba(0,255,136,0.1); border-color:var(--green); box-shadow:var(--glow-g); color:#fff; }
-.btn.lit-2d { color:var(--yellow); border-color:rgba(255,224,64,0.45); background:rgba(20,14,0,0.88); box-shadow:var(--glow-y); }
-.btn.lit-2d:hover,.btn.lit-2d:active { background:rgba(255,224,64,0.10); border-color:var(--yellow); box-shadow:var(--glow-y); color:#fff; }
-.speed-group { display:flex; align-items:center; gap:6px; }
-.speed-label { font-size:clamp(8px,1.8vw,10px); color:rgba(160,232,255,0.45); letter-spacing:.1em; }
-#speed-display { color:var(--yellow); font-size:clamp(10px,2.2vw,13px); min-width:20px; text-align:center; text-shadow:var(--glow-y); }
-.speed-btn { min-width:30px; padding:8px 8px; }
+.btn:hover, .btn:active {
+  background: rgba(0,245,255,0.12); border-color: var(--cyan);
+  box-shadow: var(--glow-c); color: #fff;
+}
+.btn.active {
+  background: rgba(0,245,255,0.14); border-color: rgba(0,245,255,0.6);
+  box-shadow: var(--glow-c); color: #fff;
+}
+.btn.danger { color: var(--magenta); border-color: rgba(255,0,204,0.22); }
+.btn.danger:hover, .btn.danger:active {
+  background: rgba(255,0,204,0.12); border-color: var(--magenta);
+  box-shadow: var(--glow-m); color: #fff;
+}
+.btn.success { color: var(--green); border-color: rgba(0,255,136,0.22); }
+.btn.success:hover, .btn.success:active {
+  background: rgba(0,255,136,0.10); border-color: var(--green);
+  box-shadow: var(--glow-g); color: #fff;
+}
+.btn.lit-2d {
+  color: var(--yellow); border-color: rgba(255,224,64,0.45);
+  background: rgba(20,14,0,0.88); box-shadow: var(--glow-y);
+}
+.btn.lit-2d:hover, .btn.lit-2d:active {
+  background: rgba(255,224,64,0.10); border-color: var(--yellow);
+  box-shadow: var(--glow-y); color: #fff;
+}
+.btn.torus-on {
+  color: var(--violet); border-color: rgba(204,136,255,0.45);
+  background: rgba(12,0,22,0.88); box-shadow: var(--glow-v);
+}
+.btn.torus-on:hover, .btn.torus-on:active {
+  background: rgba(204,136,255,0.10); border-color: var(--violet); color: #fff;
+}
+.speed-group { display: flex; align-items: center; gap: 5px; }
+.speed-label { font-size: clamp(7px, 1.6vw, 9px); color: rgba(160,232,255,0.38); letter-spacing: .1em; }
+#speed-display { color: var(--yellow); font-size: clamp(10px, 2vw, 12px); min-width: 18px; text-align: center; text-shadow: var(--glow-y); }
+.speed-btn { min-width: 28px; padding: 7px 7px; }
 
 /* ── Corner accents ─────────────────────────────────────── */
-.corner { position:fixed; width:34px; height:34px; z-index:6; pointer-events:none; opacity:.5; }
-.corner-tl { top:0;left:0;       border-top:1px solid var(--cyan);    border-left:1px solid var(--cyan); }
-.corner-tr { top:0;right:0;      border-top:1px solid var(--cyan);    border-right:1px solid var(--cyan); }
-.corner-bl { bottom:0;left:0;    border-bottom:1px solid var(--magenta); border-left:1px solid var(--magenta); }
-.corner-br { bottom:0;right:0;   border-bottom:1px solid var(--magenta); border-right:1px solid var(--magenta); }
+.corner { position: fixed; width: 28px; height: 28px; z-index: 6; pointer-events: none; opacity: .4; }
+.corner-tl { top: 0; left: 0;   border-top: 1px solid var(--cyan);    border-left: 1px solid var(--cyan); }
+.corner-tr { top: 0; right: 0;  border-top: 1px solid var(--cyan);    border-right: 1px solid var(--cyan); }
+.corner-bl { bottom: 0; left: 0;  border-bottom: 1px solid var(--magenta); border-left: 1px solid var(--magenta); }
+.corner-br { bottom: 0; right: 0; border-bottom: 1px solid var(--magenta); border-right: 1px solid var(--magenta); }
 
 /* ── Flash ──────────────────────────────────────────────── */
 #flash {
-  position:fixed; inset:0; pointer-events:none; z-index:15;
-  background:radial-gradient(ellipse at center,rgba(0,245,255,0.05) 0%,transparent 68%);
-  opacity:0; transition:opacity .06s ease-out;
+  position: fixed; inset: 0; pointer-events: none; z-index: 15;
+  background: radial-gradient(ellipse at center, rgba(0,245,255,0.04) 0%, transparent 68%);
+  opacity: 0; transition: opacity .07s ease-out;
 }
-#flash.on { opacity:1; }
+#flash.on { opacity: 1; }
 
 /* ── Info panel ─────────────────────────────────────────── */
 #param-info {
-  position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
-  background:rgba(0,4,18,0.95); border:1px solid rgba(0,245,255,0.30);
-  border-radius:6px; padding:18px 24px; max-width:290px; width:82vw;
-  z-index:50; display:none; box-shadow:0 0 40px rgba(0,245,255,0.10);
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  background: rgba(0,4,22,0.97); border: 1px solid rgba(0,245,255,0.26);
+  border-radius: 6px; padding: 18px 22px; max-width: 310px; width: 88vw;
+  z-index: 50; display: none;
+  box-shadow: 0 0 60px rgba(0,245,255,0.08), 0 0 120px rgba(0,0,40,0.9);
 }
-#param-info h3 { font-family:'Orbitron',monospace; font-size:11px; color:var(--cyan);
-  letter-spacing:.2em; margin-bottom:12px; text-shadow:var(--glow-c); }
-#param-info p { font-size:10px; line-height:1.7; color:rgba(160,232,255,0.72);
-  margin-bottom:9px; letter-spacing:.05em; }
-#param-info .close-btn { margin-top:14px; width:100%; }
+#param-info h3 {
+  font-family: 'Orbitron', monospace; font-size: 10px; color: var(--cyan);
+  letter-spacing: .22em; margin-bottom: 14px; text-shadow: var(--glow-c);
+}
+#param-info p {
+  font-size: 9.5px; line-height: 1.8; color: rgba(160,232,255,0.68);
+  margin-bottom: 10px; letter-spacing: .04em;
+}
+#param-info .kbd {
+  display: inline-block; background: rgba(0,245,255,0.10); border: 1px solid rgba(0,245,255,0.28);
+  border-radius: 2px; padding: 0 5px; font-size: 9px; color: var(--cyan); letter-spacing: .06em;
+}
+#param-info .close-btn { margin-top: 14px; width: 100%; }
+
+/* ── Keyboard hint (desktop only) ───────────────────────── */
+#kbd-hint {
+  position: fixed; bottom: 0; right: 14px;
+  padding-bottom: calc(var(--safe-bottom) + 8px);
+  z-index: 19; pointer-events: none;
+  font-size: 7px; color: rgba(160,232,255,0.18); letter-spacing: .07em;
+  line-height: 1.7; text-align: right;
+}
+@media (max-width: 640px) { #kbd-hint { display: none; } }
 </style>
 </head>
 <body>
@@ -205,8 +256,8 @@ body::before {
 <div id="hud-top">
   <div>
     <div class="title">
-      3D<span style="color:var(--magenta);text-shadow:var(--glow-m)">LIFE</span><span style="color:rgba(0,245,255,0.35)"> ·</span> GRID
-      <span class="title-sub">15×15×15 · SURVIVE 5–7 · BORN 6</span>
+      3D<span style="color:var(--magenta);text-shadow:var(--glow-m)">LIFE</span><span style="color:rgba(0,245,255,0.3)"> ·</span> GRID
+      <span class="title-sub" id="title-rule">15×15×15 · B6/S5-7</span>
     </div>
   </div>
   <div class="stats-grid">
@@ -219,211 +270,264 @@ body::before {
   </div>
 </div>
 
-<div id="slice-hud">SLICE · Z = 07 · LAYER 8 / 15</div>
-<div id="mode-badge">3D</div>
+<!-- Badge row -->
+<div id="badge-row">
+  <div class="badge badge-rule"  id="badge-rule">BAYS</div>
+  <div class="badge badge-slice" id="badge-slice">SLICE · Z=07</div>
+  <div class="badge badge-mode"  id="badge-mode">3D</div>
+</div>
 
-<!-- Legends -->
+<!-- Age legend -->
 <div id="legend">
   <div class="legend-title">AGE</div>
   <div class="legend-labels">
-    <span class="lbl-ancient">ANCIENT</span><div class="legend-sep"></div>
-    <span class="lbl-mid">ACTIVE</span><div class="legend-sep"></div>
+    <span class="lbl-old">OLD</span>
+    <div class="legend-sep"></div>
+    <span class="lbl-mid">MID</span>
+    <div class="legend-sep"></div>
     <span class="lbl-new">NEW</span>
   </div>
   <div class="legend-bar"></div>
 </div>
-<div id="legend-density">
-  <div class="density-title">DENSITY</div>
-  <div class="density-labels">
-    <span>HIGH</span><div class="density-sep"></div><span>LOW</span>
-  </div>
-  <div class="density-bar"></div>
-</div>
 
 <!-- Info panel -->
 <div id="param-info">
-  <h3>BIOLOGICAL PARAMETERS</h3>
+  <h3>SIMULATION GUIDE</h3>
   <p><span style="color:var(--cyan)">● COLOR — AGE</span><br>
-     Blue → Cyan → Green → Yellow → Red<br>Maps 0–45 generations of survival.</p>
-  <p><span style="color:var(--green)">● SIZE + GLOW — DENSITY</span><br>
-     More live neighbors → larger, brighter cell.<br>Isolated cells appear small and dim.</p>
-  <p><span style="color:var(--magenta)">● BIRTH ANIMATION</span><br>
-     Newborns spring from scale 0 with elastic overshoot.</p>
+     White→Blue→Green→Yellow→Red/Pink<br>
+     Maps 0 to 45 generations.</p>
+  <p><span style="color:var(--green)">● SIZE — DENSITY</span><br>
+     More live neighbors → larger sphere.<br>
+     Isolated cells appear small.</p>
+  <p><span style="color:var(--magenta)">● ANIMATIONS</span><br>
+     Birth: elastic spring · Death: shrink-fade.</p>
   <p><span style="color:var(--yellow)">● 2D SLICE MODE</span><br>
      Shows only the central Z-layer (z=7).<br>
-     Simulation continues in full 3D space.</p>
+     Simulation continues in full 3D.</p>
+  <p><span style="color:var(--violet)">● TOROIDAL MODE</span><br>
+     Edges wrap around — infinite space effect.</p>
+  <p style="color:rgba(160,232,255,0.5); font-size:9px; line-height:1.9;">
+     <span class="kbd">SPC</span> pause &nbsp;
+     <span class="kbd">R</span> random &nbsp;
+     <span class="kbd">G</span> reset<br>
+     <span class="kbd">M</span> 2D/3D &nbsp;
+     <span class="kbd">N</span> next rule &nbsp;
+     <span class="kbd">T</span> torus<br>
+     <span class="kbd">↑↓</span> speed &nbsp;
+     <span class="kbd">/</span> this panel
+  </p>
   <button class="btn close-btn" onclick="closeInfo()">✕ CLOSE</button>
 </div>
 
 <!-- Controls -->
 <div id="controls">
-  <button class="btn active"  id="btn-play"  onclick="togglePlay()">⏸ PAUSE</button>
-  <button class="btn danger"                 onclick="resetGrid()">⟳ RESET</button>
-  <button class="btn success"                onclick="randomize()">⚄ RANDOM</button>
-  <button class="btn"         id="btn-mode"  onclick="toggleMode()">⊞ 2D</button>
+  <button class="btn active" id="btn-play"  onclick="togglePlay()">⏸ PAUSE</button>
+  <button class="btn danger"               onclick="resetGrid()">⟳ RESET</button>
+  <button class="btn success"              onclick="randomize()">⚄ RANDOM</button>
+  <button class="btn"        id="btn-mode" onclick="toggleMode()">⊞ 2D</button>
+  <button class="btn success"id="btn-rule" onclick="cycleRule()">⊿ RULE</button>
+  <button class="btn"        id="btn-torus"onclick="toggleTorus()">□ TORUS</button>
   <div class="speed-group">
     <div class="speed-label">SPD</div>
     <button class="btn speed-btn" onclick="changeSpeed(-1)">◀</button>
     <div id="speed-display">3</div>
     <button class="btn speed-btn" onclick="changeSpeed(1)">▶</button>
   </div>
-  <button class="btn" onclick="showInfo()" style="min-width:36px;padding:8px 10px">?</button>
+  <button class="btn" onclick="showInfo()" style="min-width:34px;padding:7px 9px">?</button>
 </div>
 
-<!-- Three.js r128 (CDN) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
+<!-- Keyboard hint -->
+<div id="kbd-hint">
+  SPC pause · R random · G reset<br>
+  M mode · N rule · T torus · ↑↓ speed
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass }     from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
+
 'use strict';
+
+/* ═══════════════════════════════════════════════════════════
+   RULE PRESETS  (survive-set / born-set)
+═══════════════════════════════════════════════════════════ */
+const RULE_PRESETS = [
+  { id: 'BAYS',   survive: new Set([5,6,7]),     born: new Set([6])   },
+  { id: 'DENSE',  survive: new Set([4,5,6]),     born: new Set([5,6]) },
+  { id: 'CORAL',  survive: new Set([5,6,7,8]),   born: new Set([6,7]) },
+  { id: 'QUIET',  survive: new Set([3,4,5]),     born: new Set([5])   },
+];
+let ruleIdx = 0;
+let rule = RULE_PRESETS[ruleIdx];
 
 /* ═══════════════════════════════════════════════════════════
    CONSTANTS
 ═══════════════════════════════════════════════════════════ */
-const GRID        = 15;
-const G2          = GRID * GRID;
-const TOTAL       = GRID * G2;
-const MID_Z       = (GRID - 1) >> 1;          // = 7
-const SURVIVE_MIN = 5, SURVIVE_MAX = 7, BORN_EXACT = 6;
-const BIRTH_DUR   = 340;                       // ms for birth animation
-const BASE_SCALE  = 0.78;
-const MAX_AGE     = 40;
-const SPEEDS      = [2000, 800, 400, 200, 100, 40];
+const GRID   = 15;
+const G2     = GRID * GRID;
+const TOTAL  = GRID * G2;
+const HALF   = (GRID - 1) * 0.5;   // 7.0
+const MID_Z  = (GRID - 1) >> 1;    // 7
+
+const BIRTH_DUR  = 330;   // ms birth spring animation
+const DEATH_DUR  = 240;   // ms death shrink animation
+const BASE_SCALE = 0.72;  // cell scale at density 0
+const DENS_BONUS = 0.32;  // extra scale at max density
+const MAX_AGE    = 45;
+const SPEEDS     = [2000, 800, 400, 200, 100, 40];
 
 /* ═══════════════════════════════════════════════════════════
    SIMULATION STATE  (double-buffered typed arrays)
 ═══════════════════════════════════════════════════════════ */
-let cells       = new Uint8Array(TOTAL);
-let nextCells   = new Uint8Array(TOTAL);
-let ages        = new Uint32Array(TOTAL);
-let nextAges    = new Uint32Array(TOTAL);
-let density     = new Uint8Array(TOTAL);
-let nextDensity = new Uint8Array(TOTAL);
-let birthMs     = new Float64Array(TOTAL).fill(-1);
+let cells    = new Uint8Array(TOTAL);
+let nextCells= new Uint8Array(TOTAL);
+let ages     = new Uint32Array(TOTAL);
+let nextAges = new Uint32Array(TOTAL);
+let nbrs     = new Uint8Array(TOTAL);
+let nextNbrs = new Uint8Array(TOTAL);
+let birthMs  = new Float64Array(TOTAL).fill(-1);
+let deathMs  = new Float64Array(TOTAL).fill(-1);
 
-let generation   = 0;
-let playing      = true;
-let speedLevel   = 3;
-let lastStepTime = 0;
-let bornThisStep = 0;
+let generation  = 0, bornThisStep = 0;
+let playing     = true, speedLevel = 3;
+let lastStepTime= 0;
+let toroidal    = false;
 
 /* ═══════════════════════════════════════════════════════════
-   VIEW MODE
+   VIEW STATE
 ═══════════════════════════════════════════════════════════ */
 let is2D = false;
-
-const sph = { theta: Math.PI / 4, phi: Math.PI / 3.5, r: 34 };
-const sph3DSnapshot = { theta: Math.PI / 4, phi: Math.PI / 3.5, r: 34 };
-
+const sph = { theta: Math.PI / 4, phi: Math.PI / 3.5, r: 36 };
+const sph3DSnap = { ...sph };
 const trans = {
   running: false,
-  fromPos: new THREE.Vector3(),
-  toPos:   new THREE.Vector3(),
-  elapsed: 0, duration: 1000,
+  fromPos: new THREE.Vector3(), toPos: new THREE.Vector3(),
+  elapsed: 0, duration: 950
 };
 
 /* ═══════════════════════════════════════════════════════════
-   THREE.JS SETUP
-   ► MeshPhongMaterial  — predictable on all iOS WebGL
-   ► No outputEncoding override (default LinearEncoding)
-   ► No powerPreference (causes iOS context failure)
+   THREE.JS — renderer, scene, camera
 ═══════════════════════════════════════════════════════════ */
 const container = document.getElementById('canvas-container');
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
-// Mild tonemapping — no sRGBEncoding to avoid iOS quirks
 renderer.toneMapping         = THREE.ReinhardToneMapping;
-renderer.toneMappingExposure = 1.8;
+renderer.toneMappingExposure = 1.5;
 container.appendChild(renderer.domElement);
 
 const scene  = new THREE.Scene();
-scene.background = new THREE.Color(0x00000a);
+scene.background = new THREE.Color(0x000012);
 
-const camera = new THREE.PerspectiveCamera(
-  55, window.innerWidth / window.innerHeight, 0.5, 300);
+const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.5, 300);
 
-const fog3D = new THREE.FogExp2(0x00000f, 0.035);
+// Lighter fog so back cells remain visible
+const fog3D = new THREE.FogExp2(0x000014, 0.018);
 scene.fog = fog3D;
 
-/* ── Lighting — boosted for Phong ────────────────────────── */
-// Strong ambient so cells are always visible
-scene.add(new THREE.AmbientLight(0x223355, 5.0));
+/* ── Lighting ─────────────────────────────────────────────── */
+scene.add(new THREE.AmbientLight(0x223366, 3.5));
 
-const keyLight = new THREE.PointLight(0x44ddff, 6.0, 120);
-keyLight.position.set(20, 28, 14);
+const keyLight    = new THREE.PointLight(0x44ccff, 7.5, 160);
+keyLight.position.set(18, 26, 16);
 scene.add(keyLight);
 
-const fillLight = new THREE.PointLight(0xff44cc, 4.5, 120);
-fillLight.position.set(-20, -12, -18);
+const fillLight   = new THREE.PointLight(0xff44dd, 6.0, 150);
+fillLight.position.set(-22, -14, -20);
 scene.add(fillLight);
 
-const accentLight = new THREE.PointLight(0x44ffaa, 3.5, 100);
-accentLight.position.set(4, -20, 24);
+const accentLight = new THREE.PointLight(0x44ffaa, 4.5, 130);
+accentLight.position.set(4, -22, 26);
 scene.add(accentLight);
 
-/* ── 3-D bounding box ─────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════
+   POST-PROCESSING — UnrealBloom
+═══════════════════════════════════════════════════════════ */
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  1.45,   // strength
+  0.55,   // radius
+  0.10    // threshold (low → more things glow)
+);
+composer.addPass(bloomPass);
+
+/* ═══════════════════════════════════════════════════════════
+   BOUNDING BOX + GRID LINES
+═══════════════════════════════════════════════════════════ */
 {
-  const b = new THREE.BoxGeometry(GRID, GRID, GRID);
+  const boxGeo = new THREE.BoxGeometry(GRID, GRID, GRID);
   scene.add(new THREE.LineSegments(
-    new THREE.EdgesGeometry(b),
-    new THREE.LineBasicMaterial({ color: 0x00f5ff, transparent: true, opacity: 0.10 })
+    new THREE.EdgesGeometry(boxGeo),
+    new THREE.LineBasicMaterial({ color: 0x00f5ff, transparent: true, opacity: 0.12 })
   ));
-  b.dispose();
+  boxGeo.dispose();
 
   const half   = GRID / 2;
-  const subMat = new THREE.LineBasicMaterial({ color: 0x00f5ff, transparent: true, opacity: 0.030 });
+  const subMat = new THREE.LineBasicMaterial({ color: 0x00f5ff, transparent: true, opacity: 0.025 });
   [-5, 0, 5].forEach(a => [-5, 0, 5].forEach(b => {
-    const g = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(a, -half, b), new THREE.Vector3(a, half, b)]);
-    scene.add(new THREE.Line(g, subMat));
+    const geo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(a, -half, b), new THREE.Vector3(a, half, b)
+    ]);
+    scene.add(new THREE.Line(geo, subMat));
   }));
 }
 
-/* ── 2-D slice overlay objects ──────────────────────────── */
+/* ═══════════════════════════════════════════════════════════
+   2-D SLICE OVERLAY
+═══════════════════════════════════════════════════════════ */
 const sliceGrid = (() => {
   const verts = [], half = (GRID - 1) / 2, eps = 0.015;
   for (let i = 0; i < GRID; i++) {
     const p = i - half;
-    verts.push(-half - .5, p, -eps,  half + .5, p, -eps);
-    verts.push(p, -half - .5, -eps,  p, half + .5, -eps);
+    verts.push(-half-.5, p, -eps,  half+.5, p, -eps);
+    verts.push(p, -half-.5, -eps,  p, half+.5, -eps);
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
   const obj = new THREE.LineSegments(geo,
-    new THREE.LineBasicMaterial({ color: 0x003860, transparent: true, opacity: 0.65 }));
+    new THREE.LineBasicMaterial({ color: 0x003860, transparent: true, opacity: 0.60 }));
   obj.visible = false;
   scene.add(obj);
   return obj;
 })();
 
 const sliceBorder = (() => {
-  const h = (GRID - 1) / 2 + 0.5;
-  const pts = [
-    new THREE.Vector3(-h,-h,0), new THREE.Vector3(h,-h,0),
-    new THREE.Vector3(h,h,0),   new THREE.Vector3(-h,h,0),
-    new THREE.Vector3(-h,-h,0),
-  ];
+  const h  = (GRID - 1) / 2 + 0.5;
   const ln = new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints(pts),
-    new THREE.LineBasicMaterial({ color: 0xffe040, transparent: true, opacity: 0.60 }));
+    new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-h,-h,0), new THREE.Vector3(h,-h,0),
+      new THREE.Vector3(h, h,0),  new THREE.Vector3(-h, h,0),
+      new THREE.Vector3(-h,-h,0),
+    ]),
+    new THREE.LineBasicMaterial({ color: 0xffe040, transparent: true, opacity: 0.65 }));
   ln.visible = false;
   scene.add(ln);
   return ln;
 })();
 
-/* ── InstancedMesh ─────────────────────────────────────── */
-const cellGeo = new THREE.BoxGeometry(1, 1, 1);
+/* ═══════════════════════════════════════════════════════════
+   INSTANCED MESH — spherical cells
+   Sphere instead of box: rounder, catches light beautifully,
+   and bloom halos look like genuine glowing orbs.
+═══════════════════════════════════════════════════════════ */
+const cellGeo = new THREE.SphereGeometry(0.44, 12, 8);
 
-/*  ► MeshPhongMaterial: no env-map dependency, always visible,
-      emissive is additive, instance colours work reliably.      */
-const cellMat = new THREE.MeshPhongMaterial({
-  color:     0xffffff,   // white base — instance colour is multiplicative
-  emissive:  new THREE.Color(0x001833),
-  emissiveIntensity: 1.0,
-  shininess: 55,
-  specular:  new THREE.Color(0x88ddff),
+// MeshStandardMaterial: PBR shading + slight emissive base so
+// dim isolated cells are still faintly visible in the dark.
+const cellMat = new THREE.MeshStandardMaterial({
+  color:             0xffffff,
+  emissive:          new THREE.Color(0x112244),
+  emissiveIntensity: 0.35,
+  roughness:         0.18,
+  metalness:         0.05,
 });
 
+// Capacity = TOTAL (alive + dying cells combined ≤ TOTAL at any time)
 const iMesh = new THREE.InstancedMesh(cellGeo, cellMat, TOTAL);
 iMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 iMesh.frustumCulled = false;
@@ -434,19 +538,19 @@ const dummy = new THREE.Object3D();
 const _col  = new THREE.Color();
 
 /* ═══════════════════════════════════════════════════════════
-   COLOUR   age-hue × density-brightness
-   Fix: minimum brightness raised to 0.72 so isolated cells
-        are clearly visible on the dark background.
+   COLOR PALETTE — age-hue × density-brightness
+   New: white/cyan → blue → cyan-green → yellow → magenta
+   Bright values ensure cells bloom via UnrealBloomPass.
 ═══════════════════════════════════════════════════════════ */
 const AGE_PAL = [
-  [0.05, 0.30, 1.00],   // blue   – newborn
-  [0.00, 0.80, 1.00],   // cyan
-  [0.08, 1.00, 0.25],   // green
-  [1.00, 0.85, 0.00],   // yellow
-  [1.00, 0.10, 0.05],   // red    – ancient
+  [1.00, 1.00, 1.00],   // 0 newborn  — white
+  [0.18, 0.52, 1.00],   // 1 young    — blue
+  [0.00, 1.00, 0.52],   // 2 active   — cyan-green
+  [1.00, 0.86, 0.00],   // 3 mature   — yellow
+  [1.00, 0.08, 0.55],   // 4 ancient  — magenta
 ];
 
-function computeColor(age, nbrs) {
+function computeColor(age, nbrCount, fade) {
   const ageT = Math.min(1, age / MAX_AGE);
   const seg  = ageT * (AGE_PAL.length - 1);
   const si   = Math.min(AGE_PAL.length - 2, seg | 0);
@@ -455,40 +559,49 @@ function computeColor(age, nbrs) {
   const r = c0[0] + (c1[0] - c0[0]) * st;
   const g = c0[1] + (c1[1] - c0[1]) * st;
   const b = c0[2] + (c1[2] - c0[2]) * st;
-  // Brightness: 0.72 (isolated) → 1.55 (fully packed)
-  const br = 0.72 + Math.min(1, nbrs / 13) * 0.83;
-  _col.setRGB(
-    Math.min(1, r * br),
-    Math.min(1, g * br),
-    Math.min(1, b * br)
-  );
+  // Brightness: isolated cells ≥ 0.85, dense cells up to 1.6
+  const br = (0.85 + Math.min(1, nbrCount / 12) * 0.75) * (fade !== undefined ? fade : 1.0);
+  _col.setRGB(Math.min(1, r * br), Math.min(1, g * br), Math.min(1, b * br));
   return _col;
 }
 
-/* ── Easing ─────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════
+   EASING
+═══════════════════════════════════════════════════════════ */
 function easeOutBack(t) {
   const c1 = 1.70158, c3 = c1 + 1;
-  return 1 + c3 * Math.pow(t-1, 3) + c1 * Math.pow(t-1, 2);
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
 }
 function easeInOutQuart(t) {
   return t < 0.5 ? 8*t*t*t*t : 1 - Math.pow(-2*t+2, 4)/2;
 }
+function easeInCubic(t) { return t * t * t; }
 
 /* ═══════════════════════════════════════════════════════════
    GRID HELPERS
 ═══════════════════════════════════════════════════════════ */
-function idx(x, y, z) { return x * G2 + y * GRID + z; }
+function idx(x, y, z)  { return x * G2 + y * GRID + z; }
+function wrap(v)       { return ((v % GRID) + GRID) % GRID; }
 
 function countNeighbors(cx, cy, cz) {
   let n = 0;
-  const x0=Math.max(0,cx-1), x1=Math.min(GRID-1,cx+1);
-  const y0=Math.max(0,cy-1), y1=Math.min(GRID-1,cy+1);
-  const z0=Math.max(0,cz-1), z1=Math.min(GRID-1,cz+1);
-  for (let x=x0; x<=x1; x++)
-  for (let y=y0; y<=y1; y++)
-  for (let z=z0; z<=z1; z++) {
-    if (x===cx && y===cy && z===cz) continue;
-    n += cells[idx(x,y,z)];
+  if (toroidal) {
+    for (let dx = -1; dx <= 1; dx++)
+    for (let dy = -1; dy <= 1; dy++)
+    for (let dz = -1; dz <= 1; dz++) {
+      if (dx === 0 && dy === 0 && dz === 0) continue;
+      n += cells[idx(wrap(cx+dx), wrap(cy+dy), wrap(cz+dz))];
+    }
+  } else {
+    const x0=Math.max(0,cx-1), x1=Math.min(GRID-1,cx+1);
+    const y0=Math.max(0,cy-1), y1=Math.min(GRID-1,cy+1);
+    const z0=Math.max(0,cz-1), z1=Math.min(GRID-1,cz+1);
+    for (let x=x0; x<=x1; x++)
+    for (let y=y0; y<=y1; y++)
+    for (let z=z0; z<=z1; z++) {
+      if (x===cx && y===cy && z===cz) continue;
+      n += cells[idx(x,y,z)];
+    }
   }
   return n;
 }
@@ -498,78 +611,114 @@ function countNeighbors(cx, cy, cz) {
 ═══════════════════════════════════════════════════════════ */
 function stepSimulation(now) {
   bornThisStep = 0;
-  for (let x=0; x<GRID; x++)
-  for (let y=0; y<GRID; y++)
-  for (let z=0; z<GRID; z++) {
-    const i = idx(x,y,z);
+  for (let x = 0; x < GRID; x++)
+  for (let y = 0; y < GRID; y++)
+  for (let z = 0; z < GRID; z++) {
+    const i     = idx(x, y, z);
     const alive = cells[i];
-    const n     = countNeighbors(x,y,z);
-    nextDensity[i] = n;
-    const next = alive
-      ? (n>=SURVIVE_MIN && n<=SURVIVE_MAX ? 1 : 0)
-      : (n===BORN_EXACT ? 1 : 0);
-    nextCells[i] = next;
-    if (next) {
-      nextAges[i] = alive ? ages[i]+1 : 0;
-      if (!alive) { birthMs[i] = now; bornThisStep++; }
+    const n     = countNeighbors(x, y, z);
+    nextNbrs[i] = n;
+
+    const survive = alive  ? rule.survive.has(n) : false;
+    const born    = !alive ? rule.born.has(n)    : false;
+
+    if (survive) {
+      nextCells[i] = 1;
+      nextAges[i]  = ages[i] + 1;
+    } else if (born) {
+      nextCells[i] = 1;
+      nextAges[i]  = 0;
+      birthMs[i]   = now;
+      deathMs[i]   = -1;   // cancel any stale death animation
+      bornThisStep++;
     } else {
-      nextAges[i] = 0;
-      if (alive) birthMs[i] = -1;
+      nextCells[i] = 0;
+      nextAges[i]  = 0;
+      if (alive && deathMs[i] < 0) deathMs[i] = now;  // start death anim
     }
   }
   let t;
-  t=cells;   cells=nextCells;     nextCells=t;
-  t=ages;    ages=nextAges;       nextAges=t;
-  t=density; density=nextDensity; nextDensity=t;
+  t = cells; cells = nextCells; nextCells = t;
+  t = ages;  ages  = nextAges;  nextAges  = t;
+  t = nbrs;  nbrs  = nextNbrs;  nextNbrs  = t;
   generation++;
   updateHUD();
 }
 
 /* ═══════════════════════════════════════════════════════════
-   INSTANCED MESH UPDATE — every animation frame
+   ANIMATION SCALE HELPERS
 ═══════════════════════════════════════════════════════════ */
 function getBirthScale(i, now) {
   const bms = birthMs[i];
   if (bms < 0) return 1.0;
   const t = Math.min(1.0, (now - bms) / BIRTH_DUR);
-  return Math.max(0.0, t >= 1.0 ? 1.0 : easeOutBack(t));
+  return t >= 1.0 ? 1.0 : Math.max(0, easeOutBack(t));
 }
 
+// Returns scale for dying cell, or -1 if not dying / animation done
+function getDeathScale(i, now) {
+  const dms = deathMs[i];
+  if (dms < 0) return -1;
+  const t = Math.min(1.0, (now - dms) / DEATH_DUR);
+  if (t >= 1.0) { deathMs[i] = -1; return -1; }
+  return Math.max(0, 1.0 - easeInCubic(t));
+}
+
+/* ═══════════════════════════════════════════════════════════
+   INSTANCED MESH UPDATE — every animation frame
+═══════════════════════════════════════════════════════════ */
 function updateInstancedMesh(now) {
   let count = 0;
-  const half = (GRID-1) * 0.5;   // 7.0
 
+  /* — Alive cells — */
   if (is2D) {
-    for (let x=0; x<GRID; x++)
-    for (let y=0; y<GRID; y++) {
+    for (let x = 0; x < GRID; x++)
+    for (let y = 0; y < GRID; y++) {
       const i = idx(x, y, MID_Z);
       if (!cells[i]) continue;
-      const densT = Math.min(1, density[i]/13);
-      const sc    = (BASE_SCALE + densT*0.26) * getBirthScale(i, now);
-      dummy.position.set(x-half, y-half, 0);
-      dummy.scale.setScalar(Math.max(0, sc));
-      dummy.rotation.set(0,0,0);
+      const sc = (BASE_SCALE + Math.min(1, nbrs[i]/13) * DENS_BONUS) * getBirthScale(i, now);
+      dummy.position.set(x - HALF, y - HALF, 0);
+      dummy.scale.setScalar(Math.max(0.001, sc));
+      dummy.rotation.set(0, 0, 0);
       dummy.updateMatrix();
       iMesh.setMatrixAt(count, dummy.matrix);
-      iMesh.setColorAt(count, computeColor(ages[i], density[i]));
+      iMesh.setColorAt(count, computeColor(ages[i], nbrs[i]));
       count++;
     }
   } else {
-    for (let x=0; x<GRID; x++)
-    for (let y=0; y<GRID; y++)
-    for (let z=0; z<GRID; z++) {
-      const i = idx(x,y,z);
+    for (let x = 0; x < GRID; x++)
+    for (let y = 0; y < GRID; y++)
+    for (let z = 0; z < GRID; z++) {
+      const i = idx(x, y, z);
       if (!cells[i]) continue;
-      const densT = Math.min(1, density[i]/13);
-      const sc    = (BASE_SCALE + densT*0.26) * getBirthScale(i, now);
-      dummy.position.set(x-half, y-half, z-half);
-      dummy.scale.setScalar(Math.max(0, sc));
-      dummy.rotation.set(0,0,0);
+      const sc = (BASE_SCALE + Math.min(1, nbrs[i]/13) * DENS_BONUS) * getBirthScale(i, now);
+      dummy.position.set(x - HALF, y - HALF, z - HALF);
+      dummy.scale.setScalar(Math.max(0.001, sc));
+      dummy.rotation.set(0, 0, 0);
       dummy.updateMatrix();
       iMesh.setMatrixAt(count, dummy.matrix);
-      iMesh.setColorAt(count, computeColor(ages[i], density[i]));
+      iMesh.setColorAt(count, computeColor(ages[i], nbrs[i]));
       count++;
     }
+  }
+
+  /* — Dying cells (shrink + fade) — */
+  for (let i = 0; i < TOTAL; i++) {
+    if (cells[i]) continue;        // skip alive cells
+    const sc = getDeathScale(i, now);
+    if (sc < 0) continue;          // not dying or animation finished
+    const x = (i / G2)        | 0;
+    const y = ((i % G2) / GRID) | 0;
+    const z = i % GRID;
+    if (is2D && z !== MID_Z) { deathMs[i] = -1; continue; }
+    dummy.position.set(x - HALF, y - HALF, is2D ? 0 : z - HALF);
+    dummy.scale.setScalar(Math.max(0.001, sc * BASE_SCALE));
+    dummy.rotation.set(0, 0, 0);
+    dummy.updateMatrix();
+    iMesh.setMatrixAt(count, dummy.matrix);
+    // Dying cells fade from their last color toward dim magenta
+    iMesh.setColorAt(count, computeColor(0, 0, sc * 0.55));
+    count++;
   }
 
   iMesh.count = count;
@@ -581,53 +730,53 @@ function updateInstancedMesh(now) {
    HUD
 ═══════════════════════════════════════════════════════════ */
 function updateHUD() {
-  let alive=0, maxAge=0, totalAge=0;
-  for (let i=0; i<TOTAL; i++) {
+  let alive = 0, maxAge = 0, totalAge = 0;
+  for (let i = 0; i < TOTAL; i++) {
     if (!cells[i]) continue;
     alive++;
-    if (ages[i]>maxAge) maxAge=ages[i];
-    totalAge+=ages[i];
+    if (ages[i] > maxAge) maxAge = ages[i];
+    totalAge += ages[i];
   }
-  document.getElementById('stat-gen').textContent      = generation;
-  document.getElementById('stat-cells').textContent    = alive;
-  document.getElementById('stat-density').textContent  = ((alive/TOTAL)*100).toFixed(1)+'%';
-  document.getElementById('stat-maxage').textContent   = maxAge;
-  document.getElementById('stat-avgage').textContent   = alive>0?(totalAge/alive).toFixed(1):'0.0';
-  document.getElementById('stat-born').textContent     = bornThisStep;
+  document.getElementById('stat-gen').textContent     = generation;
+  document.getElementById('stat-cells').textContent   = alive;
+  document.getElementById('stat-density').textContent = ((alive / TOTAL) * 100).toFixed(1) + '%';
+  document.getElementById('stat-maxage').textContent  = maxAge;
+  document.getElementById('stat-avgage').textContent  = alive > 0 ? (totalAge / alive).toFixed(1) : '0.0';
+  document.getElementById('stat-born').textContent    = bornThisStep;
 }
 
 /* ═══════════════════════════════════════════════════════════
-   INIT — improved seeding so simulation sustains itself
-   Strategy: dense random core (35%) + sparse shell (8%)
-   Expected neighbours at core ≈ 26×0.35 ≈ 9  → well within SURVIVE 5-7
-   at boundary ≈ fewer neighbours → naturual shell
+   INIT / RANDOMIZE
+   Dense spherical core (40%) + sparse outer shell (7%)
+   Gives enough neighbors at the core for the rules to sustain.
 ═══════════════════════════════════════════════════════════ */
 function randomize() {
-  const cx = (GRID-1)/2, cy = (GRID-1)/2, cz = (GRID-1)/2;
-  const coreR = 5.5;   // radius of dense core
-  for (let x=0; x<GRID; x++)
-  for (let y=0; y<GRID; y++)
-  for (let z=0; z<GRID; z++) {
-    const i = idx(x,y,z);
+  const cx = HALF, cy = HALF, cz = HALF;
+  const coreR = 5.2;
+  for (let x = 0; x < GRID; x++)
+  for (let y = 0; y < GRID; y++)
+  for (let z = 0; z < GRID; z++) {
+    const i    = idx(x, y, z);
     const dist = Math.sqrt((x-cx)**2 + (y-cy)**2 + (z-cz)**2);
-    const density_p = dist < coreR ? 0.35 : 0.08;
-    cells[i]   = Math.random() < density_p ? 1 : 0;
-    ages[i]    = cells[i] ? ((Math.random()*8)|0) : 0;
-    density[i] = 0;
+    const p    = dist < coreR ? 0.40 : 0.07;
+    cells[i]   = Math.random() < p ? 1 : 0;
+    ages[i]    = cells[i] ? ((Math.random() * 12) | 0) : 0;
+    nbrs[i]    = 0;
     birthMs[i] = -1;
+    deathMs[i] = -1;
   }
   generation = 0; bornThisStep = 0;
   updateHUD();
 }
 
 function resetGrid() {
-  cells.fill(0);   nextCells.fill(0);
-  ages.fill(0);    nextAges.fill(0);
-  density.fill(0); nextDensity.fill(0);
-  birthMs.fill(-1);
-  generation=0; bornThisStep=0;
-  iMesh.count=0;
-  iMesh.instanceMatrix.needsUpdate=true;
+  cells.fill(0);    nextCells.fill(0);
+  ages.fill(0);     nextAges.fill(0);
+  nbrs.fill(0);     nextNbrs.fill(0);
+  birthMs.fill(-1); deathMs.fill(-1);
+  generation = 0;   bornThisStep = 0;
+  iMesh.count = 0;
+  iMesh.instanceMatrix.needsUpdate = true;
   updateHUD();
 }
 
@@ -643,9 +792,9 @@ function sphericalPos() {
 }
 
 function compute2DCamPos() {
-  const vFov = camera.fov * (Math.PI/180);
-  const hFov = 2 * Math.atan(Math.tan(vFov/2) * camera.aspect);
-  const dist = (GRID*0.5) / Math.tan(Math.min(vFov,hFov)/2) * 1.24;
+  const vFov = camera.fov * (Math.PI / 180);
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
+  const dist = (GRID * 0.5) / Math.tan(Math.min(vFov, hFov) / 2) * 1.26;
   return new THREE.Vector3(0, 0, dist);
 }
 
@@ -655,18 +804,12 @@ function snapCamera3D() {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   2D ↔ 3D SWITCH
+   MODE SWITCH  2D ↔ 3D
 ═══════════════════════════════════════════════════════════ */
-const sliceHudEl   = document.getElementById('slice-hud');
-const modeBadgeEl  = document.getElementById('mode-badge');
-const btnModeEl    = document.getElementById('btn-mode');
-const legendEl     = document.getElementById('legend');
-const legendDensEl = document.getElementById('legend-density');
-
-function toggleMode() {
-  if (trans.running) return;
-  is2D ? switchTo3D() : switchTo2D();
-}
+const sliceEl  = document.getElementById('badge-slice');
+const modeEl   = document.getElementById('badge-mode');
+const btnModeEl= document.getElementById('btn-mode');
+const legendEl = document.getElementById('legend');
 
 function _startTrans(toPos) {
   trans.fromPos.copy(camera.position);
@@ -676,85 +819,60 @@ function _startTrans(toPos) {
 
 function switchTo2D() {
   is2D = true; autoRotate = false;
-  Object.assign(sph3DSnapshot, sph);
+  Object.assign(sph3DSnap, sph);
   _startTrans(compute2DCamPos());
   scene.fog = null;
   sliceGrid.visible = sliceBorder.visible = true;
-  sliceHudEl.classList.add('visible');
-  modeBadgeEl.textContent = '2D'; modeBadgeEl.classList.add('mode-2d');
+  sliceEl.classList.add('visible');
+  modeEl.textContent = '2D'; modeEl.classList.add('mode-2d');
   btnModeEl.textContent = '⊞ 3D'; btnModeEl.classList.add('lit-2d');
-  legendEl.classList.add('hide'); legendDensEl.classList.add('hide');
+  legendEl.classList.add('hide');
 }
 
 function switchTo3D() {
   is2D = false;
-  Object.assign(sph, sph3DSnapshot);
+  Object.assign(sph, sph3DSnap);
   _startTrans(sphericalPos());
   scene.fog = fog3D;
   sliceGrid.visible = sliceBorder.visible = false;
-  sliceHudEl.classList.remove('visible');
-  modeBadgeEl.textContent = '3D'; modeBadgeEl.classList.remove('mode-2d');
+  sliceEl.classList.remove('visible');
+  modeEl.textContent = '3D'; modeEl.classList.remove('mode-2d');
   btnModeEl.textContent = '⊞ 2D'; btnModeEl.classList.remove('lit-2d');
-  legendEl.classList.remove('hide'); legendDensEl.classList.remove('hide');
+  legendEl.classList.remove('hide');
+}
+
+function toggleMode() {
+  if (trans.running) return;
+  is2D ? switchTo3D() : switchTo2D();
 }
 
 /* ═══════════════════════════════════════════════════════════
-   ORBIT CONTROLS
+   RULE + TORUS CONTROLS
 ═══════════════════════════════════════════════════════════ */
-let isDragging=false, prevX=0, prevY=0;
-let autoRotate=true, lastPinchDist=0;
+const ruleEl   = document.getElementById('badge-rule');
+const titleEl  = document.getElementById('title-rule');
+const torusBtn = document.getElementById('btn-torus');
 
-const domEl = renderer.domElement;
+function _ruleLabel(r) {
+  return 'B' + [...r.born].sort((a,b)=>a-b).join('') +
+         '/S' + [...r.survive].sort((a,b)=>a-b).join('');
+}
 
-domEl.addEventListener('mousedown', e => {
-  if (is2D || trans.running) return;
-  isDragging=true; autoRotate=false; prevX=e.clientX; prevY=e.clientY;
-});
-window.addEventListener('mouseup', () => { isDragging=false; });
-window.addEventListener('mousemove', e => {
-  if (!isDragging||is2D) return;
-  sph.theta -= (e.clientX-prevX)*0.008;
-  sph.phi    = Math.max(0.08, Math.min(Math.PI-0.08, sph.phi+(e.clientY-prevY)*0.008));
-  prevX=e.clientX; prevY=e.clientY;
-});
-domEl.addEventListener('wheel', e => {
-  if (is2D||trans.running) return;
-  sph.r = Math.max(14, Math.min(70, sph.r+e.deltaY*0.05));
-  e.preventDefault();
-}, { passive:false });
+function cycleRule() {
+  ruleIdx = (ruleIdx + 1) % RULE_PRESETS.length;
+  rule    = RULE_PRESETS[ruleIdx];
+  ruleEl.textContent  = rule.id;
+  titleEl.textContent = '15×15×15 · ' + _ruleLabel(rule);
+}
 
-domEl.addEventListener('touchstart', e => {
-  if (e.touches.length===1) {
-    if (!is2D && !trans.running) { isDragging=true; autoRotate=false; }
-    prevX=e.touches[0].clientX; prevY=e.touches[0].clientY;
-  } else if (e.touches.length===2) {
-    isDragging=false;
-    lastPinchDist=Math.hypot(
-      e.touches[0].clientX-e.touches[1].clientX,
-      e.touches[0].clientY-e.touches[1].clientY);
-  }
-  e.preventDefault();
-}, { passive:false });
-
-domEl.addEventListener('touchmove', e => {
-  if (e.touches.length===1 && isDragging && !is2D) {
-    sph.theta -= (e.touches[0].clientX-prevX)*0.010;
-    sph.phi    = Math.max(0.08, Math.min(Math.PI-0.08,
-      sph.phi+(e.touches[0].clientY-prevY)*0.010));
-    prevX=e.touches[0].clientX; prevY=e.touches[0].clientY;
-  } else if (e.touches.length===2) {
-    const d = Math.hypot(
-      e.touches[0].clientX-e.touches[1].clientX,
-      e.touches[0].clientY-e.touches[1].clientY);
-    if (!is2D) sph.r = Math.max(14, Math.min(70, sph.r-(d-lastPinchDist)*0.08));
-    lastPinchDist=d;
-  }
-  e.preventDefault();
-}, { passive:false });
-domEl.addEventListener('touchend', () => { isDragging=false; });
+function toggleTorus() {
+  toroidal = !toroidal;
+  torusBtn.classList.toggle('torus-on', toroidal);
+  torusBtn.textContent = toroidal ? '◯ TORUS' : '□ TORUS';
+}
 
 /* ═══════════════════════════════════════════════════════════
-   CONTROLS
+   PLAY / SPEED
 ═══════════════════════════════════════════════════════════ */
 function togglePlay() {
   playing = !playing;
@@ -762,12 +880,91 @@ function togglePlay() {
   b.textContent = playing ? '⏸ PAUSE' : '▶ PLAY';
   b.classList.toggle('active', playing);
 }
+
 function changeSpeed(d) {
-  speedLevel = Math.max(1, Math.min(6, speedLevel+d));
+  speedLevel = Math.max(1, Math.min(SPEEDS.length, speedLevel + d));
   document.getElementById('speed-display').textContent = speedLevel;
 }
-function showInfo()  { document.getElementById('param-info').style.display='block'; }
-function closeInfo() { document.getElementById('param-info').style.display='none'; }
+
+function showInfo()  { document.getElementById('param-info').style.display = 'block'; }
+function closeInfo() { document.getElementById('param-info').style.display = 'none'; }
+
+/* ═══════════════════════════════════════════════════════════
+   KEYBOARD SHORTCUTS
+═══════════════════════════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  if (document.getElementById('param-info').style.display === 'block' &&
+      e.code !== 'Escape' && e.code !== 'Slash') return;
+  switch (e.code) {
+    case 'Space':    e.preventDefault(); togglePlay(); break;
+    case 'KeyR':     randomize();        break;
+    case 'KeyG':     resetGrid();        break;
+    case 'KeyM':     toggleMode();       break;
+    case 'KeyT':     toggleTorus();      break;
+    case 'KeyN':     cycleRule();        break;
+    case 'ArrowUp':  case 'Equal': changeSpeed(1);  break;
+    case 'ArrowDown':case 'Minus': changeSpeed(-1); break;
+    case 'Slash':    e.preventDefault();
+      document.getElementById('param-info').style.display === 'block'
+        ? closeInfo() : showInfo(); break;
+    case 'Escape':   closeInfo(); break;
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════
+   ORBIT CONTROLS  (drag + pinch)
+═══════════════════════════════════════════════════════════ */
+let isDragging = false, prevX = 0, prevY = 0;
+let autoRotate = true, lastPinchDist = 0;
+
+const domEl = renderer.domElement;
+
+domEl.addEventListener('mousedown', e => {
+  if (is2D || trans.running) return;
+  isDragging = true; autoRotate = false; prevX = e.clientX; prevY = e.clientY;
+});
+window.addEventListener('mouseup', () => { isDragging = false; });
+window.addEventListener('mousemove', e => {
+  if (!isDragging || is2D) return;
+  sph.theta -= (e.clientX - prevX) * 0.008;
+  sph.phi    = Math.max(0.08, Math.min(Math.PI - 0.08, sph.phi + (e.clientY - prevY) * 0.008));
+  prevX = e.clientX; prevY = e.clientY;
+});
+domEl.addEventListener('wheel', e => {
+  if (is2D || trans.running) return;
+  sph.r = Math.max(14, Math.min(80, sph.r + e.deltaY * 0.05));
+  e.preventDefault();
+}, { passive: false });
+
+domEl.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    if (!is2D && !trans.running) { isDragging = true; autoRotate = false; }
+    prevX = e.touches[0].clientX; prevY = e.touches[0].clientY;
+  } else if (e.touches.length === 2) {
+    isDragging = false;
+    lastPinchDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY);
+  }
+  e.preventDefault();
+}, { passive: false });
+
+domEl.addEventListener('touchmove', e => {
+  if (e.touches.length === 1 && isDragging && !is2D) {
+    sph.theta -= (e.touches[0].clientX - prevX) * 0.010;
+    sph.phi    = Math.max(0.08, Math.min(Math.PI - 0.08,
+      sph.phi + (e.touches[0].clientY - prevY) * 0.010));
+    prevX = e.touches[0].clientX; prevY = e.touches[0].clientY;
+  } else if (e.touches.length === 2) {
+    const d = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY);
+    if (!is2D) sph.r = Math.max(14, Math.min(80, sph.r - (d - lastPinchDist) * 0.08));
+    lastPinchDist = d;
+  }
+  e.preventDefault();
+}, { passive: false });
+domEl.addEventListener('touchend', () => { isDragging = false; });
 
 /* ═══════════════════════════════════════════════════════════
    RENDER LOOP
@@ -775,7 +972,7 @@ function closeInfo() { document.getElementById('param-info').style.display='none
 const flashEl = document.getElementById('flash');
 function triggerFlash() {
   flashEl.classList.add('on');
-  setTimeout(() => flashEl.classList.remove('on'), 75);
+  setTimeout(() => flashEl.classList.remove('on'), 80);
 }
 
 let prevTime = 0;
@@ -788,38 +985,40 @@ function animate(now) {
   /* Camera transition */
   if (trans.running) {
     trans.elapsed += dt;
-    const t  = Math.min(1, trans.elapsed / trans.duration);
+    const t = Math.min(1, trans.elapsed / trans.duration);
     camera.position.lerpVectors(trans.fromPos, trans.toPos, easeInOutQuart(t));
     camera.lookAt(0, 0, 0);
     if (t >= 1) {
       trans.running = false;
-      if (is2D) { camera.position.copy(trans.toPos); camera.lookAt(0,0,0); }
-      else       { snapCamera3D(); }
+      if (is2D) { camera.position.copy(trans.toPos); camera.lookAt(0, 0, 0); }
+      else        snapCamera3D();
     }
   } else if (!is2D) {
     if (autoRotate && !isDragging) sph.theta += 0.0022;
     snapCamera3D();
   }
 
-  /* Lighting pulse */
-  keyLight.intensity    = 6.0 + Math.sin(now*0.0014)*1.0;
-  fillLight.intensity   = 4.5 + Math.cos(now*0.0011)*0.8;
-  accentLight.intensity = 3.5 + Math.sin(now*0.0018+1.2)*0.6;
+  /* Animate lights — subtle organic pulse */
+  const t0 = now * 0.001;
+  keyLight.intensity    = 7.5  + Math.sin(t0 * 1.40) * 1.3;
+  fillLight.intensity   = 6.0  + Math.cos(t0 * 1.10) * 1.0;
+  accentLight.intensity = 4.5  + Math.sin(t0 * 1.80 + 1.2) * 0.8;
 
-  /* Emissive pulse — synced to sim speed for heartbeat feel */
-  cellMat.emissiveIntensity = 0.65 + Math.sin(now*0.0022)*0.25;
+  /* Emissive pulse — heartbeat rhythm */
+  cellMat.emissiveIntensity = 0.30 + Math.sin(t0 * 2.4) * 0.10;
+
+  /* Gentle bloom threshold animation */
+  bloomPass.threshold = 0.10 + Math.sin(t0 * 0.7) * 0.025;
 
   /* Simulation step */
-  if (playing && (now - lastStepTime) >= SPEEDS[speedLevel-1]) {
+  if (playing && (now - lastStepTime) >= SPEEDS[speedLevel - 1]) {
     stepSimulation(now);
     triggerFlash();
     lastStepTime = now;
   }
 
-  /* Mesh update every frame (birth animation) */
   updateInstancedMesh(now);
-
-  renderer.render(scene, camera);
+  composer.render();
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -829,6 +1028,8 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+  bloomPass.resolution.set(window.innerWidth, window.innerHeight);
   if (is2D && !trans.running) {
     camera.position.copy(compute2DCamPos());
     camera.lookAt(0, 0, 0);
@@ -845,7 +1046,7 @@ if ('serviceWorker' in navigator) {
         reg.addEventListener('updatefound', () => {
           const w = reg.installing;
           w.addEventListener('statechange', () => {
-            if (w.state==='installed' && navigator.serviceWorker.controller)
+            if (w.state === 'installed' && navigator.serviceWorker.controller)
               w.postMessage('SKIP_WAITING');
           });
         });
@@ -857,6 +1058,16 @@ if ('serviceWorker' in navigator) {
 /* ═══════════════════════════════════════════════════════════
    BOOT
 ═══════════════════════════════════════════════════════════ */
+// Expose controls to inline onclick handlers
+Object.assign(window, {
+  togglePlay, resetGrid, randomize, toggleMode,
+  cycleRule, toggleTorus, changeSpeed, showInfo, closeInfo
+});
+
+// Init badge
+ruleEl.textContent  = rule.id;
+titleEl.textContent = '15×15×15 · ' + _ruleLabel(rule);
+
 snapCamera3D();
 randomize();
 animate(0);
