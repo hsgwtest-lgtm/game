@@ -1,17 +1,25 @@
 /* ─────────────────────────────────────────────────────────────
-   3D Life Grid – Service Worker
+   3D Life Grid – Service Worker  v2
    Strategy: Cache-first with network fallback.
    Bump CACHE_VERSION to force update on deploy.
 ───────────────────────────────────────────────────────────── */
 
-const CACHE_VERSION = 'v1.2.0';
+const CACHE_VERSION = 'v2.0.0';
 const CACHE_NAME    = `life3d-${CACHE_VERSION}`;
+
+const CDN_THREE = 'https://cdn.jsdelivr.net/npm/three@0.152.2';
 
 const PRECACHE_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+  `${CDN_THREE}/build/three.module.js`,
+  `${CDN_THREE}/examples/jsm/postprocessing/EffectComposer.js`,
+  `${CDN_THREE}/examples/jsm/postprocessing/RenderPass.js`,
+  `${CDN_THREE}/examples/jsm/postprocessing/UnrealBloomPass.js`,
+  `${CDN_THREE}/examples/jsm/postprocessing/ShaderPass.js`,
+  `${CDN_THREE}/examples/jsm/shaders/CopyShader.js`,
+  `${CDN_THREE}/examples/jsm/shaders/LuminosityHighPassShader.js`,
   'https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap',
 ];
 
