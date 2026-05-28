@@ -316,24 +316,24 @@ body::before {
      <span class="kbd">↑↓</span> speed &nbsp;
      <span class="kbd">/</span> this panel
   </p>
-  <button class="btn close-btn" onclick="closeInfo()">✕ CLOSE</button>
+  <button class="btn close-btn" id="btn-close-info">✕ CLOSE</button>
 </div>
 
 <!-- Controls -->
 <div id="controls">
-  <button class="btn active" id="btn-play"  onclick="togglePlay()">⏸ PAUSE</button>
-  <button class="btn danger"               onclick="resetGrid()">⟳ RESET</button>
-  <button class="btn success"              onclick="randomize()">⚄ RANDOM</button>
-  <button class="btn"        id="btn-mode" onclick="toggleMode()">⊞ 2D</button>
-  <button class="btn success"id="btn-rule" onclick="cycleRule()">⊿ RULE</button>
-  <button class="btn"        id="btn-torus"onclick="toggleTorus()">□ TORUS</button>
+  <button class="btn active" id="btn-play">⏸ PAUSE</button>
+  <button class="btn danger"  id="btn-reset">⟳ RESET</button>
+  <button class="btn success" id="btn-random">⚄ RANDOM</button>
+  <button class="btn"         id="btn-mode">⊞ 2D</button>
+  <button class="btn success" id="btn-rule">⊿ RULE</button>
+  <button class="btn"         id="btn-torus">□ TORUS</button>
   <div class="speed-group">
     <div class="speed-label">SPD</div>
-    <button class="btn speed-btn" onclick="changeSpeed(-1)">◀</button>
+    <button class="btn speed-btn" id="btn-spd-dn">◀</button>
     <div id="speed-display">3</div>
-    <button class="btn speed-btn" onclick="changeSpeed(1)">▶</button>
+    <button class="btn speed-btn" id="btn-spd-up">▶</button>
   </div>
-  <button class="btn" onclick="showInfo()" style="min-width:34px;padding:7px 9px">?</button>
+  <button class="btn" id="btn-info" style="min-width:34px;padding:7px 9px">?</button>
 </div>
 
 <!-- Keyboard hint -->
@@ -351,14 +351,18 @@ import { UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   RULE PRESETS  (survive-set / born-set)
+   RULE PRESETS  (survive-set / born-set / precomputed label)
 ═══════════════════════════════════════════════════════════ */
+function _buildLabel(r) {
+  return 'B' + [...r.born].sort((a,b)=>a-b).join('') +
+         '/S' + [...r.survive].sort((a,b)=>a-b).join('');
+}
 const RULE_PRESETS = [
   { id: 'BAYS',   survive: new Set([5,6,7]),     born: new Set([6])   },
   { id: 'DENSE',  survive: new Set([4,5,6]),     born: new Set([5,6]) },
   { id: 'CORAL',  survive: new Set([5,6,7,8]),   born: new Set([6,7]) },
   { id: 'QUIET',  survive: new Set([3,4,5]),     born: new Set([5])   },
-];
+].map(r => ({ ...r, label: _buildLabel(r) }));
 let ruleIdx = 0;
 let rule = RULE_PRESETS[ruleIdx];
 
@@ -371,12 +375,13 @@ const TOTAL  = GRID * G2;
 const HALF   = (GRID - 1) * 0.5;   // 7.0
 const MID_Z  = (GRID - 1) >> 1;    // 7
 
-const BIRTH_DUR  = 330;   // ms birth spring animation
-const DEATH_DUR  = 240;   // ms death shrink animation
-const BASE_SCALE = 0.72;  // cell scale at density 0
-const DENS_BONUS = 0.32;  // extra scale at max density
-const MAX_AGE    = 45;
-const SPEEDS     = [2000, 800, 400, 200, 100, 40];
+const BIRTH_DUR        = 330;   // ms — birth spring animation
+const DEATH_DUR        = 240;   // ms — death shrink animation
+const DEATH_FADE_FACTOR= 0.55;  // color brightness multiplier for dying cells
+const BASE_SCALE       = 0.72;  // cell scale at neighbor density 0
+const DENS_BONUS       = 0.32;  // extra scale at max neighbor density
+const MAX_AGE          = 45;    // AGE_PAL maps age [0..MAX_AGE] across 5 color stops
+const SPEEDS           = [2000, 800, 400, 200, 100, 40];
 
 /* ═══════════════════════════════════════════════════════════
    SIMULATION STATE  (double-buffered typed arrays)
@@ -716,8 +721,7 @@ function updateInstancedMesh(now) {
     dummy.rotation.set(0, 0, 0);
     dummy.updateMatrix();
     iMesh.setMatrixAt(count, dummy.matrix);
-    // Dying cells fade from their last color toward dim magenta
-    iMesh.setColorAt(count, computeColor(0, 0, sc * 0.55));
+    iMesh.setColorAt(count, computeColor(0, 0, sc * DEATH_FADE_FACTOR));
     count++;
   }
 
@@ -853,16 +857,11 @@ const ruleEl   = document.getElementById('badge-rule');
 const titleEl  = document.getElementById('title-rule');
 const torusBtn = document.getElementById('btn-torus');
 
-function _ruleLabel(r) {
-  return 'B' + [...r.born].sort((a,b)=>a-b).join('') +
-         '/S' + [...r.survive].sort((a,b)=>a-b).join('');
-}
-
 function cycleRule() {
   ruleIdx = (ruleIdx + 1) % RULE_PRESETS.length;
   rule    = RULE_PRESETS[ruleIdx];
   ruleEl.textContent  = rule.id;
-  titleEl.textContent = '15×15×15 · ' + _ruleLabel(rule);
+  titleEl.textContent = '15×15×15 · ' + rule.label;
 }
 
 function toggleTorus() {
@@ -886,15 +885,32 @@ function changeSpeed(d) {
   document.getElementById('speed-display').textContent = speedLevel;
 }
 
-function showInfo()  { document.getElementById('param-info').style.display = 'block'; }
-function closeInfo() { document.getElementById('param-info').style.display = 'none'; }
+/* Info panel — tracked with a boolean flag, not CSS inspection */
+let isInfoOpen = false;
+const infoPanel = document.getElementById('param-info');
+
+function showInfo()  { isInfoOpen = true;  infoPanel.style.display = 'block'; }
+function closeInfo() { isInfoOpen = false; infoPanel.style.display = 'none'; }
+
+/* ═══════════════════════════════════════════════════════════
+   BUTTON EVENT LISTENERS  (no global window exposure needed)
+═══════════════════════════════════════════════════════════ */
+document.getElementById('btn-play')    .addEventListener('click', togglePlay);
+document.getElementById('btn-reset')   .addEventListener('click', resetGrid);
+document.getElementById('btn-random')  .addEventListener('click', randomize);
+document.getElementById('btn-mode')    .addEventListener('click', toggleMode);
+document.getElementById('btn-rule')    .addEventListener('click', cycleRule);
+document.getElementById('btn-torus')   .addEventListener('click', toggleTorus);
+document.getElementById('btn-spd-dn')  .addEventListener('click', () => changeSpeed(-1));
+document.getElementById('btn-spd-up')  .addEventListener('click', () => changeSpeed(1));
+document.getElementById('btn-info')    .addEventListener('click', showInfo);
+document.getElementById('btn-close-info').addEventListener('click', closeInfo);
 
 /* ═══════════════════════════════════════════════════════════
    KEYBOARD SHORTCUTS
 ═══════════════════════════════════════════════════════════ */
 document.addEventListener('keydown', e => {
-  if (document.getElementById('param-info').style.display === 'block' &&
-      e.code !== 'Escape' && e.code !== 'Slash') return;
+  if (isInfoOpen && e.code !== 'Escape' && e.code !== 'Slash') return;
   switch (e.code) {
     case 'Space':    e.preventDefault(); togglePlay(); break;
     case 'KeyR':     randomize();        break;
@@ -904,9 +920,7 @@ document.addEventListener('keydown', e => {
     case 'KeyN':     cycleRule();        break;
     case 'ArrowUp':  case 'Equal': changeSpeed(1);  break;
     case 'ArrowDown':case 'Minus': changeSpeed(-1); break;
-    case 'Slash':    e.preventDefault();
-      document.getElementById('param-info').style.display === 'block'
-        ? closeInfo() : showInfo(); break;
+    case 'Slash':    e.preventDefault(); isInfoOpen ? closeInfo() : showInfo(); break;
     case 'Escape':   closeInfo(); break;
   }
 });
@@ -1058,15 +1072,13 @@ if ('serviceWorker' in navigator) {
 /* ═══════════════════════════════════════════════════════════
    BOOT
 ═══════════════════════════════════════════════════════════ */
-// Expose controls to inline onclick handlers
-Object.assign(window, {
-  togglePlay, resetGrid, randomize, toggleMode,
-  cycleRule, toggleTorus, changeSpeed, showInfo, closeInfo
-});
-
-// Init badge
+// Init rule badge
 ruleEl.textContent  = rule.id;
-titleEl.textContent = '15×15×15 · ' + _ruleLabel(rule);
+titleEl.textContent = '15×15×15 · ' + rule.label;
+
+snapCamera3D();
+randomize();
+animate(0);
 
 snapCamera3D();
 randomize();
