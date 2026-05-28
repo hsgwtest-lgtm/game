@@ -301,9 +301,9 @@ body::before {
      Isolated cells appear small.</p>
   <p><span style="color:var(--magenta)">● ANIMATIONS</span><br>
      Birth: elastic spring · Death: shrink-fade.</p>
-  <p><span style="color:var(--yellow)">● 2D SLICE MODE</span><br>
-     Shows only the central Z-layer (z=7).<br>
-     Simulation continues in full 3D.</p>
+  <p><span style="color:var(--yellow)">● 2D CONWAY MODE</span><br>
+     True 2D Life on a 50×50 grid.<br>
+     Cycle 2D rules with RULE (N key).</p>
   <p><span style="color:var(--violet)">● TOROIDAL MODE</span><br>
      Edges wrap around — infinite space effect.</p>
   <p style="color:rgba(160,232,255,0.5); font-size:9px; line-height:1.9;">
@@ -351,7 +351,7 @@ import { UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════
-   RULE PRESETS  (survive-set / born-set / precomputed label)
+   RULE PRESETS  3-D
 ═══════════════════════════════════════════════════════════ */
 function buildRuleLabel(r) {
   return 'B' + [...r.born].sort((a,b)=>a-b).join('') +
@@ -367,24 +367,42 @@ let ruleIdx = 0;
 let rule = RULE_PRESETS[ruleIdx];
 
 /* ═══════════════════════════════════════════════════════════
-   CONSTANTS
+   RULE PRESETS  2-D (standard outer-totalistic rules)
 ═══════════════════════════════════════════════════════════ */
-const GRID   = 15;
+const RULE_PRESETS_2D = [
+  { id: 'CONWAY',   survive: new Set([2,3]),       born: new Set([3]),        label: 'B3/S23'       },
+  { id: 'HIGHLIFE', survive: new Set([2,3]),       born: new Set([3,6]),      label: 'B36/S23'      },
+  { id: 'DAYNIGHT', survive: new Set([3,4,6,7,8]), born: new Set([3,6,7,8]), label: 'B3678/S34678' },
+  { id: '2x2',      survive: new Set([1,2,5]),     born: new Set([3,6]),      label: 'B36/S125'     },
+];
+let ruleIdx2D = 0;
+let rule2D = RULE_PRESETS_2D[ruleIdx2D];
+
+/* ═══════════════════════════════════════════════════════════
+   CONSTANTS  3-D
+═══════════════════════════════════════════════════════════ */
+const GRID   = 20;
 const G2     = GRID * GRID;
 const TOTAL  = GRID * G2;
-const HALF   = (GRID - 1) * 0.5;   // 7.0
-const MID_Z  = (GRID - 1) >> 1;    // 7
+const HALF   = (GRID - 1) * 0.5;
 
-const BIRTH_DUR        = 330;   // ms — birth spring animation
-const DEATH_DUR        = 240;   // ms — death shrink animation
-const DEATH_FADE_FACTOR= 0.55;  // color brightness multiplier for dying cells
-const BASE_SCALE       = 0.72;  // cell scale at neighbor density 0
-const DENS_BONUS       = 0.32;  // extra scale at max neighbor density
-const MAX_AGE          = 45;    // AGE_PAL maps age [0..MAX_AGE] across 5 color stops
+/* ═══════════════════════════════════════════════════════════
+   CONSTANTS  2-D
+═══════════════════════════════════════════════════════════ */
+const GRID2D  = 50;
+const TOTAL2D = GRID2D * GRID2D;
+const HALF2D  = (GRID2D - 1) * 0.5;
+
+const BIRTH_DUR        = 330;
+const DEATH_DUR        = 240;
+const DEATH_FADE_FACTOR= 0.55;
+const BASE_SCALE       = 0.72;
+const DENS_BONUS       = 0.32;
+const MAX_AGE          = 45;
 const SPEEDS           = [2000, 800, 400, 200, 100, 40];
 
 /* ═══════════════════════════════════════════════════════════
-   SIMULATION STATE  (double-buffered typed arrays)
+   SIMULATION STATE  3-D  (double-buffered typed arrays)
 ═══════════════════════════════════════════════════════════ */
 let cells    = new Uint8Array(TOTAL);
 let nextCells= new Uint8Array(TOTAL);
@@ -395,6 +413,19 @@ let nextNbrs = new Uint8Array(TOTAL);
 let birthMs  = new Float64Array(TOTAL).fill(-1);
 let deathMs  = new Float64Array(TOTAL).fill(-1);
 
+/* ═══════════════════════════════════════════════════════════
+   SIMULATION STATE  2-D  (double-buffered typed arrays)
+═══════════════════════════════════════════════════════════ */
+let cells2D    = new Uint8Array(TOTAL2D);
+let next2D     = new Uint8Array(TOTAL2D);
+let ages2D     = new Uint32Array(TOTAL2D);
+let nextAges2D = new Uint32Array(TOTAL2D);
+let nbrs2D     = new Uint8Array(TOTAL2D);
+let nextNbrs2D = new Uint8Array(TOTAL2D);
+let birthMs2D  = new Float64Array(TOTAL2D).fill(-1);
+let deathMs2D  = new Float64Array(TOTAL2D).fill(-1);
+let init2DDone = false;   // lazily randomized on first switch to 2D
+
 let generation  = 0, bornThisStep = 0;
 let playing     = true, speedLevel = 3;
 let lastStepTime= 0;
@@ -404,7 +435,7 @@ let toroidal    = false;
    VIEW STATE
 ═══════════════════════════════════════════════════════════ */
 let is2D = false;
-const sph = { theta: Math.PI / 4, phi: Math.PI / 3.5, r: 36 };
+const sph = { theta: Math.PI / 4, phi: Math.PI / 3.5, r: 42 };
 const sph3DSnap = { ...sph };
 const trans = {
   running: false,
@@ -427,24 +458,23 @@ container.appendChild(renderer.domElement);
 const scene  = new THREE.Scene();
 scene.background = new THREE.Color(0x000012);
 
-const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.5, 300);
+const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.5, 400);
 
-// Lighter fog so back cells remain visible
-const fog3D = new THREE.FogExp2(0x000014, 0.018);
+const fog3D = new THREE.FogExp2(0x000014, 0.015);
 scene.fog = fog3D;
 
 /* ── Lighting ─────────────────────────────────────────────── */
 scene.add(new THREE.AmbientLight(0x223366, 3.5));
 
-const keyLight    = new THREE.PointLight(0x44ccff, 7.5, 160);
+const keyLight    = new THREE.PointLight(0x44ccff, 7.5, 200);
 keyLight.position.set(18, 26, 16);
 scene.add(keyLight);
 
-const fillLight   = new THREE.PointLight(0xff44dd, 6.0, 150);
+const fillLight   = new THREE.PointLight(0xff44dd, 6.0, 180);
 fillLight.position.set(-22, -14, -20);
 scene.add(fillLight);
 
-const accentLight = new THREE.PointLight(0x44ffaa, 4.5, 130);
+const accentLight = new THREE.PointLight(0x44ffaa, 4.5, 160);
 accentLight.position.set(4, -22, 26);
 scene.add(accentLight);
 
@@ -455,61 +485,44 @@ const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  1.45,   // strength
-  0.55,   // radius
-  0.10    // threshold (low → more things glow)
+  1.45, 0.55, 0.10
 );
 composer.addPass(bloomPass);
 
 /* ═══════════════════════════════════════════════════════════
-   BOUNDING BOX + GRID LINES
+   3-D BOUNDING BOX + GRID LINES  (grouped for visibility toggle)
 ═══════════════════════════════════════════════════════════ */
+const box3DGroup = new THREE.Group();
 {
   const boxGeo = new THREE.BoxGeometry(GRID, GRID, GRID);
-  scene.add(new THREE.LineSegments(
+  box3DGroup.add(new THREE.LineSegments(
     new THREE.EdgesGeometry(boxGeo),
     new THREE.LineBasicMaterial({ color: 0x00f5ff, transparent: true, opacity: 0.12 })
   ));
   boxGeo.dispose();
-
   const half   = GRID / 2;
   const subMat = new THREE.LineBasicMaterial({ color: 0x00f5ff, transparent: true, opacity: 0.025 });
   [-5, 0, 5].forEach(a => [-5, 0, 5].forEach(b => {
     const geo = new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(a, -half, b), new THREE.Vector3(a, half, b)
     ]);
-    scene.add(new THREE.Line(geo, subMat));
+    box3DGroup.add(new THREE.Line(geo, subMat));
   }));
 }
+scene.add(box3DGroup);
 
 /* ═══════════════════════════════════════════════════════════
-   2-D SLICE OVERLAY
+   2-D GRID BORDER
 ═══════════════════════════════════════════════════════════ */
-const sliceGrid = (() => {
-  const verts = [], half = (GRID - 1) / 2, eps = 0.015;
-  for (let i = 0; i < GRID; i++) {
-    const p = i - half;
-    verts.push(-half-.5, p, -eps,  half+.5, p, -eps);
-    verts.push(p, -half-.5, -eps,  p, half+.5, -eps);
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-  const obj = new THREE.LineSegments(geo,
-    new THREE.LineBasicMaterial({ color: 0x003860, transparent: true, opacity: 0.60 }));
-  obj.visible = false;
-  scene.add(obj);
-  return obj;
-})();
-
-const sliceBorder = (() => {
-  const h  = (GRID - 1) / 2 + 0.5;
+const border2D = (() => {
+  const h = HALF2D + 0.5;
   const ln = new THREE.Line(
     new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(-h,-h,0), new THREE.Vector3(h,-h,0),
       new THREE.Vector3(h, h,0),  new THREE.Vector3(-h, h,0),
       new THREE.Vector3(-h,-h,0),
     ]),
-    new THREE.LineBasicMaterial({ color: 0xffe040, transparent: true, opacity: 0.65 }));
+    new THREE.LineBasicMaterial({ color: 0xffe040, transparent: true, opacity: 0.55 }));
   ln.visible = false;
   scene.add(ln);
   return ln;
@@ -517,13 +530,9 @@ const sliceBorder = (() => {
 
 /* ═══════════════════════════════════════════════════════════
    INSTANCED MESH — spherical cells
-   Sphere instead of box: rounder, catches light beautifully,
-   and bloom halos look like genuine glowing orbs.
 ═══════════════════════════════════════════════════════════ */
+const MAX_INSTANCES = Math.max(TOTAL, TOTAL2D);
 const cellGeo = new THREE.SphereGeometry(0.44, 12, 8);
-
-// MeshStandardMaterial: PBR shading + slight emissive base so
-// dim isolated cells are still faintly visible in the dark.
 const cellMat = new THREE.MeshStandardMaterial({
   color:             0xffffff,
   emissive:          new THREE.Color(0x112244),
@@ -531,9 +540,7 @@ const cellMat = new THREE.MeshStandardMaterial({
   roughness:         0.18,
   metalness:         0.05,
 });
-
-// Capacity = TOTAL (alive + dying cells combined ≤ TOTAL at any time)
-const iMesh = new THREE.InstancedMesh(cellGeo, cellMat, TOTAL);
+const iMesh = new THREE.InstancedMesh(cellGeo, cellMat, MAX_INSTANCES);
 iMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 iMesh.frustumCulled = false;
 iMesh.count = 0;
@@ -544,18 +551,16 @@ const _col  = new THREE.Color();
 
 /* ═══════════════════════════════════════════════════════════
    COLOR PALETTE — age-hue × density-brightness
-   New: white/cyan → blue → cyan-green → yellow → magenta
-   Bright values ensure cells bloom via UnrealBloomPass.
 ═══════════════════════════════════════════════════════════ */
 const AGE_PAL = [
-  [1.00, 1.00, 1.00],   // 0 newborn  — white
-  [0.18, 0.52, 1.00],   // 1 young    — blue
-  [0.00, 1.00, 0.52],   // 2 active   — cyan-green
-  [1.00, 0.86, 0.00],   // 3 mature   — yellow
-  [1.00, 0.08, 0.55],   // 4 ancient  — magenta
+  [1.00, 1.00, 1.00],   // newborn  — white
+  [0.18, 0.52, 1.00],   // young    — blue
+  [0.00, 1.00, 0.52],   // active   — cyan-green
+  [1.00, 0.86, 0.00],   // mature   — yellow
+  [1.00, 0.08, 0.55],   // ancient  — magenta
 ];
 
-function computeColor(age, nbrCount, fade) {
+function computeColor(age, nbrCount, maxNbr, fade) {
   const ageT = Math.min(1, age / MAX_AGE);
   const seg  = ageT * (AGE_PAL.length - 1);
   const si   = Math.min(AGE_PAL.length - 2, seg | 0);
@@ -564,8 +569,7 @@ function computeColor(age, nbrCount, fade) {
   const r = c0[0] + (c1[0] - c0[0]) * st;
   const g = c0[1] + (c1[1] - c0[1]) * st;
   const b = c0[2] + (c1[2] - c0[2]) * st;
-  // Brightness: isolated cells ≥ 0.85, dense cells up to 1.6
-  const br = (0.85 + Math.min(1, nbrCount / 12) * 0.75) * (fade !== undefined ? fade : 1.0);
+  const br = (0.85 + Math.min(1, nbrCount / maxNbr) * 0.75) * (fade !== undefined ? fade : 1.0);
   _col.setRGB(Math.min(1, r * br), Math.min(1, g * br), Math.min(1, b * br));
   return _col;
 }
@@ -583,10 +587,10 @@ function easeInOutQuart(t) {
 function easeInCubic(t) { return t * t * t; }
 
 /* ═══════════════════════════════════════════════════════════
-   GRID HELPERS
+   GRID HELPERS  3-D
 ═══════════════════════════════════════════════════════════ */
 function idx(x, y, z)  { return x * G2 + y * GRID + z; }
-function wrap(v)       { return ((v % GRID) + GRID) % GRID; }
+function wrap(v, g)    { return ((v % g) + g) % g; }
 
 function countNeighbors(cx, cy, cz) {
   let n = 0;
@@ -595,7 +599,7 @@ function countNeighbors(cx, cy, cz) {
     for (let dy = -1; dy <= 1; dy++)
     for (let dz = -1; dz <= 1; dz++) {
       if (dx === 0 && dy === 0 && dz === 0) continue;
-      n += cells[idx(wrap(cx+dx), wrap(cy+dy), wrap(cz+dz))];
+      n += cells[idx(wrap(cx+dx,GRID), wrap(cy+dy,GRID), wrap(cz+dz,GRID))];
     }
   } else {
     const x0=Math.max(0,cx-1), x1=Math.min(GRID-1,cx+1);
@@ -612,7 +616,32 @@ function countNeighbors(cx, cy, cz) {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   SIMULATION STEP — always full 3-D
+   GRID HELPERS  2-D
+═══════════════════════════════════════════════════════════ */
+function idx2D(x, y) { return x * GRID2D + y; }
+
+function countNeighbors2D(cx, cy) {
+  let n = 0;
+  if (toroidal) {
+    for (let dx = -1; dx <= 1; dx++)
+    for (let dy = -1; dy <= 1; dy++) {
+      if (dx === 0 && dy === 0) continue;
+      n += cells2D[idx2D(wrap(cx+dx,GRID2D), wrap(cy+dy,GRID2D))];
+    }
+  } else {
+    const x0=Math.max(0,cx-1), x1=Math.min(GRID2D-1,cx+1);
+    const y0=Math.max(0,cy-1), y1=Math.min(GRID2D-1,cy+1);
+    for (let x=x0; x<=x1; x++)
+    for (let y=y0; y<=y1; y++) {
+      if (x===cx && y===cy) continue;
+      n += cells2D[idx2D(x,y)];
+    }
+  }
+  return n;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SIMULATION STEP  3-D
 ═══════════════════════════════════════════════════════════ */
 function stepSimulation(now) {
   bornThisStep = 0;
@@ -623,10 +652,8 @@ function stepSimulation(now) {
     const alive = cells[i];
     const n     = countNeighbors(x, y, z);
     nextNbrs[i] = n;
-
     const survive = alive  ? rule.survive.has(n) : false;
     const born    = !alive ? rule.born.has(n)    : false;
-
     if (survive) {
       nextCells[i] = 1;
       nextAges[i]  = ages[i] + 1;
@@ -634,12 +661,12 @@ function stepSimulation(now) {
       nextCells[i] = 1;
       nextAges[i]  = 0;
       birthMs[i]   = now;
-      deathMs[i]   = -1;   // cancel any stale death animation
+      deathMs[i]   = -1;
       bornThisStep++;
     } else {
       nextCells[i] = 0;
       nextAges[i]  = 0;
-      if (alive && deathMs[i] < 0) deathMs[i] = now;  // start death anim
+      if (alive && deathMs[i] < 0) deathMs[i] = now;
     }
   }
   let t;
@@ -651,21 +678,56 @@ function stepSimulation(now) {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   ANIMATION SCALE HELPERS
+   SIMULATION STEP  2-D  (true Conway / outer-totalistic)
 ═══════════════════════════════════════════════════════════ */
-function getBirthScale(i, now) {
-  const bms = birthMs[i];
+function stepSimulation2D(now) {
+  bornThisStep = 0;
+  for (let x = 0; x < GRID2D; x++)
+  for (let y = 0; y < GRID2D; y++) {
+    const i     = idx2D(x, y);
+    const alive = cells2D[i];
+    const n     = countNeighbors2D(x, y);
+    nextNbrs2D[i] = n;
+    const survive = alive  ? rule2D.survive.has(n) : false;
+    const born    = !alive ? rule2D.born.has(n)    : false;
+    if (survive) {
+      next2D[i]    = 1;
+      nextAges2D[i]= ages2D[i] + 1;
+    } else if (born) {
+      next2D[i]    = 1;
+      nextAges2D[i]= 0;
+      birthMs2D[i] = now;
+      deathMs2D[i] = -1;
+      bornThisStep++;
+    } else {
+      next2D[i]    = 0;
+      nextAges2D[i]= 0;
+      if (alive && deathMs2D[i] < 0) deathMs2D[i] = now;
+    }
+  }
+  let t;
+  t = cells2D; cells2D = next2D;     next2D     = t;
+  t = ages2D;  ages2D  = nextAges2D; nextAges2D = t;
+  t = nbrs2D;  nbrs2D  = nextNbrs2D; nextNbrs2D = t;
+  generation++;
+  updateHUD();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ANIMATION SCALE HELPERS  (generic — pass in the right arrays)
+═══════════════════════════════════════════════════════════ */
+function getBirthScale(bArr, i, now) {
+  const bms = bArr[i];
   if (bms < 0) return 1.0;
   const t = Math.min(1.0, (now - bms) / BIRTH_DUR);
   return t >= 1.0 ? 1.0 : Math.max(0, easeOutBack(t));
 }
 
-// Returns scale for dying cell, or -1 if not dying / animation done
-function getDeathScale(i, now) {
-  const dms = deathMs[i];
+function getDeathScale(dArr, i, now) {
+  const dms = dArr[i];
   if (dms < 0) return -1;
   const t = Math.min(1.0, (now - dms) / DEATH_DUR);
-  if (t >= 1.0) { deathMs[i] = -1; return -1; }
+  if (t >= 1.0) { dArr[i] = -1; return -1; }
   return Math.max(0, 1.0 - easeInCubic(t));
 }
 
@@ -675,54 +737,70 @@ function getDeathScale(i, now) {
 function updateInstancedMesh(now) {
   let count = 0;
 
-  /* — Alive cells — */
   if (is2D) {
-    for (let x = 0; x < GRID; x++)
-    for (let y = 0; y < GRID; y++) {
-      const i = idx(x, y, MID_Z);
-      if (!cells[i]) continue;
-      const sc = (BASE_SCALE + Math.min(1, nbrs[i]/13) * DENS_BONUS) * getBirthScale(i, now);
-      dummy.position.set(x - HALF, y - HALF, 0);
+    /* ── Alive 2-D cells ── */
+    for (let x = 0; x < GRID2D; x++)
+    for (let y = 0; y < GRID2D; y++) {
+      const i = idx2D(x, y);
+      if (!cells2D[i]) continue;
+      const sc = (BASE_SCALE + Math.min(1, nbrs2D[i] / 8) * DENS_BONUS)
+                 * getBirthScale(birthMs2D, i, now);
+      dummy.position.set(x - HALF2D, y - HALF2D, 0);
       dummy.scale.setScalar(Math.max(0.001, sc));
       dummy.rotation.set(0, 0, 0);
       dummy.updateMatrix();
       iMesh.setMatrixAt(count, dummy.matrix);
-      iMesh.setColorAt(count, computeColor(ages[i], nbrs[i]));
+      iMesh.setColorAt(count, computeColor(ages2D[i], nbrs2D[i], 8));
+      count++;
+    }
+    /* ── Dying 2-D cells ── */
+    for (let i = 0; i < TOTAL2D; i++) {
+      if (cells2D[i]) continue;
+      const sc = getDeathScale(deathMs2D, i, now);
+      if (sc < 0) continue;
+      const x = (i / GRID2D) | 0;
+      const y = i % GRID2D;
+      dummy.position.set(x - HALF2D, y - HALF2D, 0);
+      dummy.scale.setScalar(Math.max(0.001, sc * BASE_SCALE));
+      dummy.rotation.set(0, 0, 0);
+      dummy.updateMatrix();
+      iMesh.setMatrixAt(count, dummy.matrix);
+      iMesh.setColorAt(count, computeColor(0, 0, 8, sc * DEATH_FADE_FACTOR));
       count++;
     }
   } else {
+    /* ── Alive 3-D cells ── */
     for (let x = 0; x < GRID; x++)
     for (let y = 0; y < GRID; y++)
     for (let z = 0; z < GRID; z++) {
       const i = idx(x, y, z);
       if (!cells[i]) continue;
-      const sc = (BASE_SCALE + Math.min(1, nbrs[i]/13) * DENS_BONUS) * getBirthScale(i, now);
+      const sc = (BASE_SCALE + Math.min(1, nbrs[i] / 13) * DENS_BONUS)
+                 * getBirthScale(birthMs, i, now);
       dummy.position.set(x - HALF, y - HALF, z - HALF);
       dummy.scale.setScalar(Math.max(0.001, sc));
       dummy.rotation.set(0, 0, 0);
       dummy.updateMatrix();
       iMesh.setMatrixAt(count, dummy.matrix);
-      iMesh.setColorAt(count, computeColor(ages[i], nbrs[i]));
+      iMesh.setColorAt(count, computeColor(ages[i], nbrs[i], 12));
       count++;
     }
-  }
-
-  /* — Dying cells (shrink + fade) — */
-  for (let i = 0; i < TOTAL; i++) {
-    if (cells[i]) continue;        // skip alive cells
-    const sc = getDeathScale(i, now);
-    if (sc < 0) continue;          // not dying or animation finished
-    const x = (i / G2)        | 0;
-    const y = ((i % G2) / GRID) | 0;
-    const z = i % GRID;
-    if (is2D && z !== MID_Z) { deathMs[i] = -1; continue; }
-    dummy.position.set(x - HALF, y - HALF, is2D ? 0 : z - HALF);
-    dummy.scale.setScalar(Math.max(0.001, sc * BASE_SCALE));
-    dummy.rotation.set(0, 0, 0);
-    dummy.updateMatrix();
-    iMesh.setMatrixAt(count, dummy.matrix);
-    iMesh.setColorAt(count, computeColor(0, 0, sc * DEATH_FADE_FACTOR));
-    count++;
+    /* ── Dying 3-D cells ── */
+    for (let i = 0; i < TOTAL; i++) {
+      if (cells[i]) continue;
+      const sc = getDeathScale(deathMs, i, now);
+      if (sc < 0) continue;
+      const x = (i / G2)          | 0;
+      const y = ((i % G2) / GRID) | 0;
+      const z = i % GRID;
+      dummy.position.set(x - HALF, y - HALF, z - HALF);
+      dummy.scale.setScalar(Math.max(0.001, sc * BASE_SCALE));
+      dummy.rotation.set(0, 0, 0);
+      dummy.updateMatrix();
+      iMesh.setMatrixAt(count, dummy.matrix);
+      iMesh.setColorAt(count, computeColor(0, 0, 12, sc * DEATH_FADE_FACTOR));
+      count++;
+    }
   }
 
   iMesh.count = count;
@@ -735,28 +813,36 @@ function updateInstancedMesh(now) {
 ═══════════════════════════════════════════════════════════ */
 function updateHUD() {
   let alive = 0, maxAge = 0, totalAge = 0;
-  for (let i = 0; i < TOTAL; i++) {
-    if (!cells[i]) continue;
-    alive++;
-    if (ages[i] > maxAge) maxAge = ages[i];
-    totalAge += ages[i];
+  if (is2D) {
+    for (let i = 0; i < TOTAL2D; i++) {
+      if (!cells2D[i]) continue;
+      alive++;
+      if (ages2D[i] > maxAge) maxAge = ages2D[i];
+      totalAge += ages2D[i];
+    }
+    document.getElementById('stat-density').textContent = ((alive / TOTAL2D) * 100).toFixed(1) + '%';
+  } else {
+    for (let i = 0; i < TOTAL; i++) {
+      if (!cells[i]) continue;
+      alive++;
+      if (ages[i] > maxAge) maxAge = ages[i];
+      totalAge += ages[i];
+    }
+    document.getElementById('stat-density').textContent = ((alive / TOTAL) * 100).toFixed(1) + '%';
   }
   document.getElementById('stat-gen').textContent     = generation;
   document.getElementById('stat-cells').textContent   = alive;
-  document.getElementById('stat-density').textContent = ((alive / TOTAL) * 100).toFixed(1) + '%';
   document.getElementById('stat-maxage').textContent  = maxAge;
   document.getElementById('stat-avgage').textContent  = alive > 0 ? (totalAge / alive).toFixed(1) : '0.0';
   document.getElementById('stat-born').textContent    = bornThisStep;
 }
 
 /* ═══════════════════════════════════════════════════════════
-   INIT / RANDOMIZE
-   Dense spherical core (40%) + sparse outer shell (7%)
-   Gives enough neighbors at the core for the rules to sustain.
+   RANDOMIZE / RESET  3-D
 ═══════════════════════════════════════════════════════════ */
-function randomize() {
+function randomize3D() {
   const cx = HALF, cy = HALF, cz = HALF;
-  const coreR = 5.2;
+  const coreR = 7.0;
   for (let x = 0; x < GRID; x++)
   for (let y = 0; y < GRID; y++)
   for (let z = 0; z < GRID; z++) {
@@ -773,7 +859,7 @@ function randomize() {
   updateHUD();
 }
 
-function resetGrid() {
+function resetGrid3D() {
   cells.fill(0);    nextCells.fill(0);
   ages.fill(0);     nextAges.fill(0);
   nbrs.fill(0);     nextNbrs.fill(0);
@@ -783,6 +869,38 @@ function resetGrid() {
   iMesh.instanceMatrix.needsUpdate = true;
   updateHUD();
 }
+
+/* ═══════════════════════════════════════════════════════════
+   RANDOMIZE / RESET  2-D
+═══════════════════════════════════════════════════════════ */
+function randomize2D() {
+  for (let x = 0; x < GRID2D; x++)
+  for (let y = 0; y < GRID2D; y++) {
+    const i      = idx2D(x, y);
+    cells2D[i]   = Math.random() < 0.35 ? 1 : 0;
+    ages2D[i]    = cells2D[i] ? ((Math.random() * 12) | 0) : 0;
+    nbrs2D[i]    = 0;
+    birthMs2D[i] = -1;
+    deathMs2D[i] = -1;
+  }
+  generation = 0; bornThisStep = 0;
+  updateHUD();
+}
+
+function resetGrid2D() {
+  cells2D.fill(0);    next2D.fill(0);
+  ages2D.fill(0);     nextAges2D.fill(0);
+  nbrs2D.fill(0);     nextNbrs2D.fill(0);
+  birthMs2D.fill(-1); deathMs2D.fill(-1);
+  generation = 0;     bornThisStep = 0;
+  iMesh.count = 0;
+  iMesh.instanceMatrix.needsUpdate = true;
+  updateHUD();
+}
+
+/* Dispatch to the active mode */
+function randomize() { if (is2D) randomize2D(); else randomize3D(); }
+function resetGrid() { if (is2D) resetGrid2D(); else resetGrid3D(); }
 
 /* ═══════════════════════════════════════════════════════════
    CAMERA HELPERS
@@ -798,7 +916,7 @@ function sphericalPos() {
 function compute2DCamPos() {
   const vFov = camera.fov * (Math.PI / 180);
   const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
-  const dist = (GRID * 0.5) / Math.tan(Math.min(vFov, hFov) / 2) * 1.26;
+  const dist = (GRID2D * 0.5) / Math.tan(Math.min(vFov, hFov) / 2) * 1.18;
   return new THREE.Vector3(0, 0, dist);
 }
 
@@ -808,13 +926,30 @@ function snapCamera3D() {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   RULE / TITLE HELPERS
+═══════════════════════════════════════════════════════════ */
+const ruleEl    = document.getElementById('badge-rule');
+const titleEl   = document.getElementById('title-rule');
+const sliceEl   = document.getElementById('badge-slice');
+const modeEl    = document.getElementById('badge-mode');
+const btnModeEl = document.getElementById('btn-mode');
+const legendEl  = document.getElementById('legend');
+const torusBtn  = document.getElementById('btn-torus');
+
+function updateTitleRule() {
+  if (is2D) {
+    ruleEl.textContent  = rule2D.id;
+    titleEl.textContent = GRID2D + '×' + GRID2D + ' · ' + rule2D.label;
+    sliceEl.textContent = rule2D.id + ' · 2D';
+  } else {
+    ruleEl.textContent  = rule.id;
+    titleEl.textContent = GRID + '×' + GRID + '×' + GRID + ' · ' + rule.label;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
    MODE SWITCH  2D ↔ 3D
 ═══════════════════════════════════════════════════════════ */
-const sliceEl  = document.getElementById('badge-slice');
-const modeEl   = document.getElementById('badge-mode');
-const btnModeEl= document.getElementById('btn-mode');
-const legendEl = document.getElementById('legend');
-
 function _startTrans(toPos) {
   trans.fromPos.copy(camera.position);
   trans.toPos.copy(toPos);
@@ -826,11 +961,14 @@ function switchTo2D() {
   Object.assign(sph3DSnap, sph);
   _startTrans(compute2DCamPos());
   scene.fog = null;
-  sliceGrid.visible = sliceBorder.visible = true;
+  box3DGroup.visible = false;
+  border2D.visible   = true;
   sliceEl.classList.add('visible');
   modeEl.textContent = '2D'; modeEl.classList.add('mode-2d');
   btnModeEl.textContent = '⊞ 3D'; btnModeEl.classList.add('lit-2d');
   legendEl.classList.add('hide');
+  updateTitleRule();
+  if (!init2DDone) { randomize2D(); init2DDone = true; }
 }
 
 function switchTo3D() {
@@ -838,11 +976,13 @@ function switchTo3D() {
   Object.assign(sph, sph3DSnap);
   _startTrans(sphericalPos());
   scene.fog = fog3D;
-  sliceGrid.visible = sliceBorder.visible = false;
+  box3DGroup.visible = true;
+  border2D.visible   = false;
   sliceEl.classList.remove('visible');
   modeEl.textContent = '3D'; modeEl.classList.remove('mode-2d');
   btnModeEl.textContent = '⊞ 2D'; btnModeEl.classList.remove('lit-2d');
   legendEl.classList.remove('hide');
+  updateTitleRule();
 }
 
 function toggleMode() {
@@ -853,15 +993,15 @@ function toggleMode() {
 /* ═══════════════════════════════════════════════════════════
    RULE + TORUS CONTROLS
 ═══════════════════════════════════════════════════════════ */
-const ruleEl   = document.getElementById('badge-rule');
-const titleEl  = document.getElementById('title-rule');
-const torusBtn = document.getElementById('btn-torus');
-
 function cycleRule() {
-  ruleIdx = (ruleIdx + 1) % RULE_PRESETS.length;
-  rule    = RULE_PRESETS[ruleIdx];
-  ruleEl.textContent  = rule.id;
-  titleEl.textContent = '15×15×15 · ' + rule.label;
+  if (is2D) {
+    ruleIdx2D = (ruleIdx2D + 1) % RULE_PRESETS_2D.length;
+    rule2D    = RULE_PRESETS_2D[ruleIdx2D];
+  } else {
+    ruleIdx = (ruleIdx + 1) % RULE_PRESETS.length;
+    rule    = RULE_PRESETS[ruleIdx];
+  }
+  updateTitleRule();
 }
 
 function toggleTorus() {
@@ -885,25 +1025,23 @@ function changeSpeed(d) {
   document.getElementById('speed-display').textContent = speedLevel;
 }
 
-/* Info panel — tracked with a boolean flag, not CSS inspection */
 let isInfoOpen = false;
 const infoPanel = document.getElementById('param-info');
-
 function showInfo()  { isInfoOpen = true;  infoPanel.style.display = 'block'; }
 function closeInfo() { isInfoOpen = false; infoPanel.style.display = 'none'; }
 
 /* ═══════════════════════════════════════════════════════════
-   BUTTON EVENT LISTENERS  (no global window exposure needed)
+   BUTTON EVENT LISTENERS
 ═══════════════════════════════════════════════════════════ */
-document.getElementById('btn-play')    .addEventListener('click', togglePlay);
-document.getElementById('btn-reset')   .addEventListener('click', resetGrid);
-document.getElementById('btn-random')  .addEventListener('click', randomize);
-document.getElementById('btn-mode')    .addEventListener('click', toggleMode);
-document.getElementById('btn-rule')    .addEventListener('click', cycleRule);
-document.getElementById('btn-torus')   .addEventListener('click', toggleTorus);
-document.getElementById('btn-spd-dn')  .addEventListener('click', () => changeSpeed(-1));
-document.getElementById('btn-spd-up')  .addEventListener('click', () => changeSpeed(1));
-document.getElementById('btn-info')    .addEventListener('click', showInfo);
+document.getElementById('btn-play')      .addEventListener('click', togglePlay);
+document.getElementById('btn-reset')     .addEventListener('click', resetGrid);
+document.getElementById('btn-random')    .addEventListener('click', randomize);
+document.getElementById('btn-mode')      .addEventListener('click', toggleMode);
+document.getElementById('btn-rule')      .addEventListener('click', cycleRule);
+document.getElementById('btn-torus')     .addEventListener('click', toggleTorus);
+document.getElementById('btn-spd-dn')    .addEventListener('click', () => changeSpeed(-1));
+document.getElementById('btn-spd-up')    .addEventListener('click', () => changeSpeed(1));
+document.getElementById('btn-info')      .addEventListener('click', showInfo);
 document.getElementById('btn-close-info').addEventListener('click', closeInfo);
 
 /* ═══════════════════════════════════════════════════════════
@@ -926,7 +1064,7 @@ document.addEventListener('keydown', e => {
 });
 
 /* ═══════════════════════════════════════════════════════════
-   ORBIT CONTROLS  (drag + pinch)
+   ORBIT CONTROLS  (drag + pinch, 3-D only)
 ═══════════════════════════════════════════════════════════ */
 let isDragging = false, prevX = 0, prevY = 0;
 let autoRotate = true, lastPinchDist = 0;
@@ -946,7 +1084,7 @@ window.addEventListener('mousemove', e => {
 });
 domEl.addEventListener('wheel', e => {
   if (is2D || trans.running) return;
-  sph.r = Math.max(14, Math.min(80, sph.r + e.deltaY * 0.05));
+  sph.r = Math.max(14, Math.min(100, sph.r + e.deltaY * 0.05));
   e.preventDefault();
 }, { passive: false });
 
@@ -973,7 +1111,7 @@ domEl.addEventListener('touchmove', e => {
     const d = Math.hypot(
       e.touches[0].clientX - e.touches[1].clientX,
       e.touches[0].clientY - e.touches[1].clientY);
-    if (!is2D) sph.r = Math.max(14, Math.min(80, sph.r - (d - lastPinchDist) * 0.08));
+    if (!is2D) sph.r = Math.max(14, Math.min(100, sph.r - (d - lastPinchDist) * 0.08));
     lastPinchDist = d;
   }
   e.preventDefault();
@@ -1012,21 +1150,19 @@ function animate(now) {
     snapCamera3D();
   }
 
-  /* Animate lights — subtle organic pulse */
+  /* Animate lights */
   const t0 = now * 0.001;
   keyLight.intensity    = 7.5  + Math.sin(t0 * 1.40) * 1.3;
   fillLight.intensity   = 6.0  + Math.cos(t0 * 1.10) * 1.0;
   accentLight.intensity = 4.5  + Math.sin(t0 * 1.80 + 1.2) * 0.8;
 
-  /* Emissive pulse — heartbeat rhythm */
   cellMat.emissiveIntensity = 0.30 + Math.sin(t0 * 2.4) * 0.10;
-
-  /* Gentle bloom threshold animation */
   bloomPass.threshold = 0.10 + Math.sin(t0 * 0.7) * 0.025;
 
-  /* Simulation step */
+  /* Simulation step — only the active mode advances */
   if (playing && (now - lastStepTime) >= SPEEDS[speedLevel - 1]) {
-    stepSimulation(now);
+    if (is2D) stepSimulation2D(now);
+    else      stepSimulation(now);
     triggerFlash();
     lastStepTime = now;
   }
@@ -1072,12 +1208,9 @@ if ('serviceWorker' in navigator) {
 /* ═══════════════════════════════════════════════════════════
    BOOT
 ═══════════════════════════════════════════════════════════ */
-// Init rule badge
-ruleEl.textContent  = rule.id;
-titleEl.textContent = '15×15×15 · ' + rule.label;
-
+updateTitleRule();
 snapCamera3D();
-randomize();
+randomize3D();
 animate(0);
 </script>
 </body>
