@@ -782,7 +782,7 @@ function updateInstancedMesh(now) {
       dummy.rotation.set(0, 0, 0);
       dummy.updateMatrix();
       iMesh.setMatrixAt(count, dummy.matrix);
-      iMesh.setColorAt(count, computeColor(ages[i], nbrs[i], 12));
+      iMesh.setColorAt(count, computeColor(ages[i], nbrs[i], 13));
       count++;
     }
     /* ── Dying 3-D cells ── */
@@ -798,7 +798,7 @@ function updateInstancedMesh(now) {
       dummy.rotation.set(0, 0, 0);
       dummy.updateMatrix();
       iMesh.setMatrixAt(count, dummy.matrix);
-      iMesh.setColorAt(count, computeColor(0, 0, 12, sc * DEATH_FADE_FACTOR));
+      iMesh.setColorAt(count, computeColor(0, 0, 13, sc * DEATH_FADE_FACTOR));
       count++;
     }
   }
