@@ -809,7 +809,7 @@
   bindSlider('sl-gravity', 'v-gravity', 'gravity', v => v / 100);
   bindSlider('sl-bounce', 'v-bounce', 'bounce', v => v / 100);
   bindSlider('sl-psize', 'v-psize', 'particleSize', v => v);
-  bindSlider('sl-trail', 'v-trail', 'trailAlpha', v => 0.04 + (v / 50) * 0.2);
+  bindSlider('sl-trail', 'v-trail', 'trailAlpha', v => 0.24 - (v / 50) * 0.2);
   bindSlider('sl-volume', 'v-volume', 'volume', v => v / 100);
 
   // Scale buttons
