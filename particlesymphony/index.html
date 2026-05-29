@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a1a">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<title>Particle Symphony</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0a0a1a;font-family:'Segoe UI',system-ui,sans-serif;color:#e0e0e0;touch-action:none;user-select:none;-webkit-user-select:none}
+canvas{display:block;position:fixed;top:0;left:0;width:100%;height:100%}
+
+/* Bottom toolbar */
+#toolbar{position:fixed;bottom:0;left:0;right:0;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom));background:rgba(10,10,26,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid rgba(255,255,255,0.08);z-index:10}
+.tb-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;width:52px;height:52px;border:none;border-radius:14px;background:rgba(255,255,255,0.07);color:#ccc;font-size:20px;cursor:pointer;transition:all .2s;position:relative}
+.tb-btn.active{background:rgba(0,255,204,0.18);color:#00ffcc;box-shadow:0 0 12px rgba(0,255,204,0.2)}
+.tb-btn:active{transform:scale(0.92)}
+.tb-btn span{font-size:8px;margin-top:2px;letter-spacing:0.5px;opacity:0.7}
+.tb-sep{width:1px;height:32px;background:rgba(255,255,255,0.1);margin:0 2px}
+
+/* Top bar */
+#topbar{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:8px 16px;padding-top:max(8px,env(safe-area-inset-top));z-index:10;pointer-events:none}
+#topbar>*{pointer-events:auto}
+#title{font-size:14px;font-weight:600;letter-spacing:2px;color:rgba(255,255,255,0.5);text-transform:uppercase}
+#gear-btn{width:36px;height:36px;border:none;border-radius:10px;background:rgba(255,255,255,0.07);color:#aaa;font-size:18px;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#gear-btn:active{transform:scale(0.9)}
+
+/* Settings panel */
+#settings{position:fixed;top:0;right:-320px;width:300px;max-width:85vw;height:100%;background:rgba(10,10,30,0.95);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-left:1px solid rgba(255,255,255,0.08);z-index:20;transition:right .35s cubic-bezier(.4,0,.2,1);overflow-y:auto;padding:20px;padding-top:max(20px,env(safe-area-inset-top))}
+#settings.open{right:0}
+#settings-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:19;opacity:0;pointer-events:none;transition:opacity .35s}
+#settings-overlay.open{opacity:1;pointer-events:auto}
+.s-title{font-size:16px;font-weight:700;margin-bottom:16px;color:#00ffcc;letter-spacing:1px}
+.s-group{margin-bottom:18px}
+.s-label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.4);margin-bottom:6px}
+.s-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.s-row input[type=range]{flex:1;-webkit-appearance:none;height:4px;border-radius:2px;background:rgba(255,255,255,0.15);outline:none}
+.s-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#00ffcc;cursor:pointer;box-shadow:0 0 6px rgba(0,255,204,0.4)}
+.s-val{font-size:12px;min-width:32px;text-align:right;color:#aaa;font-variant-numeric:tabular-nums}
+.s-btns{display:flex;gap:6px;flex-wrap:wrap}
+.s-btn{padding:6px 12px;border:1px solid rgba(255,255,255,0.12);border-radius:8px;background:rgba(255,255,255,0.05);color:#ccc;font-size:12px;cursor:pointer;transition:all .2s}
+.s-btn.active{background:rgba(0,255,204,0.15);border-color:rgba(0,255,204,0.3);color:#00ffcc}
+.s-btn:active{transform:scale(0.95)}
+
+/* Hint overlay */
+#hint{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;z-index:5;pointer-events:none;transition:opacity 1.5s}
+#hint h2{font-size:28px;font-weight:300;color:rgba(255,255,255,0.7);margin-bottom:12px;letter-spacing:3px}
+#hint p{font-size:14px;color:rgba(255,255,255,0.35);line-height:1.8}
+#hint.hide{opacity:0}
+
+/* Note flash indicator */
+.note-flash{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);font-size:13px;color:rgba(0,255,204,0.8);pointer-events:none;z-index:8;animation:noteUp 0.8s forwards}
+@keyframes noteUp{0%{opacity:1;transform:translateX(-50%) translateY(0)}100%{opacity:0;transform:translateX(-50%) translateY(-30px)}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hint">
+  <h2>♪ Particle Symphony</h2>
+  <p>🎵 画面に線を描いてストリングを作ろう<br>🌧 パーティクルを降らせて音楽を奏でよう<br>✨ タッチで画面に触れてスタート</p>
+</div>
+
+<div id="topbar">
+  <div id="title">Particle Symphony</div>
+  <button id="gear-btn" aria-label="Settings">⚙</button>
+</div>
+
+<div id="toolbar">
+  <button class="tb-btn active" data-mode="string" title="ストリングを描く">🎸<span>STRING</span></button>
+  <button class="tb-btn" data-mode="emitter" title="エミッターを配置">💧<span>EMITTER</span></button>
+  <button class="tb-btn" data-mode="erase" title="消しゴム">🧹<span>ERASE</span></button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" id="btn-rain" title="パーティクルを降らせる">🌧<span>RAIN</span></button>
+  <button class="tb-btn" id="btn-burst" title="バースト">💥<span>BURST</span></button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" id="btn-clear" title="クリア">🗑<span>CLEAR</span></button>
+  <button class="tb-btn" id="btn-preset" title="プリセット">🎹<span>PRESET</span></button>
+</div>
+
+<div id="settings-overlay"></div>
+<div id="settings">
+  <div class="s-title">⚙ Settings</div>
+  
+  <div class="s-group">
+    <div class="s-label">Gravity</div>
+    <div class="s-row"><input type="range" id="sl-gravity" min="0" max="200" value="60"><span class="s-val" id="v-gravity">0.6</span></div>
+  </div>
+  
+  <div class="s-group">
+    <div class="s-label">Bounce</div>
+    <div class="s-row"><input type="range" id="sl-bounce" min="10" max="95" value="70"><span class="s-val" id="v-bounce">0.70</span></div>
+  </div>
+  
+  <div class="s-group">
+    <div class="s-label">Particle Size</div>
+    <div class="s-row"><input type="range" id="sl-psize" min="1" max="8" value="3"><span class="s-val" id="v-psize">3</span></div>
+  </div>
+  
+  <div class="s-group">
+    <div class="s-label">Trail Length</div>
+    <div class="s-row"><input type="range" id="sl-trail" min="0" max="50" value="20"><span class="s-val" id="v-trail">20</span></div>
+  </div>
+  
+  <div class="s-group">
+    <div class="s-label">Volume</div>
+    <div class="s-row"><input type="range" id="sl-volume" min="0" max="100" value="60"><span class="s-val" id="v-volume">60</span></div>
+  </div>
+  
+  <div class="s-group">
+    <div class="s-label">Scale</div>
+    <div class="s-btns" id="scale-btns">
+      <button class="s-btn active" data-scale="pentatonic">ペンタ</button>
+      <button class="s-btn" data-scale="major">メジャー</button>
+      <button class="s-btn" data-scale="minor">マイナー</button>
+      <button class="s-btn" data-scale="blues">ブルース</button>
+      <button class="s-btn" data-scale="chromatic">クロマ</button>
+    </div>
+  </div>
+  
+  <div class="s-group">
+    <div class="s-label">Instrument</div>
+    <div class="s-btns" id="inst-btns">
+      <button class="s-btn active" data-inst="bell">🔔 ベル</button>
+      <button class="s-btn" data-inst="pluck">🎸 プラック</button>
+      <button class="s-btn" data-inst="pad">🎹 パッド</button>
+      <button class="s-btn" data-inst="perc">🥁 パーカス</button>
+    </div>
+  </div>
+  
+  <div class="s-group">
+    <div class="s-label">Background</div>
+    <div class="s-btns" id="bg-btns">
+      <button class="s-btn active" data-bg="space">🌌 宇宙</button>
+      <button class="s-btn" data-bg="ocean">🌊 海</button>
+      <button class="s-btn" data-bg="forest">🌲 森</button>
+      <button class="s-btn" data-bg="minimal">⬛ ミニマル</button>
+    </div>
+  </div>
+  
+  <div class="s-group">
+    <div class="s-label">Presets</div>
+    <div class="s-btns">
+      <button class="s-btn" id="pre-harp">🎵 ハープ</button>
+      <button class="s-btn" id="pre-rain">🌧 レインドロップ</button>
+      <button class="s-btn" id="pre-chaos">🌀 カオス</button>
+      <button class="s-btn" id="pre-zen">🧘 ゼン</button>
+    </div>
+  </div>
+</div>
+
+<script src="./app.js"></script>
+</body>
+</html>
