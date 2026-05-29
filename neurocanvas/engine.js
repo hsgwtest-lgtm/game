@@ -22,7 +22,7 @@ const ACT_FNS = [
   x => Math.max(0, x),
   x => Math.exp(-(x * x)),
   x => Math.abs(x),
-  x => ((x % 1) + 1) % 1,
+  x => ((x % 1) + 1) % 1, // sawtooth: repeating ramp 0→1
   x => 1 / (1 + Math.exp(-x))
 ];
 const ACT_COLORS = [
@@ -670,7 +670,7 @@ class GalleryManager {
 
   add(genome, generation) {
     if (this.items.length >= MAX_GALLERY) {
-      showToast('ギャラリーが満杯です（最大' + MAX_GALLERY + '作品）');
+      showToast(`ギャラリーが満杯です（最大${MAX_GALLERY}作品）`);
       return false;
     }
     this.items.push({
