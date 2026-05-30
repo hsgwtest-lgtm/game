@@ -256,9 +256,9 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
   padding: 3px 4px; border-radius: 4px; font-size: 10px;
   margin-bottom: 2px;
 }
-.ranking-item:nth-child(2) { color: var(--gold); }
-.ranking-item:nth-child(3) { color: var(--silver); }
-.ranking-item:nth-child(4) { color: var(--bronze); }
+.ranking-item:nth-child(1) { color: var(--gold); }
+.ranking-item:nth-child(2) { color: var(--silver); }
+.ranking-item:nth-child(3) { color: var(--bronze); }
 .ranking-medal { font-size: 12px; width: 16px; text-align: center; }
 .ranking-name { color: var(--text-dim); flex: 1; }
 .ranking-score { font-family: var(--font); font-weight: 600; }
@@ -435,7 +435,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
   #bottom-bar { max-height: 100px; }
   #neural-overlay { max-width: calc(100vw - 16px); }
   #neuralCanvas { width: 320px; height: 240px; }
-  #mission-display { display: none; }
+  #mission-display { max-width: 30%; font-size: 10px; }
   #agent-ranking { right: 8px; top: calc(280px + var(--safe-top)); }
   .sculpt-tools .sculpt-btn { min-width: 36px; height: 32px; }
   .sculpt-tools .btn-text { font-size: 8px; }

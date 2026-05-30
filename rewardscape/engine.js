@@ -1516,13 +1516,24 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
       .slice(0, 5);
 
     const medals = ['🥇', '🥈', '🥉', '4', '5'];
-    listEl.innerHTML = sorted.map((item, rank) => `
-      <div class="ranking-item">
-        <span class="ranking-medal">${medals[rank]}</span>
-        <span class="ranking-name">Agent ${item.idx}</span>
-        <span class="ranking-score">${item.score.toFixed(2)}</span>
-      </div>
-    `).join('');
+    listEl.innerHTML = '';
+    sorted.forEach((item, rank) => {
+      const div = document.createElement('div');
+      div.className = 'ranking-item';
+      const medalSpan = document.createElement('span');
+      medalSpan.className = 'ranking-medal';
+      medalSpan.textContent = medals[rank];
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'ranking-name';
+      nameSpan.textContent = `Agent ${item.idx}`;
+      const scoreSpan = document.createElement('span');
+      scoreSpan.className = 'ranking-score';
+      scoreSpan.textContent = item.score.toFixed(2);
+      div.appendChild(medalSpan);
+      div.appendChild(nameSpan);
+      div.appendChild(scoreSpan);
+      listEl.appendChild(div);
+    });
   }
 
   // ─── エポック進捗バー更新 ───
@@ -1531,14 +1542,15 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     const labelEl = document.getElementById('epoch-progress-label');
     if (!barEl || !labelEl) return;
 
+    const maxLen = CFG.maxEpisodeLen || 64;
     // 各エージェントのエピソード進捗を平均
     let totalProgress = 0;
     for (const agent of agents) {
-      totalProgress += (agent.stepCount || 0) / CFG.maxEpisodeLen;
+      totalProgress += (agent.stepCount || 0) / maxLen;
     }
     const avgProgress = agents.length > 0 ? totalProgress / agents.length : 0;
     barEl.style.width = `${Math.min(avgProgress * 100, 100)}%`;
-    labelEl.textContent = `エピソード ${epoch} / ステップ ${Math.round(avgProgress * CFG.maxEpisodeLen)}`;
+    labelEl.textContent = `世代 ${epoch} | 進捗 ${Math.round(avgProgress * 100)}%`;
   }
 
   function initUI() {
