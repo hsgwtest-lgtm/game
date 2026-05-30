@@ -34,15 +34,19 @@
     </div>
   </div>
 
+  <!-- ═══ Toolbar Toggles ═══ -->
+  <button class="toolbar-toggle active" id="toggle-sculpt" title="彫刻ツール" aria-label="彫刻ツール切替">🎨</button>
+  <button class="toolbar-toggle active" id="toggle-agent" title="エージェント操作" aria-label="エージェント操作切替">🤖</button>
+
   <!-- ═══ Reward Sculpt Toolbar ═══ -->
   <div id="sculpt-bar">
     <div class="sculpt-group">
-      <span class="sculpt-label">🎨 報酬彫刻</span>
-      <button class="sculpt-btn active" data-tool="attract" title="引力場 (エージェントを誘引)">🧲</button>
-      <button class="sculpt-btn" data-tool="repel" title="斥力場 (エージェントを排斥)">💥</button>
-      <button class="sculpt-btn" data-tool="bonus" title="ボーナス地点">⭐</button>
-      <button class="sculpt-btn" data-tool="penalty" title="ペナルティ地点">☠️</button>
-      <button class="sculpt-btn" data-tool="flow" title="流れ場 (方向報酬)">🌊</button>
+      <span class="sculpt-label">彫刻</span>
+      <button class="sculpt-btn active" data-tool="attract" title="引力場">🧲</button>
+      <button class="sculpt-btn" data-tool="repel" title="斥力場">💥</button>
+      <button class="sculpt-btn" data-tool="bonus" title="ボーナス">⭐</button>
+      <button class="sculpt-btn" data-tool="penalty" title="ペナルティ">☠️</button>
+      <button class="sculpt-btn" data-tool="flow" title="流れ場">🌊</button>
       <button class="sculpt-btn" data-tool="erase" title="消しゴム">🧹</button>
     </div>
     <div class="sculpt-group">
@@ -64,21 +68,21 @@
   <!-- ═══ Agent Controls ═══ -->
   <div id="agent-bar">
     <div class="agent-group">
-      <span class="agent-label">🤖 エージェント</span>
+      <span class="agent-label">操作</span>
       <button class="agent-btn" id="btn-reset-agents" title="リセット">🔄</button>
-      <button class="agent-btn" id="btn-add-agents" title="エージェント追加">➕</button>
+      <button class="agent-btn" id="btn-add-agents" title="追加">➕</button>
     </div>
     <div class="agent-group">
       <button class="speed-btn" id="btn-pause" title="一時停止">⏸</button>
       <button class="speed-btn active" id="btn-play" title="再生">▶</button>
       <button class="speed-btn" id="btn-fast" title="高速">⏩</button>
-      <button class="speed-btn" id="btn-ultra" title="超高速 (描画間引き)">⚡</button>
+      <button class="speed-btn" id="btn-ultra" title="超高速">⚡</button>
     </div>
     <div class="agent-group">
-      <button class="view-btn active" data-view="3d" title="3Dビュー">🌐</button>
-      <button class="view-btn" data-view="reward" title="報酬ヒートマップ">🗺️</button>
-      <button class="view-btn" data-view="brain" title="脳内可視化">🧠</button>
-      <button class="view-btn" data-view="landscape" title="適応度地形">📊</button>
+      <button class="view-btn active" data-view="3d" title="3D">🌐</button>
+      <button class="view-btn" data-view="reward" title="報酬">🗺️</button>
+      <button class="view-btn" data-view="brain" title="脳">🧠</button>
+      <button class="view-btn" data-view="landscape" title="地形">📊</button>
     </div>
   </div>
 

@@ -1461,6 +1461,20 @@ import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.164.1/exampl
     raycaster = new THREE.Raycaster();
     pointerVec = new THREE.Vector2();
 
+    // ─── ツールバートグル ───
+    document.getElementById('toggle-sculpt').addEventListener('click', () => {
+      const bar = document.getElementById('sculpt-bar');
+      const btn = document.getElementById('toggle-sculpt');
+      bar.classList.toggle('collapsed');
+      btn.classList.toggle('active');
+    });
+    document.getElementById('toggle-agent').addEventListener('click', () => {
+      const bar = document.getElementById('agent-bar');
+      const btn = document.getElementById('toggle-agent');
+      bar.classList.toggle('collapsed');
+      btn.classList.toggle('active');
+    });
+
     // ─── 彫刻ツール ───
     document.querySelectorAll('.sculpt-btn[data-tool]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1740,8 +1754,8 @@ import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.164.1/exampl
     rebuildAgentMeshes();
     initUI();
 
-    // デフォルトプリセット
-    applyPreset('gradient');
+    // デフォルトプリセット (螺旋は視覚的に面白い)
+    applyPreset('spiral');
     updateGradientArrows();
 
     addLog('🎮 RewardScape 起動');
