@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover,user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a0a1a">
+  <title>NeuroCanvas — ニューロキャンバス</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Background particles -->
+  <canvas id="bgCanvas"></canvas>
+
+  <!-- Header -->
+  <header id="header">
+    <div class="header-left">
+      <h1>🧬 <span class="title-gradient">NeuroCanvas</span></h1>
+    </div>
+    <div class="header-center">
+      <div id="genBadge">
+        <span class="gen-label">世代</span>
+        <span id="genNum" class="gen-num">1</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div id="diversityMeter" title="集団の多様性">
+        <span class="meter-label">多様性</span>
+        <div class="meter-track"><div class="meter-fill" id="diversityFill"></div></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Grid -->
+  <main id="gridContainer"></main>
+
+  <!-- Bottom Bar -->
+  <footer id="bottomBar">
+    <div id="selectionInfo">
+      <span id="selCount">0</span><span class="sel-total">/12 選択中</span>
+    </div>
+    <button id="evolveBtn" class="btn-evolve" disabled>
+      <span class="btn-evolve-icon">🧬</span>
+      <span class="btn-evolve-text">進化させる</span>
+    </button>
+    <div id="toolButtons">
+      <button id="randomBtn" class="btn-icon" title="ランダム生成">🎲</button>
+      <button id="historyBtn" class="btn-icon" title="進化の歴史">📜</button>
+      <button id="galleryBtn" class="btn-icon" title="ギャラリー">🖼️</button>
+      <button id="settingsBtn" class="btn-icon" title="設定">⚙️</button>
+    </div>
+  </footer>
+
+  <!-- Inspect Overlay -->
+  <div id="inspectOverlay" class="overlay hidden">
+    <div class="overlay-backdrop"></div>
+    <div class="overlay-content inspect-layout">
+      <button class="close-btn" data-close="inspectOverlay">✕</button>
+      <div class="inspect-grid">
+        <div class="inspect-art-wrap">
+          <canvas id="inspectCanvas" width="512" height="512"></canvas>
+          <div class="inspect-art-label">
+            <span id="inspectSymmetry"></span>
+            <span id="inspectScale"></span>
+          </div>
+        </div>
+        <div class="inspect-panel">
+          <h3>🧠 ニューラルネットワーク</h3>
+          <canvas id="networkCanvas" width="480" height="300"></canvas>
+          <div id="activationInfo">
+            <div class="act-legend"></div>
+          </div>
+          <h3>🧬 ゲノム情報</h3>
+          <canvas id="genomeCanvas" width="480" height="60"></canvas>
+          <div id="genomeStats"></div>
+          <div class="inspect-actions">
+            <button id="saveBtn" class="btn-secondary">💾 ギャラリーに保存</button>
+            <button id="downloadBtn" class="btn-secondary">📥 画像ダウンロード</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- History Overlay -->
+  <div id="historyOverlay" class="overlay hidden">
+    <div class="overlay-backdrop"></div>
+    <div class="overlay-content">
+      <button class="close-btn" data-close="historyOverlay">✕</button>
+      <h2>📜 進化の歴史</h2>
+      <p class="overlay-subtitle">世代ごとのベストアートと多様性の変遷</p>
+      <div id="historyGraphWrap">
+        <canvas id="historyGraph" width="600" height="150"></canvas>
+      </div>
+      <div id="historyTimeline"></div>
+      <div id="historyEmpty" class="empty-msg">まだ歴史がありません。進化を始めましょう！</div>
+    </div>
+  </div>
+
+  <!-- Gallery Overlay -->
+  <div id="galleryOverlay" class="overlay hidden">
+    <div class="overlay-backdrop"></div>
+    <div class="overlay-content">
+      <button class="close-btn" data-close="galleryOverlay">✕</button>
+      <h2>🖼️ ギャラリー</h2>
+      <p class="overlay-subtitle">保存したお気に入りのAIアート</p>
+      <div id="galleryGrid"></div>
+      <div id="galleryEmpty" class="empty-msg">まだ作品が保存されていません。<br>作品を長押し → 💾 で保存できます。</div>
+    </div>
+  </div>
+
+  <!-- Settings Overlay -->
+  <div id="settingsOverlay" class="overlay hidden">
+    <div class="overlay-backdrop"></div>
+    <div class="overlay-content settings-content">
+      <button class="close-btn" data-close="settingsOverlay">✕</button>
+      <h2>⚙️ 設定</h2>
+      <div class="setting-group">
+        <div class="setting-row">
+          <label for="sldMutRate">変異率</label>
+          <input type="range" id="sldMutRate" min="0.05" max="0.50" step="0.05" value="0.15">
+          <span id="valMutRate" class="setting-val">15%</span>
+        </div>
+        <div class="setting-row">
+          <label for="sldMutStr">変異強度</label>
+          <input type="range" id="sldMutStr" min="0.1" max="1.5" step="0.1" value="0.5">
+          <span id="valMutStr" class="setting-val">0.5</span>
+        </div>
+        <div class="setting-row">
+          <label for="selResolution">描画解像度</label>
+          <select id="selResolution">
+            <option value="64">64×64（高速）</option>
+            <option value="128" selected>128×128（標準）</option>
+            <option value="200">200×200（高画質）</option>
+          </select>
+        </div>
+      </div>
+      <div class="setting-actions">
+        <button id="resetBtn" class="btn-danger">🔄 すべてリセット</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tutorial Overlay -->
+  <div id="tutorialOverlay" class="overlay hidden">
+    <div class="overlay-backdrop"></div>
+    <div class="overlay-content tutorial-content">
+      <div class="tutorial-header">
+        <div class="tutorial-logo">🧬</div>
+        <h2>NeuroCanvas</h2>
+        <p class="tutorial-tagline">AIアートの進化を体験しよう</p>
+      </div>
+      <div class="tutorial-steps">
+        <div class="tutorial-step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <div class="step-icon">👆</div>
+            <div class="step-text">好きなアートを<strong>タップ</strong>して選択</div>
+          </div>
+        </div>
+        <div class="tutorial-step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <div class="step-icon">🧬</div>
+            <div class="step-text"><strong>「進化させる」</strong>で次世代を生成</div>
+          </div>
+        </div>
+        <div class="tutorial-step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <div class="step-icon">🧠</div>
+            <div class="step-text">AIがあなたの<strong>美的感覚を学習</strong></div>
+          </div>
+        </div>
+        <div class="tutorial-step">
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <div class="step-icon">🎨</div>
+            <div class="step-text">世代を重ねて<strong>究極のアート</strong>を進化させよう</div>
+          </div>
+        </div>
+      </div>
+      <button id="tutorialStart" class="btn-evolve">
+        <span class="btn-evolve-icon">🚀</span>
+        <span class="btn-evolve-text">始める</span>
+      </button>
+      <p class="tutorial-hint">💡 長押しで作品の詳細を表示</p>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="engine.js"></script>
+</body>
+</html>
