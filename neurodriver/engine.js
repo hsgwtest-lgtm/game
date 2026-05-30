@@ -384,8 +384,14 @@ class Game {
   resizeCanvas(c) {
     if (!c || !c.parentElement) return;
     const w = c.parentElement.clientWidth || 300;
-    const ar = parseFloat(c.style.aspectRatio) || 1.7;
-    const h = Math.round(w / ar) || Math.round(w / 1.7);
+    const computed = getComputedStyle(c);
+    const arStr = computed.aspectRatio;
+    let ar = 1.7;
+    if (arStr && arStr !== 'auto') {
+      const parts = arStr.split('/');
+      ar = parseFloat(parts[0]) / (parseFloat(parts[1]) || 1);
+    }
+    const h = Math.round(w / ar);
     c.width = w * devicePixelRatio;
     c.height = h * devicePixelRatio;
     c.style.width = w + 'px';
@@ -430,12 +436,21 @@ class Game {
     });
     document.getElementById('btnDrawDone').addEventListener('click', () => this.finishDraw());
 
-    // Draw canvas click
+    // Draw canvas click/touch
     this.drawC.addEventListener('click', (e) => this.handleDrawClick(e));
     this.drawC.addEventListener('mousemove', (e) => { this._drawMouse = this.getCanvasPos(this.drawC, e); this.renderDrawMode(); });
+    this.drawC.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      const touch = e.changedTouches[0];
+      this.handleDrawClick(touch);
+    });
 
-    // Main canvas click (select car)
+    // Main canvas click/touch (select car)
     this.mainC.addEventListener('click', (e) => this.handleMainClick(e));
+    this.mainC.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      this.handleMainClick(e.changedTouches[0]);
+    });
 
     // Parameter sliders
     this.bindSlider('ctrlPop', 'valPop', v => { CFG.POP = v; return v; });
@@ -833,16 +848,19 @@ class Game {
   //  Rendering
   // ============================================================
   render() {
+    if (this.state !== 'sim') return;
     this.frameCount++;
     this.renderTrack();
     if (this.frameCount % 3 === 0) this.renderNeural();
     if (this.frameCount % 5 === 0) this.renderFitness();
-    if (this.state === 'sim') this.updateStats();
+    this.updateStats();
   }
 
   renderTrack() {
     const ctx = this.mainCtx;
+    if (!ctx) return;
     const cw = this.mainC.width, ch = this.mainC.height;
+    if (cw === 0 || ch === 0) return;
     ctx.clearRect(0, 0, cw, ch);
 
     if (!this.track) return;

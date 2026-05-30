@@ -42,7 +42,7 @@ button{cursor:pointer;border:none;font-family:inherit;font-size:inherit}
 #drawOverlay{position:fixed;inset:0;z-index:90;display:none;flex-direction:column;align-items:center;background:var(--bg)}
 #drawOverlay .draw-header{width:100%;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;background:var(--panel);border-bottom:1px solid var(--border)}
 #drawOverlay .draw-info{color:var(--text2);font-size:.85rem}
-#drawCanvas{flex:1;width:100%;cursor:crosshair}
+#drawCanvas{flex:1;width:100%;cursor:crosshair;touch-action:none}
 .draw-btns{display:flex;gap:10px}
 .draw-btns button{padding:8px 20px;border-radius:8px;font-size:.85rem;font-weight:600}
 .btn-done{background:var(--green);color:#000}
@@ -63,7 +63,7 @@ button{cursor:pointer;border:none;font-family:inherit;font-size:inherit}
 
 .main-area{display:flex;flex:1;overflow:hidden}
 .canvas-wrap{flex:1;position:relative;min-width:0}
-#mainCanvas{width:100%;height:100%;display:block;background:#0a0a18}
+#mainCanvas{width:100%;height:100%;display:block;background:#0a0a18;touch-action:none}
 .side-panel{width:320px;display:flex;flex-direction:column;border-left:1px solid var(--border);overflow-y:auto;background:var(--panel)}
 .panel-section{padding:12px;border-bottom:1px solid var(--border)}
 .panel-title{font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
