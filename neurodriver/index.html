@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#00ff88">
+<title>NeuroDriver - AI Racing Evolution</title>
+<link rel="manifest" href="manifest.json">
+<style>
+:root{
+  --bg:#0a0a1a;--panel:#111125;--border:#2a2a4a;
+  --text:#d0d0ee;--text2:#7777aa;
+  --green:#00ff88;--blue:#4488ff;--red:#ff4455;
+  --gold:#ffcc00;--purple:#aa55ff;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden;height:100vh;width:100vw;user-select:none}
+button{cursor:pointer;border:none;font-family:inherit;font-size:inherit}
+
+/* ===== START SCREEN ===== */
+#startScreen{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg)}
+#startScreen .title{font-size:clamp(2rem,6vw,3.5rem);font-weight:900;background:linear-gradient(135deg,var(--green),var(--blue),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:glow 3s ease-in-out infinite alternate;margin-bottom:.2em}
+@keyframes glow{0%{filter:brightness(1) drop-shadow(0 0 8px rgba(0,255,136,.3))}100%{filter:brightness(1.2) drop-shadow(0 0 20px rgba(0,255,136,.6))}}
+#startScreen .subtitle{font-size:clamp(.9rem,2.5vw,1.2rem);color:var(--text2);margin-bottom:2em}
+#startScreen .desc{font-size:.85rem;color:var(--text2);max-width:500px;text-align:center;line-height:1.6;margin-bottom:2em}
+.track-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;max-width:640px;width:90%;margin-bottom:1.5em}
+.track-card{background:var(--panel);border:2px solid var(--border);border-radius:12px;padding:14px;text-align:center;transition:all .2s;cursor:pointer}
+.track-card:hover,.track-card.selected{border-color:var(--green);box-shadow:0 0 20px rgba(0,255,136,.15)}
+.track-card.selected{background:#1a1a35}
+.track-card canvas{width:100%;aspect-ratio:1.4;border-radius:6px;margin-bottom:8px;background:#0d0d20}
+.track-card .name{font-weight:700;font-size:.95rem}
+.track-card .diff{font-size:.75rem;color:var(--text2);margin-top:4px}
+.btn-start{background:linear-gradient(135deg,var(--green),#00cc66);color:#000;font-size:1.1rem;font-weight:700;padding:14px 48px;border-radius:50px;letter-spacing:.05em;transition:all .2s}
+.btn-start:hover{transform:scale(1.05);box-shadow:0 0 30px rgba(0,255,136,.3)}
+.btn-start:disabled{opacity:.4;transform:none;cursor:default}
+.btn-custom{background:transparent;border:2px dashed var(--text2)!important;color:var(--text2);font-size:.9rem;padding:12px 24px;border-radius:50px;margin-bottom:1em;transition:all .2s}
+.btn-custom:hover{border-color:var(--blue)!important;color:var(--blue)}
+
+/* ===== DRAW MODE ===== */
+#drawOverlay{position:fixed;inset:0;z-index:90;display:none;flex-direction:column;align-items:center;background:var(--bg)}
+#drawOverlay .draw-header{width:100%;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;background:var(--panel);border-bottom:1px solid var(--border)}
+#drawOverlay .draw-info{color:var(--text2);font-size:.85rem}
+#drawCanvas{flex:1;width:100%;cursor:crosshair;touch-action:none}
+.draw-btns{display:flex;gap:10px}
+.draw-btns button{padding:8px 20px;border-radius:8px;font-size:.85rem;font-weight:600}
+.btn-done{background:var(--green);color:#000}
+.btn-done:disabled{opacity:.3}
+.btn-undo{background:var(--panel);color:var(--text);border:1px solid var(--border)!important}
+.btn-back{background:var(--panel);color:var(--red);border:1px solid var(--border)!important}
+
+/* ===== MAIN GAME ===== */
+#gameUI{display:none;flex-direction:column;height:100vh;width:100vw}
+.header{display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--border);flex-wrap:wrap;min-height:44px}
+.header .logo{font-weight:800;font-size:1rem;color:var(--green)}
+.stat{font-size:.8rem;color:var(--text2)}
+.stat b{color:var(--text);font-weight:600}
+.speed-btns{display:flex;gap:4px;margin-left:auto}
+.speed-btns button{width:36px;height:28px;border-radius:6px;font-size:.75rem;font-weight:700;background:var(--panel);color:var(--text2);border:1px solid var(--border)!important;transition:all .15s}
+.speed-btns button.active{background:var(--green);color:#000;border-color:var(--green)!important}
+.btn-reset{background:var(--panel);color:var(--red);border:1px solid var(--border)!important;padding:4px 12px;border-radius:6px;font-size:.75rem;font-weight:600;margin-left:6px}
+
+.main-area{display:flex;flex:1;overflow:hidden}
+.canvas-wrap{flex:1;position:relative;min-width:0}
+#mainCanvas{width:100%;height:100%;display:block;background:#0a0a18;touch-action:none}
+.side-panel{width:320px;display:flex;flex-direction:column;border-left:1px solid var(--border);overflow-y:auto;background:var(--panel)}
+.panel-section{padding:12px;border-bottom:1px solid var(--border)}
+.panel-title{font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+#neuralCanvas{width:100%;aspect-ratio:1.7;border-radius:6px;background:#0a0a18}
+#fitnessCanvas{width:100%;aspect-ratio:2;border-radius:6px;background:#0a0a18}
+.controls{display:grid;grid-template-columns:1fr;gap:6px}
+.ctrl-row{display:flex;align-items:center;gap:8px;font-size:.78rem}
+.ctrl-row label{flex:0 0 90px;color:var(--text2);text-align:right}
+.ctrl-row input[type=range]{flex:1;accent-color:var(--green);height:4px}
+.ctrl-row .val{flex:0 0 36px;text-align:right;font-weight:600;font-size:.75rem;color:var(--green)}
+
+/* ===== STATUS BAR ===== */
+.status-bar{display:flex;align-items:center;gap:16px;padding:6px 14px;background:var(--panel);border-top:1px solid var(--border);font-size:.75rem;color:var(--text2)}
+.status-bar .ticker{flex:1;overflow:hidden;white-space:nowrap}
+.progress-fill{height:3px;background:var(--green);border-radius:2px;transition:width .3s}
+
+/* ===== MOBILE ===== */
+@media(max-width:800px){
+  .side-panel{display:none}
+  .header{gap:6px;padding:6px 8px}
+  .stat{font-size:.7rem}
+  #mobilePanel{display:block;border-top:1px solid var(--border);background:var(--panel)}
+  .mob-tabs{display:flex;border-bottom:1px solid var(--border)}
+  .mob-tabs button{flex:1;padding:8px;font-size:.8rem;background:transparent;color:var(--text2);border:none;border-bottom:2px solid transparent}
+  .mob-tabs button.active{color:var(--green);border-bottom-color:var(--green)}
+  .mob-content{max-height:35vh;overflow-y:auto}
+  .mob-content .panel-section{display:none}
+  .mob-content .panel-section.active{display:block}
+}
+@media(min-width:801px){
+  #mobilePanel{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== START SCREEN ===== -->
+<div id="startScreen">
+  <div class="title">NeuroDriver</div>
+  <div class="subtitle">🧠 AIが走りを学ぶ進化シミュレーター</div>
+  <div class="desc">ニューラルネットワークで制御されたAIカーが、遺伝的アルゴリズムにより走行を学習。脳の活動・学習過程をリアルタイムで可視化します。</div>
+  <div class="track-grid" id="trackGrid"></div>
+  <button class="btn-custom" id="btnCustom">✏️ カスタムコースを描く</button>
+  <button class="btn-start" id="btnStart" disabled>▶ トレーニング開始</button>
+</div>
+
+<!-- ===== DRAW MODE ===== -->
+<div id="drawOverlay">
+  <div class="draw-header">
+    <div class="draw-btns">
+      <button class="btn-back" id="btnDrawBack">← 戻る</button>
+      <button class="btn-undo" id="btnDrawUndo">↩ 元に戻す</button>
+    </div>
+    <div class="draw-info" id="drawInfo">クリックでコースの中心線を配置（8点以上、最後は始点の近くに）</div>
+    <div class="draw-btns">
+      <button class="btn-done" id="btnDrawDone" disabled>✓ 完了</button>
+    </div>
+  </div>
+  <canvas id="drawCanvas"></canvas>
+</div>
+
+<!-- ===== GAME UI ===== -->
+<div id="gameUI">
+  <div class="header">
+    <span class="logo">🧠 NeuroDriver</span>
+    <span class="stat">🧬 世代 <b id="statGen">0</b></span>
+    <span class="stat">🏆 最高 <b id="statBest">0</b></span>
+    <span class="stat">📊 平均 <b id="statAvg">0</b></span>
+    <span class="stat">🚗 生存 <b id="statAlive">0</b>/<b id="statTotal">30</b></span>
+    <span class="stat">⏱ <b id="statTime">0.0</b>s</span>
+    <div class="speed-btns">
+      <button data-speed="0" title="一時停止">⏸</button>
+      <button data-speed="1" class="active" title="通常速度">1x</button>
+      <button data-speed="3" title="3倍速">3x</button>
+      <button data-speed="8" title="8倍速">8x</button>
+      <button data-speed="20" title="最高速">⚡</button>
+    </div>
+    <button class="btn-reset" id="btnReset">🔄 リセット</button>
+  </div>
+  <div class="main-area">
+    <div class="canvas-wrap">
+      <canvas id="mainCanvas"></canvas>
+    </div>
+    <div class="side-panel">
+      <div class="panel-section">
+        <div class="panel-title">🧠 ニューラルネットワーク</div>
+        <canvas id="neuralCanvas"></canvas>
+      </div>
+      <div class="panel-section">
+        <div class="panel-title">📊 学習グラフ</div>
+        <canvas id="fitnessCanvas"></canvas>
+      </div>
+      <div class="panel-section">
+        <div class="panel-title">⚙️ パラメータ</div>
+        <div class="controls">
+          <div class="ctrl-row"><label>個体数</label><input type="range" id="ctrlPop" min="10" max="60" value="30"><span class="val" id="valPop">30</span></div>
+          <div class="ctrl-row"><label>突然変異率</label><input type="range" id="ctrlMutRate" min="5" max="50" value="15"><span class="val" id="valMutRate">15%</span></div>
+          <div class="ctrl-row"><label>変異強度</label><input type="range" id="ctrlMutStr" min="5" max="80" value="30"><span class="val" id="valMutStr">0.30</span></div>
+          <div class="ctrl-row"><label>エリート数</label><input type="range" id="ctrlElite" min="2" max="15" value="6"><span class="val" id="valElite">6</span></div>
+          <div class="ctrl-row"><label>評価時間</label><input type="range" id="ctrlTime" min="5" max="30" value="12"><span class="val" id="valTime">12s</span></div>
+          <div class="ctrl-row"><label>コース幅</label><input type="range" id="ctrlWidth" min="30" max="100" value="60"><span class="val" id="valWidth">60</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Mobile panels -->
+  <div id="mobilePanel">
+    <div class="mob-tabs">
+      <button class="active" data-tab="brain">🧠 脳</button>
+      <button data-tab="graph">📊 学習</button>
+      <button data-tab="ctrl">⚙️ 設定</button>
+    </div>
+    <div class="mob-content">
+      <div class="panel-section active" data-panel="brain">
+        <canvas id="neuralCanvasM"></canvas>
+      </div>
+      <div class="panel-section" data-panel="graph">
+        <canvas id="fitnessCanvasM"></canvas>
+      </div>
+      <div class="panel-section" data-panel="ctrl">
+        <div class="controls" id="mobileControls"></div>
+      </div>
+    </div>
+  </div>
+  <div class="status-bar">
+    <div class="ticker" id="ticker">🧠 AIの学習を観察しましょう</div>
+    <div style="width:100px;background:var(--border);border-radius:2px;height:3px"><div class="progress-fill" id="progressBar" style="width:0%"></div></div>
+  </div>
+</div>
+
+<script src="engine.js"></script>
+</body>
+</html>
