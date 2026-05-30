@@ -108,12 +108,13 @@ function catmullRom(p0, p1, p2, p3, t) {
 }
 
 // ---- Sensor angle generation ----
+const SENSOR_SPREAD_DEG = 120; // total angular spread of sensors in degrees
+
 function generateSensorAngles(count) {
   if (count <= 1) return [0];
   const angles = [];
-  const spread = 120; // total spread in degrees
   for (let i = 0; i < count; i++) {
-    angles.push(-spread / 2 + (spread / (count - 1)) * i);
+    angles.push(-SENSOR_SPREAD_DEG / 2 + (SENSOR_SPREAD_DEG / (count - 1)) * i);
   }
   return angles;
 }
@@ -121,9 +122,25 @@ function generateSensorAngles(count) {
 // ============================================================
 //  Reward Computation (extracted from Car.update)
 // ============================================================
+// Reward scaling constants: when efficiency progress exists, use full scale;
+// otherwise reduce reward to avoid rewarding stationary cars.
+const REWARD_SCALE_ACTIVE = 1;
+const REWARD_SCALE_INACTIVE = 0.1;
+// Center-of-gravity effect on turning: higher values amplify oversteer/understeer
+const COG_EFFECT_MULTIPLIER = 0.3;
+
+// Shared condition type definitions for reward rules
+const RULE_CONDITION_TYPES = [
+  { value: 'wall_distance', label: '壁距離' },
+  { value: 'speed_over', label: '速度超過' },
+  { value: 'speed_under', label: '速度不足' },
+  { value: 'steer_change', label: '操舵変化' },
+];
+
 function computeReward(car, checkpoints) {
   const w = REWARD_CFG.weights;
-  const totalWeight = (w.speed + w.safety + w.efficiency + w.smoothness) || 1;
+  const totalWeight = (w.speed + w.safety + w.efficiency + w.smoothness);
+  if (totalWeight === 0) return 0;
 
   // Efficiency reward: checkpoint progress (original fitness)
   let efficiencyReward = 0;
@@ -159,7 +176,7 @@ function computeReward(car, checkpoints) {
   ) / totalWeight;
 
   // Scale so efficiency component dominates magnitude (keeps evolution working)
-  const scaledReward = baseReward * (efficiencyReward > 0 ? 1 : 0.1);
+  const scaledReward = baseReward * (efficiencyReward > 0 ? REWARD_SCALE_ACTIVE : REWARD_SCALE_INACTIVE);
 
   // Apply conditional rules
   let ruleBonus = 0;
@@ -385,7 +402,7 @@ class Car {
 
     // Turn rate scales with speed, plus CoG offset effect
     const speedFactor = Math.abs(this.speed) / CFG.MAX_SPEED + 0.15;
-    const cogEffect = 1 + CFG.COG_OFFSET * 0.3 * (this.speed / CFG.MAX_SPEED);
+    const cogEffect = 1 + CFG.COG_OFFSET * COG_EFFECT_MULTIPLIER * (this.speed / CFG.MAX_SPEED);
     this.angle += steer * CFG.TURN * Math.min(speedFactor, 1) * cogEffect;
 
     if (accel > 0) this.speed += accel * CFG.ACCEL;
@@ -483,10 +500,10 @@ function renderRuleList(containerId) {
     div.className = 'rule-item';
 
     const condSelect = document.createElement('select');
-    [['wall_distance', '壁距離'], ['speed_over', '速度超過'], ['speed_under', '速度不足'], ['steer_change', '操舵変化']].forEach(([v, l]) => {
+    RULE_CONDITION_TYPES.forEach(({ value, label }) => {
       const o = document.createElement('option');
-      o.value = v; o.textContent = l;
-      if (v === rule.condition.type) o.selected = true;
+      o.value = value; o.textContent = label;
+      if (value === rule.condition.type) o.selected = true;
       condSelect.appendChild(o);
     });
     condSelect.addEventListener('change', () => { rule.condition.type = condSelect.value; syncRuleLists(); });
