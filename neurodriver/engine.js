@@ -1,7 +1,8 @@
 'use strict';
 // ============================================================
-//  NeuroDriver — AI Racing Evolution Engine
-//  ニューロドライバー：遺伝的アルゴリズム × ニューラルネット
+//  NeuroDriver — AI Racing Evolution Engine v2
+//  ニューロドライバー：AI学習サンドボックス
+//  報酬カスタマイズ・車体設計・XAI可視化
 // ============================================================
 
 // ---- Configuration ----
@@ -14,7 +15,57 @@ const CFG = {
   SENSOR_ANGLES: [-60, -30, 0, 30, 60],
   HIDDEN: 8,
   TRACK_W: 60, CP_COUNT: 50,
+  COG_OFFSET: 0,
+  LATENCY: 0,
 };
+
+// ---- Reward Configuration ----
+const REWARD_CFG = {
+  weights: { speed: 0.30, safety: 0.20, efficiency: 0.80, smoothness: 0.10 },
+  rules: [],
+};
+
+// ---- Telemetry Ring Buffer ----
+const TELEM_SIZE = 120;
+const telemetry = {
+  throttle: new Float32Array(TELEM_SIZE),
+  brake: new Float32Array(TELEM_SIZE),
+  steering: new Float32Array(TELEM_SIZE),
+  speed: new Float32Array(TELEM_SIZE),
+  idx: 0,
+  count: 0,
+  sensorAttention: [],
+  current: { throttle: 0, brake: 0, steering: 0, speed: 0, sensorValues: [] },
+};
+
+function telemPush(throttle, brake, steering, speed) {
+  telemetry.throttle[telemetry.idx] = throttle;
+  telemetry.brake[telemetry.idx] = brake;
+  telemetry.steering[telemetry.idx] = steering;
+  telemetry.speed[telemetry.idx] = speed;
+  telemetry.idx = (telemetry.idx + 1) % TELEM_SIZE;
+  if (telemetry.count < TELEM_SIZE) telemetry.count++;
+  telemetry.current = { throttle, brake, steering, speed, sensorValues: [] };
+}
+
+function telemGet(arr) {
+  const out = [];
+  const start = telemetry.count < TELEM_SIZE ? 0 : telemetry.idx;
+  for (let i = 0; i < telemetry.count; i++) {
+    out.push(arr[(start + i) % TELEM_SIZE]);
+  }
+  return out;
+}
+
+function telemReset() {
+  telemetry.throttle.fill(0);
+  telemetry.brake.fill(0);
+  telemetry.steering.fill(0);
+  telemetry.speed.fill(0);
+  telemetry.idx = 0;
+  telemetry.count = 0;
+  telemetry.sensorAttention = [];
+}
 
 // ---- Math Utilities ----
 const PI2 = Math.PI * 2;
@@ -25,12 +76,10 @@ function dist(x1, y1, x2, y2) { const dx = x2 - x1, dy = y2 - y1; return Math.sq
 function randF(lo, hi) { return Math.random() * (hi - lo) + lo; }
 function randGauss() { let u = 0, v = 0; while (!u) u = Math.random(); v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(PI2 * v); }
 
-// Side of point relative to line segment (sign = side)
 function side(px, py, x1, y1, x2, y2) {
   return (x2 - x1) * (py - y1) - (y2 - y1) * (px - x1);
 }
 
-// Ray vs segment intersection → returns distance or -1
 function raySeg(ox, oy, dx, dy, x1, y1, x2, y2) {
   const sx = x2 - x1, sy = y2 - y1;
   const det = sx * dy - dx * sy;
@@ -41,7 +90,6 @@ function raySeg(ox, oy, dx, dy, x1, y1, x2, y2) {
   return (t >= 0 && s >= 0 && s <= 1) ? t : -1;
 }
 
-// Point-to-segment distance
 function ptSegDist(px, py, x1, y1, x2, y2) {
   const dx = x2 - x1, dy = y2 - y1;
   const lenSq = dx * dx + dy * dy;
@@ -51,13 +99,88 @@ function ptSegDist(px, py, x1, y1, x2, y2) {
   return dist(px, py, x1 + t * dx, y1 + t * dy);
 }
 
-// Catmull-Rom spline point
 function catmullRom(p0, p1, p2, p3, t) {
   const t2 = t * t, t3 = t2 * t;
   return {
     x: 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
     y: 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3),
   };
+}
+
+// ---- Sensor angle generation ----
+function generateSensorAngles(count) {
+  if (count <= 1) return [0];
+  const angles = [];
+  const spread = 120; // total spread in degrees
+  for (let i = 0; i < count; i++) {
+    angles.push(-spread / 2 + (spread / (count - 1)) * i);
+  }
+  return angles;
+}
+
+// ============================================================
+//  Reward Computation (extracted from Car.update)
+// ============================================================
+function computeReward(car, checkpoints) {
+  const w = REWARD_CFG.weights;
+  const totalWeight = (w.speed + w.safety + w.efficiency + w.smoothness) || 1;
+
+  // Efficiency reward: checkpoint progress (original fitness)
+  let efficiencyReward = 0;
+  if (checkpoints.length > 0) {
+    const cp = checkpoints[car.nextCP];
+    const d = dist(car.x, car.y, cp.cx, cp.cy);
+    const prevCPIdx = (car.nextCP - 1 + checkpoints.length) % checkpoints.length;
+    const prevCP = checkpoints[prevCPIdx];
+    const totalD = dist(prevCP.cx, prevCP.cy, cp.cx, cp.cy) || 1;
+    const progress = clamp(1 - d / totalD, 0, 1);
+    efficiencyReward = car.cpPassed + progress * 0.99;
+  }
+
+  // Speed reward: normalized speed
+  const speedReward = car.speed / CFG.MAX_SPEED;
+
+  // Safety reward: minimum sensor value (farther from walls = higher)
+  let minSensor = 1;
+  for (let i = 0; i < car.sensors.length; i++) {
+    if (car.sensors[i] < minSensor) minSensor = car.sensors[i];
+  }
+  const safetyReward = minSensor;
+
+  // Smoothness reward: penalize sudden steering changes
+  const smoothReward = 1 - Math.abs(car._steerChange || 0);
+
+  // Weighted combination
+  const baseReward = (
+    w.efficiency * efficiencyReward +
+    w.speed * speedReward +
+    w.safety * safetyReward +
+    w.smoothness * smoothReward
+  ) / totalWeight;
+
+  // Scale so efficiency component dominates magnitude (keeps evolution working)
+  const scaledReward = baseReward * (efficiencyReward > 0 ? 1 : 0.1);
+
+  // Apply conditional rules
+  let ruleBonus = 0;
+  for (const rule of REWARD_CFG.rules) {
+    if (!rule.enabled) continue;
+    let condVal = 0;
+    if (rule.condition.type === 'wall_distance') condVal = minSensor;
+    else if (rule.condition.type === 'speed_over') condVal = car.speed;
+    else if (rule.condition.type === 'speed_under') condVal = car.speed;
+    else if (rule.condition.type === 'steer_change') condVal = Math.abs(car._steerChange || 0);
+
+    let met = false;
+    if (rule.condition.comparison === 'lt') met = condVal < rule.condition.threshold;
+    else if (rule.condition.comparison === 'gt') met = condVal > rule.condition.threshold;
+
+    if (met) {
+      ruleBonus += rule.effect.type === 'penalty' ? -Math.abs(rule.effect.value) : Math.abs(rule.effect.value);
+    }
+  }
+
+  return scaledReward + ruleBonus;
 }
 
 // ============================================================
@@ -83,13 +206,11 @@ class NeuralNet {
   }
   forward(inputs) {
     for (let i = 0; i < this.inN; i++) this.aIn[i] = inputs[i];
-    // Hidden
     for (let h = 0; h < this.hidN; h++) {
       let s = this.bH[h];
       for (let i = 0; i < this.inN; i++) s += inputs[i] * this.wIH[i * this.hidN + h];
       this.aHid[h] = Math.tanh(s);
     }
-    // Output
     for (let o = 0; o < this.outN; o++) {
       let s = this.bO[o];
       for (let h = 0; h < this.hidN; h++) s += this.aHid[h] * this.wHO[h * this.outN + o];
@@ -108,6 +229,23 @@ class NeuralNet {
     mutArr(this.wIH); mutArr(this.bH); mutArr(this.wHO); mutArr(this.bO);
   }
   getGenomeSize() { return this.wIH.length + this.bH.length + this.wHO.length + this.bO.length; }
+
+  // Compute sensor attention: sum of absolute weights from each input to hidden layer
+  getSensorAttention() {
+    const attn = new Float32Array(this.inN);
+    for (let i = 0; i < this.inN; i++) {
+      let sum = 0;
+      for (let h = 0; h < this.hidN; h++) {
+        sum += Math.abs(this.wIH[i * this.hidN + h]);
+      }
+      attn[i] = sum;
+    }
+    // Normalize
+    let maxA = 0;
+    for (let i = 0; i < attn.length; i++) if (attn[i] > maxA) maxA = attn[i];
+    if (maxA > 0) for (let i = 0; i < attn.length; i++) attn[i] /= maxA;
+    return attn;
+  }
 }
 
 // ============================================================
@@ -128,7 +266,6 @@ function buildTrack(centerPts, halfW, cpCount) {
   const n = centerPts.length;
   const inner = [], outer = [], walls = [], checkpoints = [];
 
-  // Compute normals & offset
   for (let i = 0; i < n; i++) {
     const prev = centerPts[(i - 1 + n) % n], next = centerPts[(i + 1) % n];
     const dx = next.x - prev.x, dy = next.y - prev.y;
@@ -138,14 +275,12 @@ function buildTrack(centerPts, halfW, cpCount) {
     outer.push({ x: centerPts[i].x - nx * halfW, y: centerPts[i].y - ny * halfW });
   }
 
-  // Walls
   for (let i = 0; i < n; i++) {
     const j = (i + 1) % n;
     walls.push({ x1: inner[i].x, y1: inner[i].y, x2: inner[j].x, y2: inner[j].y });
     walls.push({ x1: outer[i].x, y1: outer[i].y, x2: outer[j].x, y2: outer[j].y });
   }
 
-  // Checkpoints
   const cpSpacing = Math.max(1, Math.floor(n / cpCount));
   for (let k = 0; k < cpCount; k++) {
     const idx = Math.floor(k * n / cpCount) % n;
@@ -160,14 +295,12 @@ function buildTrack(centerPts, halfW, cpCount) {
     });
   }
 
-  // Start position = first centerline point, facing along tangent
   const s0 = centerPts[0], s1 = centerPts[1];
   const startAngle = Math.atan2(s1.y - s0.y, s1.x - s0.x);
 
   return { walls, checkpoints, inner, outer, center: centerPts, startX: s0.x, startY: s0.y, startAngle };
 }
 
-// Preset track generators (polar-based)
 function presetTrack(cx, cy, baseR, perturbations, numCtrl = 24) {
   const ctrl = [];
   for (let i = 0; i < numCtrl; i++) {
@@ -187,7 +320,7 @@ const PRESETS = [
 ];
 
 // ============================================================
-//  Car
+//  Car (with latency buffer & CoG offset)
 // ============================================================
 class Car {
   constructor(x, y, angle, brain) {
@@ -199,6 +332,14 @@ class Car {
     this.sensors = new Float32Array(CFG.SENSORS);
     this.age = 0; this.maxFit = 0;
     this.stagnant = 0;
+    this._prevSteer = 0;
+    this._steerChange = 0;
+    // Latency buffer for delayed inputs
+    this._latencyBuf = [];
+    for (let i = 0; i < CFG.LATENCY; i++) {
+      this._latencyBuf.push(new Float32Array(CFG.SENSORS + 1));
+    }
+    this._latencyIdx = 0;
   }
 
   castSensors(walls) {
@@ -210,7 +351,7 @@ class Car {
         const d = raySeg(this.x, this.y, dx, dy, w.x1, w.y1, w.x2, w.y2);
         if (d >= 0 && d < minD) minD = d;
       }
-      this.sensors[s] = minD / CFG.SENSOR_RANGE; // 0=close, 1=far
+      this.sensors[s] = minD / CFG.SENSOR_RANGE;
     }
   }
 
@@ -218,33 +359,44 @@ class Car {
     if (!this.alive) return;
     this.age++;
 
-    // Cast sensors
     this.castSensors(walls);
 
-    // Neural network input: sensors + normalized speed
-    const inputs = [...this.sensors, this.speed / CFG.MAX_SPEED];
+    // Build current inputs
+    const currentInputs = new Float32Array(CFG.SENSORS + 1);
+    for (let i = 0; i < CFG.SENSORS; i++) currentInputs[i] = this.sensors[i];
+    currentInputs[CFG.SENSORS] = this.speed / CFG.MAX_SPEED;
+
+    // Apply latency: use delayed inputs if latency > 0
+    let inputs;
+    if (CFG.LATENCY > 0 && this._latencyBuf.length > 0) {
+      inputs = this._latencyBuf[this._latencyIdx % this._latencyBuf.length];
+      this._latencyBuf[this._latencyIdx % this._latencyBuf.length] = currentInputs;
+      this._latencyIdx++;
+    } else {
+      inputs = currentInputs;
+    }
+
     const out = this.brain.forward(inputs);
 
-    // Apply controls
-    const steer = out[0]; // -1..1
-    const accel = out[1]; // -1..1
+    const steer = out[0];
+    const accel = out[1];
+    this._steerChange = steer - this._prevSteer;
+    this._prevSteer = steer;
 
-    // Turn rate scales with speed for realism
+    // Turn rate scales with speed, plus CoG offset effect
     const speedFactor = Math.abs(this.speed) / CFG.MAX_SPEED + 0.15;
-    this.angle += steer * CFG.TURN * Math.min(speedFactor, 1);
+    const cogEffect = 1 + CFG.COG_OFFSET * 0.3 * (this.speed / CFG.MAX_SPEED);
+    this.angle += steer * CFG.TURN * Math.min(speedFactor, 1) * cogEffect;
 
-    // Acceleration
     if (accel > 0) this.speed += accel * CFG.ACCEL;
     else this.speed += accel * CFG.BRAKE;
     this.speed *= CFG.DRAG;
     this.speed = clamp(this.speed, -0.5, CFG.MAX_SPEED);
 
-    // Move
     this.prevX = this.x; this.prevY = this.y;
     this.x += Math.cos(this.angle) * this.speed;
     this.y += Math.sin(this.angle) * this.speed;
 
-    // Collision: check if too close to any wall
     for (const w of walls) {
       if (ptSegDist(this.x, this.y, w.x1, w.y1, w.x2, w.y2) < CFG.CAR_R) {
         this.alive = false;
@@ -258,7 +410,6 @@ class Car {
       const prevS = side(this.prevX, this.prevY, cp.x1, cp.y1, cp.x2, cp.y2);
       const currS = side(this.x, this.y, cp.x1, cp.y1, cp.x2, cp.y2);
       if (prevS * currS < 0) {
-        // Crossed checkpoint line — verify correct direction
         if (Math.sign(currS) === cp.correctSign || cp.correctSign === 0) {
           this.cpPassed++;
           this.nextCP = (this.nextCP + 1) % checkpoints.length;
@@ -267,25 +418,16 @@ class Car {
       }
     }
 
-    // Fitness = checkpoints passed (smooth)
-    // Add fractional progress toward next checkpoint
-    if (checkpoints.length > 0) {
-      const cp = checkpoints[this.nextCP];
-      const d = dist(this.x, this.y, cp.cx, cp.cy);
-      const prevCPIdx = (this.nextCP - 1 + checkpoints.length) % checkpoints.length;
-      const prevCP = checkpoints[prevCPIdx];
-      const totalD = dist(prevCP.cx, prevCP.cy, cp.cx, cp.cy) || 1;
-      const progress = clamp(1 - d / totalD, 0, 1);
-      this.fitness = this.cpPassed + progress * 0.99;
-    }
+    // Compute fitness using reward function
+    this.fitness = computeReward(this, checkpoints);
 
-    // Stagnation detection — kill cars that aren't making progress
+    // Stagnation detection
     if (this.fitness > this.maxFit + 0.01) {
       this.maxFit = this.fitness;
       this.stagnant = 0;
     } else {
       this.stagnant++;
-      if (this.stagnant > 180) this.alive = false; // 3 seconds at 60fps
+      if (this.stagnant > 180) this.alive = false;
     }
   }
 }
@@ -298,12 +440,10 @@ function evolve(cars, eliteCount) {
   const elites = cars.slice(0, eliteCount);
   const children = [];
 
-  // Keep elites
   for (const e of elites) {
     children.push(e.brain.copy());
   }
 
-  // Generate offspring from elites
   while (children.length < CFG.POP) {
     const parent = elites[Math.floor(Math.random() * elites.length)];
     const child = parent.brain.copy();
@@ -315,11 +455,100 @@ function evolve(cars, eliteCount) {
 }
 
 // ============================================================
+//  Reward Rule Management
+// ============================================================
+let ruleIdCounter = 0;
+
+function addRewardRule() {
+  const rule = {
+    id: 'rule_' + (ruleIdCounter++),
+    condition: { type: 'wall_distance', threshold: 0.3, comparison: 'lt' },
+    effect: { type: 'penalty', value: 0.5 },
+    enabled: true,
+  };
+  REWARD_CFG.rules.push(rule);
+  return rule;
+}
+
+function removeRewardRule(id) {
+  REWARD_CFG.rules = REWARD_CFG.rules.filter(r => r.id !== id);
+}
+
+function renderRuleList(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+  for (const rule of REWARD_CFG.rules) {
+    const div = document.createElement('div');
+    div.className = 'rule-item';
+
+    const condSelect = document.createElement('select');
+    [['wall_distance', '壁距離'], ['speed_over', '速度超過'], ['speed_under', '速度不足'], ['steer_change', '操舵変化']].forEach(([v, l]) => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = l;
+      if (v === rule.condition.type) o.selected = true;
+      condSelect.appendChild(o);
+    });
+    condSelect.addEventListener('change', () => { rule.condition.type = condSelect.value; syncRuleLists(); });
+
+    const compSelect = document.createElement('select');
+    [['lt', '＜'], ['gt', '＞']].forEach(([v, l]) => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = l;
+      if (v === rule.condition.comparison) o.selected = true;
+      compSelect.appendChild(o);
+    });
+    compSelect.addEventListener('change', () => { rule.condition.comparison = compSelect.value; syncRuleLists(); });
+
+    const threshInput = document.createElement('input');
+    threshInput.type = 'number';
+    threshInput.step = '0.1';
+    threshInput.value = rule.condition.threshold;
+    threshInput.addEventListener('change', () => { rule.condition.threshold = parseFloat(threshInput.value) || 0; syncRuleLists(); });
+
+    const effSelect = document.createElement('select');
+    [['penalty', '罰'], ['bonus', '報酬']].forEach(([v, l]) => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = l;
+      if (v === rule.effect.type) o.selected = true;
+      effSelect.appendChild(o);
+    });
+    effSelect.addEventListener('change', () => { rule.effect.type = effSelect.value; syncRuleLists(); });
+
+    const valInput = document.createElement('input');
+    valInput.type = 'number';
+    valInput.step = '0.1';
+    valInput.min = '0';
+    valInput.max = '5';
+    valInput.value = rule.effect.value;
+    valInput.addEventListener('change', () => { rule.effect.value = parseFloat(valInput.value) || 0; syncRuleLists(); });
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'rule-remove';
+    removeBtn.textContent = '✕';
+    removeBtn.addEventListener('click', () => { removeRewardRule(rule.id); syncRuleLists(); });
+
+    div.appendChild(condSelect);
+    div.appendChild(compSelect);
+    div.appendChild(threshInput);
+    div.appendChild(effSelect);
+    div.appendChild(valInput);
+    div.appendChild(removeBtn);
+    container.appendChild(div);
+  }
+}
+
+function syncRuleLists() {
+  renderRuleList('ruleList');
+  renderRuleList('ruleListM');
+}
+
+// ============================================================
 //  Main Game
 // ============================================================
 class Game {
   constructor() {
-    this.state = 'menu'; // menu | draw | sim
+    this.state = 'menu';
     this.track = null;
     this.cars = [];
     this.gen = 0;
@@ -345,10 +574,18 @@ class Game {
     this.fitCtx = this.fitC.getContext('2d');
     this.drawC = document.getElementById('drawCanvas');
     this.drawCtx = this.drawC.getContext('2d');
+    this.telemC = document.getElementById('telemetryCanvas');
+    this.telemCtx = this.telemC ? this.telemC.getContext('2d') : null;
+    this.attnC = document.getElementById('attentionCanvas');
+    this.attnCtx = this.attnC ? this.attnC.getContext('2d') : null;
+    this.sensorPrev = document.getElementById('sensorPreview');
+    this.sensorPrevCtx = this.sensorPrev ? this.sensorPrev.getContext('2d') : null;
 
     // Mobile canvases
     this.neuralCM = document.getElementById('neuralCanvasM');
     this.fitCM = document.getElementById('fitnessCanvasM');
+    this.telemCM = document.getElementById('telemetryCanvasM');
+    this.attnCM = document.getElementById('attentionCanvasM');
 
     this.setupUI();
     this.setupPresets();
@@ -358,27 +595,28 @@ class Game {
   }
 
   resizeAll() {
-    // Main canvas
     const wrap = this.mainC.parentElement;
     if (wrap) {
       this.mainC.width = wrap.clientWidth * devicePixelRatio;
       this.mainC.height = wrap.clientHeight * devicePixelRatio;
       this.mainC.style.width = wrap.clientWidth + 'px';
       this.mainC.style.height = wrap.clientHeight + 'px';
-      this.trackCache = null; // force redraw
+      this.trackCache = null;
     }
-    // Side canvases
     this.resizeCanvas(this.neuralC);
     this.resizeCanvas(this.fitC);
-    // Draw canvas
+    this.resizeCanvas(this.telemC);
+    this.resizeCanvas(this.attnC);
     if (this.drawC.parentElement) {
       this.drawC.width = window.innerWidth * devicePixelRatio;
       this.drawC.height = (window.innerHeight - 52) * devicePixelRatio;
       this.drawC.style.width = '100%';
     }
-    // Mobile
     if (this.neuralCM) this.resizeCanvas(this.neuralCM);
     if (this.fitCM) this.resizeCanvas(this.fitCM);
+    if (this.telemCM) this.resizeCanvas(this.telemCM);
+    if (this.attnCM) this.resizeCanvas(this.attnCM);
+    this.renderSensorPreview();
   }
 
   resizeCanvas(c) {
@@ -420,6 +658,7 @@ class Game {
       this.allTimeBest = 0;
       this.bestBrain = null;
       this.selectedPreset = null;
+      telemReset();
       document.querySelectorAll('.track-card').forEach(c => c.classList.remove('selected'));
       document.getElementById('btnStart').disabled = true;
     });
@@ -436,32 +675,81 @@ class Game {
     });
     document.getElementById('btnDrawDone').addEventListener('click', () => this.finishDraw());
 
-    // Draw canvas click/touch
+    // Draw canvas
     this.drawC.addEventListener('click', (e) => this.handleDrawClick(e));
     this.drawC.addEventListener('mousemove', (e) => { this._drawMouse = this.getCanvasPos(this.drawC, e); this.renderDrawMode(); });
     this.drawC.addEventListener('touchend', (e) => {
       e.preventDefault();
-      const touch = e.changedTouches[0];
-      this.handleDrawClick(touch);
+      this.handleDrawClick(e.changedTouches[0]);
     });
 
-    // Main canvas click/touch (select car)
+    // Main canvas click/touch
     this.mainC.addEventListener('click', (e) => this.handleMainClick(e));
     this.mainC.addEventListener('touchend', (e) => {
       e.preventDefault();
       this.handleMainClick(e.changedTouches[0]);
     });
 
-    // Parameter sliders
+    // Evolution parameter sliders
     this.bindSlider('ctrlPop', 'valPop', v => { CFG.POP = v; return v; });
     this.bindSlider('ctrlMutRate', 'valMutRate', v => { CFG.MUT_RATE = v / 100; return v + '%'; });
     this.bindSlider('ctrlMutStr', 'valMutStr', v => { CFG.MUT_STR = v / 100; return (v / 100).toFixed(2); });
     this.bindSlider('ctrlElite', 'valElite', v => { CFG.ELITE = v; return v; });
     this.bindSlider('ctrlTime', 'valTime', v => { CFG.GEN_TIME = v; return v + 's'; });
-    this.bindSlider('ctrlWidth', 'valWidth', v => {
-      CFG.TRACK_W = v;
-      return v;
-    });
+    this.bindSlider('ctrlWidth', 'valWidth', v => { CFG.TRACK_W = v; return v; });
+
+    // Reward weight sliders
+    this.bindSlider('rwdSpeed', 'valRwdSpeed', v => { REWARD_CFG.weights.speed = v / 100; return (v / 100).toFixed(2); });
+    this.bindSlider('rwdSafety', 'valRwdSafety', v => { REWARD_CFG.weights.safety = v / 100; return (v / 100).toFixed(2); });
+    this.bindSlider('rwdEfficiency', 'valRwdEfficiency', v => { REWARD_CFG.weights.efficiency = v / 100; return (v / 100).toFixed(2); });
+    this.bindSlider('rwdSmoothness', 'valRwdSmoothness', v => { REWARD_CFG.weights.smoothness = v / 100; return (v / 100).toFixed(2); });
+
+    // Body design sliders (physics: immediate effect)
+    this.bindSlider('bodySteer', 'valBodySteer', v => { CFG.TURN = v / 1000; return (v / 1000).toFixed(3); });
+    this.bindSlider('bodyFriction', 'valBodyFriction', v => { CFG.DRAG = v / 1000; return (v / 1000).toFixed(3); });
+    this.bindSlider('bodyMaxSpd', 'valBodyMaxSpd', v => { CFG.MAX_SPEED = v / 10; return (v / 10).toFixed(1); });
+    this.bindSlider('bodyAccel', 'valBodyAccel', v => { CFG.ACCEL = v / 100; return (v / 100).toFixed(2); });
+    this.bindSlider('bodyBrake', 'valBodyBrake', v => { CFG.BRAKE = v / 100; return (v / 100).toFixed(2); });
+    this.bindSlider('bodyCog', 'valBodyCog', v => { CFG.COG_OFFSET = v / 100; return (v / 100).toFixed(2); });
+    this.bindSlider('bodyLatency', 'valBodyLatency', v => { CFG.LATENCY = v; return v; });
+
+    // Sensor & hidden (require NN reset — only apply on button click)
+    this.bindSlider('bodySensors', 'valBodySensors', v => { this._pendingSensors = v; this.renderSensorPreview(); return v; });
+    this.bindSlider('bodyRange', 'valBodyRange', v => { this._pendingRange = v; return v; });
+    this.bindSlider('bodyHidden', 'valBodyHidden', v => { this._pendingHidden = v; return v; });
+
+    this._pendingSensors = CFG.SENSORS;
+    this._pendingRange = CFG.SENSOR_RANGE;
+    this._pendingHidden = CFG.HIDDEN;
+
+    // Apply design button (triggers NN rebuild)
+    const applyDesign = () => {
+      CFG.SENSORS = this._pendingSensors;
+      CFG.SENSOR_RANGE = this._pendingRange;
+      CFG.SENSOR_ANGLES = generateSensorAngles(CFG.SENSORS);
+      CFG.HIDDEN = this._pendingHidden;
+      // Reset evolution
+      if (this.state === 'sim') {
+        this.gen = 0;
+        this.bestFitHistory = [];
+        this.avgFitHistory = [];
+        this.allTimeBest = 0;
+        this.bestBrain = null;
+        telemReset();
+        this.newGeneration();
+        this.tickerMsg = '🔄 設計変更を適用しました — 新しいAIで再スタート！';
+      }
+    };
+    const btnApply = document.getElementById('btnApplyDesign');
+    if (btnApply) btnApply.addEventListener('click', applyDesign);
+    const btnApplyM = document.getElementById('btnApplyDesignM');
+    if (btnApplyM) btnApplyM.addEventListener('click', applyDesign);
+
+    // Rule add buttons
+    const addRuleBtn = document.getElementById('btnAddRule');
+    if (addRuleBtn) addRuleBtn.addEventListener('click', () => { addRewardRule(); syncRuleLists(); });
+    const addRuleBtnM = document.getElementById('btnAddRuleM');
+    if (addRuleBtnM) addRuleBtnM.addEventListener('click', () => { addRewardRule(); syncRuleLists(); });
 
     // Mobile tabs
     document.querySelectorAll('.mob-tabs button').forEach(b => {
@@ -473,6 +761,9 @@ class Game {
         if (panel) panel.classList.add('active');
       });
     });
+
+    // Initial rule list render
+    syncRuleLists();
   }
 
   bindSlider(sliderId, valId, fn) {
@@ -490,6 +781,67 @@ class Game {
     };
   }
 
+  // ---- Sensor Preview ----
+  renderSensorPreview() {
+    const c = this.sensorPrev;
+    if (!c || !c.parentElement) return;
+    const w = c.parentElement.clientWidth || 160;
+    c.width = w * devicePixelRatio;
+    c.height = w * devicePixelRatio;
+    c.style.width = w + 'px';
+    c.style.height = w + 'px';
+    const ctx = c.getContext('2d');
+    if (!ctx) return;
+
+    const cx = c.width / 2, cy = c.height / 2;
+    const r = c.width * 0.38;
+    const count = this._pendingSensors || CFG.SENSORS;
+    const angles = generateSensorAngles(count);
+
+    ctx.clearRect(0, 0, c.width, c.height);
+
+    // Range circle
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, PI2);
+    ctx.strokeStyle = '#ffffff15';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Car body
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.fillStyle = '#00ff8844';
+    ctx.beginPath();
+    ctx.arc(0, 0, 8 * devicePixelRatio, 0, PI2);
+    ctx.fill();
+
+    // Sensor rays
+    for (let i = 0; i < count; i++) {
+      const a = (-90 + angles[i]) * DEG; // -90 to point up
+      const ex = Math.cos(a) * r;
+      const ey = Math.sin(a) * r;
+      const hue = (i / count) * 120;
+      ctx.strokeStyle = `hsla(${hue}, 80%, 60%, 0.6)`;
+      ctx.lineWidth = 2 * devicePixelRatio;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+      // Endpoint dot
+      ctx.beginPath();
+      ctx.arc(ex, ey, 3 * devicePixelRatio, 0, PI2);
+      ctx.fillStyle = `hsla(${hue}, 80%, 60%, 0.8)`;
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Label
+    ctx.fillStyle = '#777';
+    ctx.font = `${9 * devicePixelRatio}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`${count}センサー × ${this._pendingRange || CFG.SENSOR_RANGE}px`, cx, c.height - 6 * devicePixelRatio);
+  }
+
   // ---- Preset Cards ----
   setupPresets() {
     const grid = document.getElementById('trackGrid');
@@ -504,8 +856,6 @@ class Game {
         document.getElementById('btnStart').disabled = false;
       });
       grid.appendChild(card);
-
-      // Draw mini preview
       const mc = card.querySelector('canvas');
       setTimeout(() => this.drawPreview(mc, p, 400, 280), 50);
     });
@@ -520,10 +870,8 @@ class Game {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.scale(2, 2);
-    // Generate track at standard center, then scale to fit preview
     const ctrl = preset.ctrl(cx, cy);
     const pts = smoothCenterline(ctrl, 6);
-    // Find bounds
     let minX=1e9, minY=1e9, maxX=-1e9, maxY=-1e9;
     for (const p of pts) { minX=Math.min(minX,p.x); minY=Math.min(minY,p.y); maxX=Math.max(maxX,p.x); maxY=Math.max(maxY,p.y); }
     const tw=maxX-minX+40, th=maxY-minY+40;
@@ -562,12 +910,9 @@ class Game {
   handleDrawClick(e) {
     const pos = this.getCanvasPos(this.drawC, e);
     const pts = this.drawPoints;
-
-    // Check if closing the loop
     if (pts.length >= 8) {
       const d = dist(pos.x, pos.y, pts[0].x, pts[0].y);
       if (d < 40 * devicePixelRatio) {
-        // Close!
         document.getElementById('btnDrawDone').disabled = false;
         this.renderDrawMode();
         return;
@@ -586,7 +931,6 @@ class Game {
     const w = this.drawC.width, h = this.drawC.height;
     ctx.clearRect(0, 0, w, h);
 
-    // Grid
     ctx.strokeStyle = '#ffffff08';
     ctx.lineWidth = 1;
     for (let x = 0; x < w; x += 40 * devicePixelRatio) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
@@ -594,7 +938,6 @@ class Game {
 
     const pts = this.drawPoints;
     if (pts.length < 2) {
-      // Draw placed points
       pts.forEach(p => {
         ctx.beginPath(); ctx.arc(p.x, p.y, 6 * devicePixelRatio, 0, PI2);
         ctx.fillStyle = '#00ff88'; ctx.fill();
@@ -602,14 +945,11 @@ class Game {
       return;
     }
 
-    // Draw smooth preview
     const closed = pts.length >= 8;
     if (closed) {
       const smooth = smoothCenterline(pts, 6);
-      // Draw track preview
       const halfW = CFG.TRACK_W * devicePixelRatio / 2;
       const n = smooth.length;
-      // Compute walls for preview
       const innerPts = [], outerPts = [];
       for (let i = 0; i < n; i++) {
         const prev = smooth[(i - 1 + n) % n], next = smooth[(i + 1) % n];
@@ -619,7 +959,6 @@ class Game {
         outerPts.push({ x: smooth[i].x - (-dy / len) * halfW, y: smooth[i].y - (dx / len) * halfW });
       }
 
-      // Fill track surface
       ctx.fillStyle = '#1a1a3044';
       ctx.beginPath();
       innerPts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
@@ -630,7 +969,6 @@ class Game {
       ctx.closePath();
       ctx.fill('evenodd');
 
-      // Wall lines
       ctx.strokeStyle = '#00ff8844';
       ctx.lineWidth = 2 * devicePixelRatio;
       ctx.beginPath();
@@ -641,7 +979,6 @@ class Game {
       ctx.closePath(); ctx.stroke();
     }
 
-    // Centerline
     ctx.strokeStyle = '#00ff88';
     ctx.lineWidth = 2 * devicePixelRatio;
     ctx.setLineDash([8 * devicePixelRatio, 4 * devicePixelRatio]);
@@ -651,14 +988,12 @@ class Game {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Points
     pts.forEach((p, i) => {
       ctx.beginPath(); ctx.arc(p.x, p.y, 5 * devicePixelRatio, 0, PI2);
       ctx.fillStyle = i === 0 ? '#ffcc00' : '#00ff88';
       ctx.fill();
     });
 
-    // Start point indicator
     if (pts.length >= 8) {
       ctx.beginPath(); ctx.arc(pts[0].x, pts[0].y, 20 * devicePixelRatio, 0, PI2);
       ctx.strokeStyle = '#ffcc0066'; ctx.lineWidth = 2 * devicePixelRatio;
@@ -668,7 +1003,6 @@ class Game {
 
   finishDraw() {
     if (this.drawPoints.length < 8) return;
-    // Scale points from canvas coordinates to game coordinates
     const scale = 1 / devicePixelRatio;
     const ctrl = this.drawPoints.map(p => ({ x: p.x * scale, y: p.y * scale }));
     this.customCtrl = ctrl;
@@ -680,7 +1014,6 @@ class Game {
   startSim() {
     let ctrl;
     if (this.selectedPreset != null) {
-      // Use center of main canvas
       const cx = 420, cy = 280;
       ctrl = PRESETS[this.selectedPreset].ctrl(cx, cy);
     } else {
@@ -698,6 +1031,7 @@ class Game {
     this.allTimeBest = 0;
     this.bestBrain = null;
     this.trackCache = null;
+    telemReset();
 
     document.getElementById('startScreen').style.display = 'none';
     document.getElementById('gameUI').style.display = 'flex';
@@ -726,22 +1060,34 @@ class Game {
     for (let s = 0; s < this.speedMult; s++) {
       this.genTimer += dt;
 
-      // Update all cars
       let anyAlive = false;
       for (const car of this.cars) {
         car.update(this.track.walls, this.track.checkpoints);
         if (car.alive) anyAlive = true;
       }
 
-      // Find best car
       let best = this.cars[0];
       for (const c of this.cars) if (c.fitness > best.fitness) best = c;
       this.bestCar = best;
 
-      // Auto-select best if no selection
       if (!this.selectedCar || !this.selectedCar.alive) this.selectedCar = this.bestCar;
 
-      // End of generation?
+      // Collect telemetry from selected car
+      const tel = this.selectedCar || this.bestCar;
+      if (tel && tel.alive) {
+        const out = tel.brain.aOut;
+        const accelVal = out[1] || 0;
+        telemPush(
+          Math.max(0, accelVal),
+          Math.max(0, -accelVal),
+          out[0] || 0,
+          tel.speed / CFG.MAX_SPEED
+        );
+        telemetry.current.sensorValues = Array.from(tel.sensors);
+        // Compute attention
+        telemetry.sensorAttention = Array.from(tel.brain.getSensorAttention());
+      }
+
       if (!anyAlive || this.genTimer >= CFG.GEN_TIME) {
         this.endGeneration();
         break;
@@ -750,7 +1096,6 @@ class Game {
   }
 
   endGeneration() {
-    // Record fitness
     let best = 0, sum = 0;
     for (const c of this.cars) {
       if (c.fitness > best) best = c.fitness;
@@ -759,15 +1104,12 @@ class Game {
     this.bestFitHistory.push(best);
     this.avgFitHistory.push(sum / this.cars.length);
 
-    // Update all-time best
     if (best > this.allTimeBest) {
       this.allTimeBest = best;
-      // Find the best car's brain
       const bestCar = this.cars.reduce((a, b) => a.fitness > b.fitness ? a : b);
       this.bestBrain = bestCar.brain.copy();
     }
 
-    // Ticker message
     const cpStr = Math.floor(best);
     const bestCar = this.cars.reduce((a, b) => a.fitness > b.fitness ? a : b);
     if (this.gen <= 1) {
@@ -782,12 +1124,8 @@ class Game {
       this.tickerMsg = `🏆 世代${this.gen} — ${bestCar.laps > 0 ? 'ラップ完走！' : `${cpStr}CP通過`} 素晴らしい学習成果！`;
     }
 
-    // Evolve
     const brains = evolve(this.cars, CFG.ELITE);
-
-    // Inject all-time best
     if (this.bestBrain) brains[0] = this.bestBrain.copy();
-
     this.newGeneration(brains);
   }
 
@@ -808,13 +1146,10 @@ class Game {
   handleMainClick(e) {
     if (this.state !== 'sim') return;
     const pos = this.getCanvasPos(this.mainC, e);
-    const cw = this.mainC.width, ch = this.mainC.height;
-    // Transform to track coords
     const view = this.getView();
     const tx = (pos.x - view.ox) / view.scale;
     const ty = (pos.y - view.oy) / view.scale;
 
-    // Find nearest alive car
     let minD = 30, found = null;
     for (const c of this.cars) {
       if (!c.alive) continue;
@@ -827,7 +1162,6 @@ class Game {
   getView() {
     if (!this.track) return { scale: 1, ox: 0, oy: 0 };
     const cw = this.mainC.width, ch = this.mainC.height;
-    // Find track bounds
     let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
     for (const p of this.track.inner) {
       if (p.x < minX) minX = p.x; if (p.y < minY) minY = p.y;
@@ -853,6 +1187,8 @@ class Game {
     this.renderTrack();
     if (this.frameCount % 3 === 0) this.renderNeural();
     if (this.frameCount % 5 === 0) this.renderFitness();
+    if (this.frameCount % 2 === 0) this.renderTelemetry();
+    if (this.frameCount % 4 === 0) this.renderAttention();
     this.updateStats();
   }
 
@@ -870,7 +1206,6 @@ class Game {
     ctx.translate(v.ox, v.oy);
     ctx.scale(v.scale, v.scale);
 
-    // Track surface (cached)
     if (!this.trackCache) {
       this.trackCache = document.createElement('canvas');
       this.trackCache.width = cw;
@@ -879,7 +1214,6 @@ class Game {
       tc.translate(v.ox, v.oy);
       tc.scale(v.scale, v.scale);
 
-      // Fill track surface
       const t = this.track;
       tc.fillStyle = '#181830';
       tc.beginPath();
@@ -892,7 +1226,6 @@ class Game {
       tc.closePath();
       tc.fill();
 
-      // Wall lines
       tc.strokeStyle = '#444470';
       tc.lineWidth = 2 / v.scale;
       tc.lineJoin = 'round';
@@ -903,14 +1236,12 @@ class Game {
       t.outer.forEach((p, i) => i === 0 ? tc.moveTo(p.x, p.y) : tc.lineTo(p.x, p.y));
       tc.closePath(); tc.stroke();
 
-      // Checkpoints (subtle)
       tc.strokeStyle = '#ffffff10';
       tc.lineWidth = 1 / v.scale;
       for (const cp of t.checkpoints) {
         tc.beginPath(); tc.moveTo(cp.x1, cp.y1); tc.lineTo(cp.x2, cp.y2); tc.stroke();
       }
 
-      // Start line
       const cp0 = t.checkpoints[0];
       tc.strokeStyle = '#00ff8866';
       tc.lineWidth = 3 / v.scale;
@@ -919,7 +1250,6 @@ class Game {
     ctx.restore();
     ctx.drawImage(this.trackCache, 0, 0);
 
-    // Draw cars
     ctx.save();
     ctx.translate(v.ox, v.oy);
     ctx.scale(v.scale, v.scale);
@@ -928,7 +1258,6 @@ class Game {
   }
 
   renderCars(ctx, scale) {
-    // Sort: dead first, alive on top, selected last
     const sorted = [...this.cars].sort((a, b) => {
       if (a === this.selectedCar) return 1;
       if (b === this.selectedCar) return -1;
@@ -938,7 +1267,7 @@ class Game {
     });
 
     for (const car of sorted) {
-      if (!car.alive && car.age < this.genTimer * 60 - 30) continue; // Hide old dead cars
+      if (!car.alive && car.age < this.genTimer * 60 - 30) continue;
 
       const isSelected = car === this.selectedCar;
       const isBest = car === this.bestCar;
@@ -948,7 +1277,6 @@ class Game {
       ctx.rotate(car.angle);
 
       if (!car.alive) {
-        // Dead car: small X
         ctx.strokeStyle = '#ff444488';
         ctx.lineWidth = 1.5 / scale;
         ctx.beginPath(); ctx.moveTo(-3, -3); ctx.lineTo(3, 3); ctx.stroke();
@@ -957,7 +1285,6 @@ class Game {
         continue;
       }
 
-      // Car color based on fitness ranking
       const maxFit = this.bestCar ? this.bestCar.fitness : 1;
       const fitRatio = maxFit > 0 ? car.fitness / maxFit : 0;
       let color;
@@ -966,13 +1293,11 @@ class Game {
       else if (fitRatio > 0.3) color = '#4488ff';
       else color = '#ff6644';
 
-      // Glow for best/selected
       if (isSelected || isBest) {
         ctx.shadowColor = color;
         ctx.shadowBlur = 12 / scale;
       }
 
-      // Car triangle
       const L = 9, W = 5;
       ctx.fillStyle = color;
       ctx.beginPath();
@@ -985,20 +1310,23 @@ class Game {
       ctx.shadowBlur = 0;
       ctx.restore();
 
-      // Sensor rays for selected car
+      // Sensor rays for selected car (with attention coloring)
       if (isSelected && car.alive) {
+        const attn = telemetry.sensorAttention;
         for (let s = 0; s < CFG.SENSORS; s++) {
           const a = car.angle + CFG.SENSOR_ANGLES[s] * DEG;
           const d = car.sensors[s] * CFG.SENSOR_RANGE;
           const ex = car.x + Math.cos(a) * d;
           const ey = car.y + Math.sin(a) * d;
           const danger = 1 - car.sensors[s];
-          ctx.strokeStyle = danger > 0.7 ? `rgba(255,68,68,${0.6})` :
-                            danger > 0.4 ? `rgba(255,200,0,${0.5})` :
-                            `rgba(0,255,136,${0.3})`;
-          ctx.lineWidth = 1.5 / scale;
+          const attnVal = (attn && attn[s]) ? attn[s] : 0;
+          // Blend danger color with attention brightness
+          const alpha = 0.3 + attnVal * 0.5;
+          ctx.strokeStyle = danger > 0.7 ? `rgba(255,68,68,${alpha})` :
+                            danger > 0.4 ? `rgba(255,200,0,${alpha})` :
+                            `rgba(0,255,136,${alpha})`;
+          ctx.lineWidth = (1.5 + attnVal * 2) / scale;
           ctx.beginPath(); ctx.moveTo(car.x, car.y); ctx.lineTo(ex, ey); ctx.stroke();
-          // Sensor endpoint
           ctx.beginPath(); ctx.arc(ex, ey, 2 / scale, 0, PI2);
           ctx.fillStyle = ctx.strokeStyle; ctx.fill();
         }
@@ -1008,13 +1336,9 @@ class Game {
 
   // ---- Neural Network Visualization ----
   renderNeural() {
-    const targets = [
-      { canvas: this.neuralC, ctx: this.neuralCtx },
-    ];
-    // Mobile canvas
+    const targets = [{ canvas: this.neuralC, ctx: this.neuralCtx }];
     if (this.neuralCM && this.neuralCM.getContext) {
-      const mCtx = this.neuralCM.getContext('2d');
-      targets.push({ canvas: this.neuralCM, ctx: mCtx });
+      targets.push({ canvas: this.neuralCM, ctx: this.neuralCM.getContext('2d') });
     }
 
     const car = this.selectedCar || this.bestCar;
@@ -1038,13 +1362,18 @@ class Game {
       const layerX = [pad, w / 2, w - pad];
       const layers = [brain.inN, brain.hidN, brain.outN];
       const activations = [brain.aIn, brain.aHid, brain.aOut];
-      const labels = [
-        ['L60°', 'L30°', '前方', 'R30°', 'R60°', '速度'],
-        [],
-        ['操舵', '加速']
-      ];
 
-      // Compute node positions
+      // Dynamic sensor labels
+      const sensorLabels = [];
+      for (let i = 0; i < CFG.SENSORS; i++) {
+        const angle = CFG.SENSOR_ANGLES[i];
+        if (angle === 0) sensorLabels.push('前方');
+        else if (angle < 0) sensorLabels.push(`L${Math.abs(angle)}°`);
+        else sensorLabels.push(`R${angle}°`);
+      }
+      sensorLabels.push('速度');
+      const labels = [sensorLabels, [], ['操舵', '加速']];
+
       const nodePos = [];
       for (let l = 0; l < 3; l++) {
         const nodes = [];
@@ -1057,8 +1386,7 @@ class Game {
         nodePos.push(nodes);
       }
 
-      // Draw connections
-      // Input → Hidden
+      // Draw connections: Input → Hidden
       for (let i = 0; i < brain.inN; i++) {
         for (let h2 = 0; h2 < brain.hidN; h2++) {
           const weight = brain.wIH[i * brain.hidN + h2];
@@ -1084,7 +1412,6 @@ class Game {
         }
       }
 
-      // Layer labels
       ctx.fillStyle = '#555';
       ctx.font = `${9 * devicePixelRatio}px sans-serif`;
       ctx.textAlign = 'center';
@@ -1111,7 +1438,6 @@ class Game {
     const r = 8 * devicePixelRatio;
     const absVal = Math.min(Math.abs(val), 1);
 
-    // Glow
     if (absVal > 0.3) {
       ctx.beginPath(); ctx.arc(x, y, r + 4 * devicePixelRatio, 0, PI2);
       const glowColor = val > 0 ? `rgba(0,255,136,${absVal * 0.3})` : `rgba(255,68,85,${absVal * 0.3})`;
@@ -1119,7 +1445,6 @@ class Game {
       ctx.fill();
     }
 
-    // Node circle
     ctx.beginPath(); ctx.arc(x, y, r, 0, PI2);
     const brightness = 40 + absVal * 180;
     if (val >= 0) {
@@ -1132,14 +1457,12 @@ class Game {
     ctx.lineWidth = 1 * devicePixelRatio;
     ctx.stroke();
 
-    // Value text inside
     ctx.fillStyle = '#fff';
     ctx.font = `bold ${7 * devicePixelRatio}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(val.toFixed(1), x, y);
 
-    // Label
     if (label) {
       ctx.fillStyle = '#aaa';
       ctx.font = `${8 * devicePixelRatio}px sans-serif`;
@@ -1147,11 +1470,157 @@ class Game {
     }
   }
 
+  // ---- Telemetry Graph ----
+  renderTelemetry() {
+    const targets = [{ canvas: this.telemC, ctx: this.telemCtx }];
+    if (this.telemCM && this.telemCM.getContext) {
+      targets.push({ canvas: this.telemCM, ctx: this.telemCM.getContext('2d') });
+    }
+
+    for (const { canvas, ctx } of targets) {
+      if (!canvas || !ctx) continue;
+      const w = canvas.width, h = canvas.height;
+      if (w === 0 || h === 0) continue;
+      ctx.clearRect(0, 0, w, h);
+
+      const pad = 25 * devicePixelRatio;
+      const gw = w - pad * 2, gh = h - pad * 2;
+
+      if (telemetry.count < 2) {
+        ctx.fillStyle = '#555';
+        ctx.font = `${11 * devicePixelRatio}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText('テレメトリデータ収集中...', w / 2, h / 2);
+        continue;
+      }
+
+      // Grid
+      ctx.strokeStyle = '#ffffff08';
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= 4; i++) {
+        const y = pad + gh * (1 - i / 4);
+        ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(pad + gw, y); ctx.stroke();
+      }
+      // Zero line
+      const zeroY = pad + gh * 0.5;
+      ctx.strokeStyle = '#ffffff15';
+      ctx.beginPath(); ctx.moveTo(pad, zeroY); ctx.lineTo(pad + gw, zeroY); ctx.stroke();
+
+      const datasets = [
+        { data: telemGet(telemetry.throttle), color: '#00ff88', label: 'スロットル' },
+        { data: telemGet(telemetry.brake), color: '#ff4455', label: 'ブレーキ' },
+        { data: telemGet(telemetry.steering), color: '#4488ff', label: 'ステアリング' },
+        { data: telemGet(telemetry.speed), color: '#ffcc00', label: '速度' },
+      ];
+
+      // Draw each dataset
+      for (const ds of datasets) {
+        if (ds.data.length < 2) continue;
+        ctx.strokeStyle = ds.color;
+        ctx.lineWidth = 1.5 * devicePixelRatio;
+        ctx.beginPath();
+        for (let i = 0; i < ds.data.length; i++) {
+          const x = pad + (i / (ds.data.length - 1)) * gw;
+          // Map -1..1 to graph height
+          const val = clamp(ds.data[i], -1, 1);
+          const y = pad + gh * (1 - (val + 1) / 2);
+          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+
+      // Legend
+      const ly = pad - 8 * devicePixelRatio;
+      ctx.font = `${8 * devicePixelRatio}px sans-serif`;
+      let lx = pad;
+      for (const ds of datasets) {
+        ctx.fillStyle = ds.color;
+        ctx.fillRect(lx, ly, 8 * devicePixelRatio, 3 * devicePixelRatio);
+        ctx.fillStyle = '#aaa'; ctx.textAlign = 'left';
+        ctx.fillText(ds.label, lx + 10 * devicePixelRatio, ly + 4 * devicePixelRatio);
+        lx += 60 * devicePixelRatio;
+      }
+    }
+  }
+
+  // ---- Attention Heatmap ----
+  renderAttention() {
+    const targets = [{ canvas: this.attnC, ctx: this.attnCtx }];
+    if (this.attnCM && this.attnCM.getContext) {
+      targets.push({ canvas: this.attnCM, ctx: this.attnCM.getContext('2d') });
+    }
+
+    for (const { canvas, ctx } of targets) {
+      if (!canvas || !ctx) continue;
+      const w = canvas.width, h = canvas.height;
+      if (w === 0 || h === 0) continue;
+      ctx.clearRect(0, 0, w, h);
+
+      const attn = telemetry.sensorAttention;
+      const sensorVals = telemetry.current.sensorValues;
+      if (!attn || attn.length === 0) {
+        ctx.fillStyle = '#555';
+        ctx.font = `${11 * devicePixelRatio}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText('アテンションデータなし', w / 2, h / 2);
+        continue;
+      }
+
+      const pad = 20 * devicePixelRatio;
+      const barW = Math.min(30 * devicePixelRatio, (w - pad * 2) / attn.length - 4 * devicePixelRatio);
+      const maxH = h - pad * 3;
+      const totalW = attn.length * (barW + 4 * devicePixelRatio);
+      const startX = (w - totalW) / 2;
+
+      // Title
+      ctx.fillStyle = '#777';
+      ctx.font = `${9 * devicePixelRatio}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText('センサー注目度（重み）', w / 2, pad - 4 * devicePixelRatio);
+
+      for (let i = 0; i < attn.length; i++) {
+        const x = startX + i * (barW + 4 * devicePixelRatio);
+        const barH = attn[i] * maxH;
+        const y = h - pad - barH;
+
+        // Background bar
+        ctx.fillStyle = '#1a1a30';
+        ctx.fillRect(x, h - pad - maxH, barW, maxH);
+
+        // Attention bar (heatmap color)
+        const hue = (1 - attn[i]) * 120; // red=high attention, green=low
+        ctx.fillStyle = `hsla(${hue}, 80%, 50%, 0.8)`;
+        ctx.fillRect(x, y, barW, barH);
+
+        // Sensor value overlay (smaller bar inside)
+        if (sensorVals && sensorVals[i] !== undefined) {
+          const sH = sensorVals[i] * maxH * 0.3;
+          ctx.fillStyle = '#ffffff30';
+          ctx.fillRect(x + barW * 0.3, h - pad - sH, barW * 0.4, sH);
+        }
+
+        // Label
+        const angle = CFG.SENSOR_ANGLES[i];
+        let label;
+        if (angle === 0) label = '前';
+        else if (angle < 0) label = `L${Math.abs(angle)}`;
+        else label = `R${angle}`;
+
+        ctx.fillStyle = '#888';
+        ctx.font = `${7 * devicePixelRatio}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(label, x + barW / 2, h - pad + 10 * devicePixelRatio);
+
+        // Attention value on top
+        ctx.fillStyle = '#ccc';
+        ctx.fillText((attn[i] * 100).toFixed(0) + '%', x + barW / 2, y - 4 * devicePixelRatio);
+      }
+    }
+  }
+
   // ---- Fitness Graph ----
   renderFitness() {
-    const targets = [
-      { canvas: this.fitC, ctx: this.fitCtx },
-    ];
+    const targets = [{ canvas: this.fitC, ctx: this.fitCtx }];
     if (this.fitCM && this.fitCM.getContext) {
       targets.push({ canvas: this.fitCM, ctx: this.fitCM.getContext('2d') });
     }
@@ -1178,7 +1647,6 @@ class Game {
       const maxVal = Math.max(...data, 1);
       const numGens = data.length;
 
-      // Grid
       ctx.strokeStyle = '#ffffff0a';
       ctx.lineWidth = 1;
       for (let i = 0; i <= 4; i++) {
@@ -1190,7 +1658,6 @@ class Game {
         ctx.fillText(Math.round(maxVal * i / 4), pad - 4 * devicePixelRatio, y + 3 * devicePixelRatio);
       }
 
-      // Average fill
       ctx.fillStyle = 'rgba(68,136,255,0.08)';
       ctx.beginPath();
       ctx.moveTo(pad, pad + gh);
@@ -1202,7 +1669,6 @@ class Game {
       ctx.lineTo(pad + gw, pad + gh);
       ctx.closePath(); ctx.fill();
 
-      // Best fill
       ctx.fillStyle = 'rgba(0,255,136,0.08)';
       ctx.beginPath();
       ctx.moveTo(pad, pad + gh);
@@ -1214,7 +1680,6 @@ class Game {
       ctx.lineTo(pad + gw, pad + gh);
       ctx.closePath(); ctx.fill();
 
-      // Average line
       ctx.strokeStyle = '#4488ff';
       ctx.lineWidth = 1.5 * devicePixelRatio;
       ctx.beginPath();
@@ -1225,7 +1690,6 @@ class Game {
       }
       ctx.stroke();
 
-      // Best line
       ctx.strokeStyle = '#00ff88';
       ctx.lineWidth = 2 * devicePixelRatio;
       ctx.beginPath();
@@ -1236,7 +1700,6 @@ class Game {
       }
       ctx.stroke();
 
-      // Legend
       const ly = pad - 10 * devicePixelRatio;
       ctx.font = `${9 * devicePixelRatio}px sans-serif`;
       ctx.fillStyle = '#00ff88'; ctx.fillRect(pad, ly, 12 * devicePixelRatio, 3 * devicePixelRatio);
@@ -1246,7 +1709,6 @@ class Game {
       ctx.fillStyle = '#aaa';
       ctx.fillText('平均', pad + 66 * devicePixelRatio, ly + 4 * devicePixelRatio);
 
-      // X axis label
       ctx.fillStyle = '#555';
       ctx.textAlign = 'center';
       ctx.fillText(`世代 (${numGens})`, w / 2, h - 6 * devicePixelRatio);
