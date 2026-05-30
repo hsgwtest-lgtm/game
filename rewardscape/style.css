@@ -1,0 +1,221 @@
+/* =====================================================
+   RewardScape — 報酬地形の彫刻師 — Styles
+   ===================================================== */
+
+:root {
+  --bg: #0a0a1a;
+  --surface: rgba(12, 14, 30, 0.92);
+  --surface2: rgba(20, 24, 50, 0.88);
+  --accent: #00e5ff;
+  --accent2: #7c4dff;
+  --reward-pos: #00e676;
+  --reward-neg: #ff1744;
+  --text: #e0e0e0;
+  --text-dim: #6a6a8a;
+  --border: rgba(100, 120, 200, 0.2);
+  --glow: 0 0 12px rgba(0, 229, 255, 0.3);
+  --radius: 8px;
+  --font: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); font-family: var(--font); color: var(--text); }
+
+#app { width: 100%; height: 100%; position: relative; }
+
+/* ─── Canvases ─── */
+#mainCanvas {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  display: block; z-index: 0;
+}
+#overlayCanvas {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 1;
+}
+
+/* ─── Top Bar ─── */
+#top-bar {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 10;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 16px;
+  background: linear-gradient(180deg, var(--surface) 60%, transparent);
+}
+#title-area { display: flex; flex-direction: column; }
+#title { font-size: 16px; font-weight: 700; color: var(--accent); text-shadow: var(--glow); }
+#subtitle { font-size: 10px; color: var(--text-dim); }
+#stats { display: flex; gap: 12px; font-size: 11px; color: var(--text-dim); }
+#stats span { white-space: nowrap; }
+
+/* ─── Sculpt Bar ─── */
+#sculpt-bar {
+  position: absolute; top: 48px; left: 50%; transform: translateX(-50%);
+  z-index: 10; display: flex; gap: 8px; align-items: center;
+  padding: 6px 12px; border-radius: var(--radius);
+  background: var(--surface); border: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+}
+.sculpt-group { display: flex; align-items: center; gap: 4px; }
+.sculpt-label, .agent-label { font-size: 11px; color: var(--accent); margin-right: 4px; }
+.sculpt-slider-label { font-size: 10px; color: var(--text-dim); }
+#sculpt-strength, #sculpt-radius { width: 60px; height: 4px; }
+#sculpt-strength-val, #sculpt-radius-val { font-size: 10px; color: var(--text-dim); width: 24px; text-align: center; }
+
+.sculpt-btn, .agent-btn, .speed-btn, .view-btn {
+  width: 32px; height: 32px; border: 1px solid var(--border);
+  border-radius: 6px; background: transparent; color: var(--text);
+  font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.sculpt-btn:hover, .agent-btn:hover, .speed-btn:hover, .view-btn:hover {
+  background: rgba(0, 229, 255, 0.1); border-color: var(--accent);
+}
+.sculpt-btn.active, .speed-btn.active, .view-btn.active {
+  background: rgba(0, 229, 255, 0.2); border-color: var(--accent);
+  box-shadow: var(--glow);
+}
+.sculpt-action { border-color: rgba(255, 255, 255, 0.1); }
+
+/* ─── Agent Bar ─── */
+#agent-bar {
+  position: absolute; top: 48px; right: 12px; z-index: 10;
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 6px; border-radius: var(--radius);
+  background: var(--surface); border: 1px solid var(--border);
+}
+.agent-group { display: flex; gap: 4px; align-items: center; }
+
+/* ─── Panels ─── */
+.panel {
+  position: absolute; z-index: 20;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); backdrop-filter: blur(12px);
+  min-width: 280px; max-height: 80vh; overflow-y: auto;
+}
+.panel.hidden { display: none; }
+#reward-panel { right: 12px; bottom: 160px; width: 300px; }
+#config-panel { left: 12px; bottom: 160px; width: 280px; }
+.panel-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; border-bottom: 1px solid var(--border);
+  font-size: 12px; color: var(--accent);
+}
+.panel-close {
+  width: 24px; height: 24px; border: none; background: none;
+  color: var(--text-dim); cursor: pointer; font-size: 14px;
+}
+.panel-content { padding: 8px 12px; }
+.reward-component { margin-bottom: 8px; }
+.reward-component label { font-size: 11px; color: var(--text-dim); display: flex; justify-content: space-between; }
+.rw-slider { width: 100%; height: 4px; margin-top: 4px; }
+.rw-val { color: var(--accent); }
+.reward-formula {
+  font-size: 10px; color: var(--accent2); padding: 6px 8px;
+  background: rgba(124, 77, 255, 0.1); border-radius: 4px;
+  margin-top: 8px; text-align: center;
+}
+.panel-btn {
+  width: 100%; margin-top: 8px; padding: 6px;
+  border: 1px solid var(--accent2); border-radius: 4px;
+  background: rgba(124, 77, 255, 0.1); color: var(--accent2);
+  cursor: pointer; font-size: 11px;
+}
+
+/* ─── Bottom Bar ─── */
+#bottom-bar {
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 10;
+  display: flex; align-items: flex-end; gap: 8px;
+  padding: 8px 12px;
+  background: linear-gradient(0deg, var(--surface) 60%, transparent);
+}
+#reward-preview { flex-shrink: 0; }
+#rewardMinimap {
+  width: 100px; height: 100px; border-radius: 6px;
+  border: 1px solid var(--border); background: #000;
+}
+.minimap-label { display: block; text-align: center; font-size: 9px; color: var(--text-dim); margin-top: 2px; }
+#learning-graph { flex: 1; min-width: 0; }
+#graphCanvas { width: 100%; height: 80px; border-radius: 6px; border: 1px solid var(--border); }
+#bottom-controls { display: flex; flex-direction: column; gap: 4px; }
+.bottom-btn {
+  padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px;
+  background: transparent; color: var(--text-dim); cursor: pointer; font-size: 10px;
+  white-space: nowrap; transition: all 0.15s;
+}
+.bottom-btn:hover { background: rgba(0, 229, 255, 0.1); color: var(--accent); }
+
+/* ─── Event Log ─── */
+#event-log {
+  position: absolute; left: 12px; top: 100px; z-index: 10;
+  display: flex; flex-direction: column; gap: 2px;
+  pointer-events: none; max-width: 300px;
+}
+.log-entry {
+  font-size: 10px; color: var(--text-dim); padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.5); border-radius: 3px;
+  animation: fadeLog 4s forwards;
+}
+@keyframes fadeLog {
+  0% { opacity: 1; transform: translateY(0); }
+  80% { opacity: 0.6; }
+  100% { opacity: 0; transform: translateY(-10px); }
+}
+
+/* ─── Modal ─── */
+.modal {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 100; display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px);
+}
+.modal.hidden { display: none; }
+.modal-content {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 16px; max-width: 480px; width: 90%;
+}
+.modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding-bottom: 12px; border-bottom: 1px solid var(--border);
+  font-size: 14px; color: var(--accent);
+}
+.modal-close {
+  width: 28px; height: 28px; border: none; background: none;
+  color: var(--text-dim); cursor: pointer; font-size: 16px;
+}
+.preset-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding-top: 12px; }
+.preset-card {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 12px 8px; border: 1px solid var(--border); border-radius: 8px;
+  background: transparent; cursor: pointer; transition: all 0.2s; color: var(--text);
+}
+.preset-card:hover { background: rgba(0, 229, 255, 0.08); border-color: var(--accent); }
+.preset-icon { font-size: 24px; }
+.preset-name { font-size: 11px; font-weight: 600; }
+.preset-desc { font-size: 9px; color: var(--text-dim); text-align: center; }
+
+/* ─── Neural Overlay ─── */
+#neural-overlay {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  z-index: 15; border-radius: 12px; overflow: hidden;
+  border: 1px solid var(--accent); box-shadow: var(--glow);
+}
+#neural-overlay.hidden { display: none; }
+#neuralCanvas { display: block; background: rgba(0, 0, 0, 0.9); }
+
+/* ─── Config items ─── */
+.config-section { margin-bottom: 12px; }
+.config-section-title { font-size: 11px; color: var(--accent); margin-bottom: 6px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.config-item { margin-bottom: 6px; }
+.config-item label { font-size: 10px; color: var(--text-dim); display: flex; justify-content: space-between; }
+.config-item input[type="range"] { width: 100%; height: 3px; margin-top: 3px; }
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ─── Responsive ─── */
+@media (max-width: 768px) {
+  #sculpt-bar { flex-wrap: wrap; top: 44px; max-width: calc(100% - 24px); }
+  #agent-bar { top: auto; bottom: 140px; right: 4px; }
+  .preset-grid { grid-template-columns: 1fr 1fr; }
+  #reward-panel, #config-panel { width: calc(100% - 24px); left: 12px; right: 12px; }
+}

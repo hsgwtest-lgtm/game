@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a1a">
+<title>RewardScape — 報酬地形の彫刻師</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ═══ Three.js Canvas (背景) ═══ -->
+  <canvas id="mainCanvas"></canvas>
+
+  <!-- ═══ 2D Overlay Canvas (学習グラフ・ニューラル可視化) ═══ -->
+  <canvas id="overlayCanvas"></canvas>
+
+  <!-- ═══ Top Bar ═══ -->
+  <div id="top-bar">
+    <div id="title-area">
+      <span id="title">RewardScape</span>
+      <span id="subtitle">報酬地形の彫刻師</span>
+    </div>
+    <div id="stats">
+      <span id="stat-epoch">Epoch: 0</span>
+      <span id="stat-best">Best: 0.00</span>
+      <span id="stat-avg">Avg: 0.00</span>
+      <span id="stat-fps">60fps</span>
+    </div>
+  </div>
+
+  <!-- ═══ Reward Sculpt Toolbar ═══ -->
+  <div id="sculpt-bar">
+    <div class="sculpt-group">
+      <span class="sculpt-label">🎨 報酬彫刻</span>
+      <button class="sculpt-btn active" data-tool="attract" title="引力場 (エージェントを誘引)">🧲</button>
+      <button class="sculpt-btn" data-tool="repel" title="斥力場 (エージェントを排斥)">💥</button>
+      <button class="sculpt-btn" data-tool="bonus" title="ボーナス地点">⭐</button>
+      <button class="sculpt-btn" data-tool="penalty" title="ペナルティ地点">☠️</button>
+      <button class="sculpt-btn" data-tool="flow" title="流れ場 (方向報酬)">🌊</button>
+      <button class="sculpt-btn" data-tool="erase" title="消しゴム">🧹</button>
+    </div>
+    <div class="sculpt-group">
+      <label class="sculpt-slider-label">強度</label>
+      <input type="range" id="sculpt-strength" min="0.1" max="2.0" step="0.1" value="1.0">
+      <span id="sculpt-strength-val">1.0</span>
+    </div>
+    <div class="sculpt-group">
+      <label class="sculpt-slider-label">半径</label>
+      <input type="range" id="sculpt-radius" min="1" max="8" step="1" value="3">
+      <span id="sculpt-radius-val">3</span>
+    </div>
+    <div class="sculpt-group">
+      <button class="sculpt-btn sculpt-action" id="btn-clear-reward" title="報酬リセット">🔄</button>
+      <button class="sculpt-btn sculpt-action" id="btn-presets" title="プリセット">📋</button>
+    </div>
+  </div>
+
+  <!-- ═══ Agent Controls ═══ -->
+  <div id="agent-bar">
+    <div class="agent-group">
+      <span class="agent-label">🤖 エージェント</span>
+      <button class="agent-btn" id="btn-reset-agents" title="リセット">🔄</button>
+      <button class="agent-btn" id="btn-add-agents" title="エージェント追加">➕</button>
+    </div>
+    <div class="agent-group">
+      <button class="speed-btn" id="btn-pause" title="一時停止">⏸</button>
+      <button class="speed-btn active" id="btn-play" title="再生">▶</button>
+      <button class="speed-btn" id="btn-fast" title="高速">⏩</button>
+      <button class="speed-btn" id="btn-ultra" title="超高速 (描画間引き)">⚡</button>
+    </div>
+    <div class="agent-group">
+      <button class="view-btn active" data-view="3d" title="3Dビュー">🌐</button>
+      <button class="view-btn" data-view="reward" title="報酬ヒートマップ">🗺️</button>
+      <button class="view-btn" data-view="brain" title="脳内可視化">🧠</button>
+      <button class="view-btn" data-view="landscape" title="適応度地形">📊</button>
+    </div>
+  </div>
+
+  <!-- ═══ Reward Function Editor (Advanced) ═══ -->
+  <div id="reward-panel" class="panel hidden">
+    <div class="panel-header">
+      <span>⚗️ 報酬関数エディタ</span>
+      <button class="panel-close" data-panel="reward-panel">✕</button>
+    </div>
+    <div class="panel-content">
+      <div class="reward-component">
+        <label>距離報酬 <span class="rw-val" id="rw-distance-val">1.0</span></label>
+        <input type="range" class="rw-slider" id="rw-distance" min="-2" max="2" step="0.1" value="1.0">
+      </div>
+      <div class="reward-component">
+        <label>探索ボーナス <span class="rw-val" id="rw-explore-val">0.5</span></label>
+        <input type="range" class="rw-slider" id="rw-explore" min="-2" max="2" step="0.1" value="0.5">
+      </div>
+      <div class="reward-component">
+        <label>速度報酬 <span class="rw-val" id="rw-speed-val">0.3</span></label>
+        <input type="range" class="rw-slider" id="rw-speed" min="-2" max="2" step="0.1" value="0.3">
+      </div>
+      <div class="reward-component">
+        <label>安定性報酬 <span class="rw-val" id="rw-stability-val">0.2</span></label>
+        <input type="range" class="rw-slider" id="rw-stability" min="-2" max="2" step="0.1" value="0.2">
+      </div>
+      <div class="reward-component">
+        <label>群集報酬 <span class="rw-val" id="rw-swarm-val">0.0</span></label>
+        <input type="range" class="rw-slider" id="rw-swarm" min="-2" max="2" step="0.1" value="0.0">
+      </div>
+      <div class="reward-component">
+        <label>空間報酬マップ <span class="rw-val" id="rw-spatial-val">1.0</span></label>
+        <input type="range" class="rw-slider" id="rw-spatial" min="0" max="3" step="0.1" value="1.0">
+      </div>
+      <div class="reward-formula" id="reward-formula">R = 1.0·d + 0.5·e + 0.3·v + 0.2·s + 0.0·sw + 1.0·Σmap</div>
+      <button id="btn-open-reward" class="panel-btn">⚗️ 詳細設定</button>
+    </div>
+  </div>
+
+  <!-- ═══ Learning Config Panel ═══ -->
+  <div id="config-panel" class="panel hidden">
+    <div class="panel-header">
+      <span>⚙️ 学習パラメータ</span>
+      <button class="panel-close" data-panel="config-panel">✕</button>
+    </div>
+    <div class="panel-content" id="config-content">
+      <!-- dynamically generated -->
+    </div>
+  </div>
+
+  <!-- ═══ Preset Modal ═══ -->
+  <div id="preset-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span>📋 報酬プリセット</span>
+        <button class="modal-close" id="close-preset-modal">✕</button>
+      </div>
+      <div class="preset-grid">
+        <button class="preset-card" data-preset="maze">
+          <span class="preset-icon">🏗️</span>
+          <span class="preset-name">迷路探索</span>
+          <span class="preset-desc">壁を避け、ゴールに到達する</span>
+        </button>
+        <button class="preset-card" data-preset="swarm">
+          <span class="preset-icon">🐝</span>
+          <span class="preset-name">群知能</span>
+          <span class="preset-desc">群れを形成して移動する</span>
+        </button>
+        <button class="preset-card" data-preset="spiral">
+          <span class="preset-icon">🌀</span>
+          <span class="preset-name">螺旋回廊</span>
+          <span class="preset-desc">渦巻き状の報酬を追う</span>
+        </button>
+        <button class="preset-card" data-preset="gradient">
+          <span class="preset-icon">🌈</span>
+          <span class="preset-name">勾配登山</span>
+          <span class="preset-desc">報酬勾配を登る</span>
+        </button>
+        <button class="preset-card" data-preset="adversarial">
+          <span class="preset-icon">⚔️</span>
+          <span class="preset-name">敵対的</span>
+          <span class="preset-desc">動的に変化する報酬を追跡</span>
+        </button>
+        <button class="preset-card" data-preset="empty">
+          <span class="preset-icon">🫧</span>
+          <span class="preset-name">空白</span>
+          <span class="preset-desc">白紙から彫刻する</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Bottom Info ═══ -->
+  <div id="bottom-bar">
+    <div id="reward-preview">
+      <canvas id="rewardMinimap" width="120" height="120"></canvas>
+      <span class="minimap-label">報酬マップ</span>
+    </div>
+    <div id="learning-graph">
+      <canvas id="graphCanvas" width="300" height="100"></canvas>
+    </div>
+    <div id="bottom-controls">
+      <button class="bottom-btn" id="btn-toggle-reward-panel">⚗️ 報酬</button>
+      <button class="bottom-btn" id="btn-toggle-config">⚙️ 設定</button>
+      <button class="bottom-btn" id="btn-toggle-overlay">📊 解析</button>
+    </div>
+  </div>
+
+  <!-- ═══ Event Log ═══ -->
+  <div id="event-log"></div>
+
+  <!-- ═══ Neural Overlay (brain view) ═══ -->
+  <div id="neural-overlay" class="hidden">
+    <canvas id="neuralCanvas" width="400" height="300"></canvas>
+  </div>
+
+</div>
+<script type="module" src="engine.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js');
+}
+</script>
+</body>
+</html>
