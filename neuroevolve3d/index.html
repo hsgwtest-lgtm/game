@@ -559,7 +559,7 @@ class EvolutionEngine {
     const outputSize = 2;
     for (let i = 0; i < count; i++) {
       const brain = new NeuralNetwork(inputSize, hiddenSize, outputSize);
-      const angle = world.goal ? Math.atan2(world.goal.z - world.spawnPoint.z, world.goal.x - world.spawnPoint.x) : 0;
+      const angle = this.calcSpawnAngle(world);
       const c = new Creature(brain, { x: world.spawnPoint.x, z: world.spawnPoint.z, angle });
       c.hue = (brain.getWeightHash() * 137.508) % 360;
       if (c.hue < 0) c.hue += 360;
@@ -795,7 +795,7 @@ class EvolutionEngine {
     // Create new generation
     this.clearCreatures(scene);
     world.resetFoods();
-    const spAngle = world.goal ? Math.atan2(world.goal.z - world.spawnPoint.z, world.goal.x - world.spawnPoint.x) : 0;
+    const spAngle = this.calcSpawnAngle(world);
     for (const brain of newBrains) {
       const c = new Creature(brain, { x: world.spawnPoint.x, z: world.spawnPoint.z, angle: spAngle });
       c.hue = (brain.getWeightHash() * 137.508) % 360;
@@ -814,9 +814,15 @@ class EvolutionEngine {
     }
     return best;
   }
+  calcSpawnAngle(world) {
+    if (!world.goal) return 0;
+    return Math.atan2(world.goal.z - world.spawnPoint.z, world.goal.x - world.spawnPoint.x);
+  }
   getBest() {
     let best = this.creatures[0];
-    for (const c of this.creatures) if (c.fitness > best.fitness || (c.foodCollected > best.foodCollected)) best = c;
+    for (const c of this.creatures) {
+      if (c.fitness > best.fitness) best = c;
+    }
     return best;
   }
 }
