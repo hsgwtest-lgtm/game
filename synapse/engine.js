@@ -1085,8 +1085,6 @@ class Game {
       tPos.array[vi + 1] = 0.05;
       tPos.array[vi + 2] = this.agentVisualZ;
       tCol.array[vi] = 0.12; tCol.array[vi + 1] = 0.37; tCol.array[vi + 2] = 0.67;
-      // Mark as opaque
-      const ci = ti * 4;
       tPos.needsUpdate = true;
       tCol.needsUpdate = true;
       this.trailIdx++;
