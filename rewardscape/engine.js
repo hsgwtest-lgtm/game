@@ -554,6 +554,10 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
       this.visited = new Uint8Array(GRID * GRID);
       this.visitCount = 0;
 
+      // パフォーマンス記録
+      this.bestReward = 0;
+      this.stepCount = 0;
+
       // 軌跡 (可視化用)
       this.trail = [];
 
@@ -612,6 +616,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
       this.trajectory.rewards.push(reward);
       this.episodeReward += reward;
       this.episodeStep++;
+      this.stepCount = this.episodeStep;
 
       // 訪問記録
       const gx = Math.floor(this.x), gy = Math.floor(this.y);
@@ -667,6 +672,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     endEpisode() {
       this.totalReward += this.episodeReward;
       this.episodeCount++;
+      if (this.episodeReward > this.bestReward) {
+        this.bestReward = this.episodeReward;
+      }
       const result = { ...this.trajectory, totalReward: this.episodeReward };
 
       // リセット
@@ -1457,9 +1465,131 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
   let isPointerDown = false;
   let raycaster, pointerVec;
 
+  // ─── ツールヒント情報 ───
+  const TOOL_HINTS = {
+    attract: { icon: '🧲', text: '引力場 — クリックで正の報酬を追加' },
+    repel:   { icon: '💥', text: '斥力場 — クリックで負の報酬（罰）を追加' },
+    bonus:   { icon: '⭐', text: 'ボーナス — 高報酬スパイクを設置' },
+    penalty: { icon: '☠️', text: 'ペナルティ — 強い負の報酬を設置' },
+    flow:    { icon: '🌊', text: '流れ場 — 方向性のある勾配を生成' },
+    erase:   { icon: '🧹', text: '消しゴム — 描いた報酬を消去' },
+  };
+
+  function updateToolHint() {
+    const hint = TOOL_HINTS[sculptTool];
+    if (hint) {
+      const iconEl = document.getElementById('tool-hint-icon');
+      const textEl = document.getElementById('tool-hint-text');
+      if (iconEl) iconEl.textContent = hint.icon;
+      if (textEl) textEl.textContent = hint.text;
+    }
+  }
+
+  // ─── ミッションテキスト更新 ───
+  function updateMissionText() {
+    const missionEl = document.getElementById('mission-text');
+    if (!missionEl) return;
+
+    if (epoch === 0) {
+      missionEl.textContent = '報酬地形を彫刻して、AIの学習を導こう';
+    } else if (epoch < 20) {
+      missionEl.textContent = 'AIが報酬を探索中… 地形を調整してみよう';
+    } else if (bestFitness < 1) {
+      missionEl.textContent = 'エージェントが苦戦中。報酬を見直そう';
+    } else if (bestFitness > 5) {
+      missionEl.textContent = '🚀 素晴らしい！エージェントが高性能に到達';
+    } else {
+      missionEl.textContent = 'AIが学習中。地形を変えて反応を観察しよう';
+    }
+  }
+
+  // ─── エージェントランキング更新 ───
+  function updateAgentRanking() {
+    const listEl = document.getElementById('ranking-list');
+    if (!listEl) return;
+    const rankingEl = document.getElementById('agent-ranking');
+    if (!rankingEl || rankingEl.classList.contains('hidden')) return;
+
+    const sorted = agents
+      .map((a, i) => ({ idx: i, score: a.bestReward || 0 }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+
+    const medals = ['🥇', '🥈', '🥉', '4', '5'];
+    listEl.innerHTML = '';
+    sorted.forEach((item, rank) => {
+      const div = document.createElement('div');
+      div.className = 'ranking-item';
+      const medalSpan = document.createElement('span');
+      medalSpan.className = 'ranking-medal';
+      medalSpan.textContent = medals[rank];
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'ranking-name';
+      nameSpan.textContent = `Agent ${item.idx}`;
+      const scoreSpan = document.createElement('span');
+      scoreSpan.className = 'ranking-score';
+      scoreSpan.textContent = item.score.toFixed(2);
+      div.appendChild(medalSpan);
+      div.appendChild(nameSpan);
+      div.appendChild(scoreSpan);
+      listEl.appendChild(div);
+    });
+  }
+
+  // ─── エポック進捗バー更新 ───
+  function updateEpochProgress() {
+    const barEl = document.getElementById('epoch-bar-fill');
+    const labelEl = document.getElementById('epoch-progress-label');
+    if (!barEl || !labelEl) return;
+
+    const maxLen = CFG.maxEpisodeLen || 64;
+    // 各エージェントのエピソード進捗を平均
+    let totalProgress = 0;
+    for (const agent of agents) {
+      totalProgress += (agent.stepCount || 0) / maxLen;
+    }
+    const avgProgress = agents.length > 0 ? totalProgress / agents.length : 0;
+    barEl.style.width = `${Math.min(avgProgress * 100, 100)}%`;
+    labelEl.textContent = `世代 ${epoch} | 進捗 ${Math.round(avgProgress * 100)}%`;
+  }
+
   function initUI() {
     raycaster = new THREE.Raycaster();
     pointerVec = new THREE.Vector2();
+
+    // ─── Welcome overlay ───
+    const welcomeOverlay = document.getElementById('welcome-overlay');
+    const btnWelcomeStart = document.getElementById('btn-welcome-start');
+    const btnWelcomePreset = document.getElementById('btn-welcome-preset');
+
+    if (btnWelcomeStart) {
+      btnWelcomeStart.addEventListener('click', () => {
+        welcomeOverlay.classList.add('hidden');
+        // シミュレーション開始
+        paused = false;
+        simSpeed = 1;
+        updateSpeedButtons();
+        addLog('▶ シミュレーション開始！地形をクリックして報酬を描こう');
+      });
+    }
+    if (btnWelcomePreset) {
+      btnWelcomePreset.addEventListener('click', () => {
+        welcomeOverlay.classList.add('hidden');
+        document.getElementById('preset-modal').classList.remove('hidden');
+        // プリセット選択後にシミュレーション開始
+        paused = false;
+        simSpeed = 1;
+        updateSpeedButtons();
+      });
+    }
+
+    // ─── ヘルプボタン ───
+    const btnHelp = document.getElementById('btn-help');
+    if (btnHelp) {
+      btnHelp.addEventListener('click', () => {
+        welcomeOverlay.classList.toggle('hidden');
+      });
+    }
 
     // ─── ツールバートグル ───
     document.getElementById('toggle-sculpt').addEventListener('click', () => {
@@ -1481,6 +1611,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         document.querySelectorAll('.sculpt-btn[data-tool]').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         sculptTool = btn.dataset.tool;
+        updateToolHint();
       });
     });
 
@@ -1566,6 +1697,12 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     document.getElementById('btn-toggle-overlay').addEventListener('click', () => {
       document.getElementById('neural-overlay').classList.toggle('hidden');
     });
+    const btnToggleRanking = document.getElementById('btn-toggle-ranking');
+    if (btnToggleRanking) {
+      btnToggleRanking.addEventListener('click', () => {
+        document.getElementById('agent-ranking').classList.toggle('hidden');
+      });
+    }
 
     document.querySelectorAll('.panel-close').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1611,6 +1748,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
     // 初期報酬式表示
     updateRewardFormula();
+
+    // 初期ツールヒント
+    updateToolHint();
   }
 
   function updateSpeedButtons() {
@@ -1738,10 +1878,17 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     }
 
     // ─── HUD更新 ───
-    document.getElementById('stat-epoch').textContent = `Epoch: ${epoch}`;
-    document.getElementById('stat-best').textContent = `Best: ${bestFitness.toFixed(2)}`;
-    document.getElementById('stat-avg').textContent = `Avg: ${avgFitness.toFixed(2)}`;
+    document.getElementById('stat-epoch').textContent = epoch;
+    document.getElementById('stat-best').textContent = bestFitness.toFixed(2);
+    document.getElementById('stat-avg').textContent = avgFitness.toFixed(2);
     document.getElementById('stat-fps').textContent = `${fps}fps`;
+
+    // ─── 新UI要素更新 (4フレームおき) ───
+    if (frameCount % 4 === 0) {
+      updateMissionText();
+      updateEpochProgress();
+      updateAgentRanking();
+    }
   }
 
   // ═══════════════════════════════════════════════════
@@ -1758,8 +1905,13 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     applyPreset('spiral');
     updateGradientArrows();
 
+    // シミュレーションは一時停止で開始（チュートリアル閲覧のため）
+    paused = true;
+    simSpeed = 0;
+    updateSpeedButtons();
+
     addLog('🎮 RewardScape 起動');
-    addLog('🎨 報酬マップを彫刻してエージェントの学習を観察しよう');
+    addLog('🎨 報酬地形を彫刻してAIの学習を観察しよう');
 
     mainLoop();
   }
