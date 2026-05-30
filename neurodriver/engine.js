@@ -21,7 +21,7 @@ const CFG = {
 
 // ---- Reward Configuration ----
 const REWARD_CFG = {
-  weights: { speed: 0.30, safety: 0.20, efficiency: 0.80, smoothness: 0.10 },
+  weights: { speed: 0, safety: 0, efficiency: 0, smoothness: 0 },
   rules: [],
 };
 
@@ -140,46 +140,54 @@ const RULE_CONDITION_TYPES = [
 function computeReward(car, checkpoints) {
   const w = REWARD_CFG.weights;
   const totalWeight = (w.speed + w.safety + w.efficiency + w.smoothness);
-  if (totalWeight === 0) return 0;
 
-  // Efficiency reward: checkpoint progress (original fitness)
-  let efficiencyReward = 0;
-  if (checkpoints.length > 0) {
-    const cp = checkpoints[car.nextCP];
-    const d = dist(car.x, car.y, cp.cx, cp.cy);
-    const prevCPIdx = (car.nextCP - 1 + checkpoints.length) % checkpoints.length;
-    const prevCP = checkpoints[prevCPIdx];
-    const totalD = dist(prevCP.cx, prevCP.cy, cp.cx, cp.cy) || 1;
-    const progress = clamp(1 - d / totalD, 0, 1);
-    efficiencyReward = car.cpPassed + progress * 0.99;
+  // When all weights are 0, base reward is 0 — cars get no reward for progressing
+  let baseReward = 0;
+
+  if (totalWeight > 0) {
+    // Efficiency reward: checkpoint progress (original fitness)
+    let efficiencyReward = 0;
+    if (checkpoints.length > 0) {
+      const cp = checkpoints[car.nextCP];
+      const d = dist(car.x, car.y, cp.cx, cp.cy);
+      const prevCPIdx = (car.nextCP - 1 + checkpoints.length) % checkpoints.length;
+      const prevCP = checkpoints[prevCPIdx];
+      const totalD = dist(prevCP.cx, prevCP.cy, cp.cx, cp.cy) || 1;
+      const progress = clamp(1 - d / totalD, 0, 1);
+      efficiencyReward = car.cpPassed + progress * 0.99;
+    }
+
+    // Speed reward: normalized speed
+    const speedReward = car.speed / CFG.MAX_SPEED;
+
+    // Safety reward: minimum sensor value (farther from walls = higher)
+    let minSensor = 1;
+    for (let i = 0; i < car.sensors.length; i++) {
+      if (car.sensors[i] < minSensor) minSensor = car.sensors[i];
+    }
+    const safetyReward = minSensor;
+
+    // Smoothness reward: penalize sudden steering changes
+    const smoothReward = 1 - Math.abs(car._steerChange || 0);
+
+    // Weighted combination
+    baseReward = (
+      w.efficiency * efficiencyReward +
+      w.speed * speedReward +
+      w.safety * safetyReward +
+      w.smoothness * smoothReward
+    ) / totalWeight;
+
+    // Scale so efficiency component dominates magnitude (keeps evolution working)
+    baseReward *= (efficiencyReward > 0 ? REWARD_SCALE_ACTIVE : REWARD_SCALE_INACTIVE);
   }
 
-  // Speed reward: normalized speed
-  const speedReward = car.speed / CFG.MAX_SPEED;
-
-  // Safety reward: minimum sensor value (farther from walls = higher)
+  // Apply conditional rules (these work even with zero base weights)
+  let ruleBonus = 0;
   let minSensor = 1;
   for (let i = 0; i < car.sensors.length; i++) {
     if (car.sensors[i] < minSensor) minSensor = car.sensors[i];
   }
-  const safetyReward = minSensor;
-
-  // Smoothness reward: penalize sudden steering changes
-  const smoothReward = 1 - Math.abs(car._steerChange || 0);
-
-  // Weighted combination
-  const baseReward = (
-    w.efficiency * efficiencyReward +
-    w.speed * speedReward +
-    w.safety * safetyReward +
-    w.smoothness * smoothReward
-  ) / totalWeight;
-
-  // Scale so efficiency component dominates magnitude (keeps evolution working)
-  const scaledReward = baseReward * (efficiencyReward > 0 ? REWARD_SCALE_ACTIVE : REWARD_SCALE_INACTIVE);
-
-  // Apply conditional rules
-  let ruleBonus = 0;
   for (const rule of REWARD_CFG.rules) {
     if (!rule.enabled) continue;
     let condVal = 0;
@@ -197,7 +205,7 @@ function computeReward(car, checkpoints) {
     }
   }
 
-  return scaledReward + ruleBonus;
+  return baseReward + ruleBonus;
 }
 
 // ============================================================
@@ -558,6 +566,7 @@ function renderRuleList(containerId) {
 function syncRuleLists() {
   renderRuleList('ruleList');
   renderRuleList('ruleListM');
+  renderRuleList('ruleListLive');
 }
 
 // ============================================================
@@ -565,7 +574,7 @@ function syncRuleLists() {
 // ============================================================
 class Game {
   constructor() {
-    this.state = 'menu';
+    this.state = 'start';
     this.track = null;
     this.cars = [];
     this.gen = 0;
@@ -581,6 +590,9 @@ class Game {
     this.drawPoints = [];
     this.frameCount = 0;
     this.trackCache = null;
+    this.showRacerInfo = false;
+    this.watchMode = false;
+    this.watchBrain = null;
 
     // Canvas refs
     this.mainC = document.getElementById('mainCanvas');
@@ -655,6 +667,26 @@ class Game {
 
   // ---- UI Setup ----
   setupUI() {
+    // ---- Phase Navigation ----
+    // Start screen → Racer Design
+    document.getElementById('btnStartDesign').addEventListener('click', () => this.showScreen('racerDesign'));
+    // Start screen → Saved Racers
+    document.getElementById('btnViewSaved').addEventListener('click', () => {
+      this.renderSavedRacers();
+      this.showScreen('savedRacers');
+    });
+    // Racer Design → back to Start
+    document.getElementById('btnBackToStart').addEventListener('click', () => this.showScreen('start'));
+    // Racer Design → Course Design
+    document.getElementById('btnToCourse').addEventListener('click', () => {
+      this.applyDesignFromPhase();
+      this.showScreen('courseDesign');
+    });
+    // Course Design → back to Racer Design
+    document.getElementById('btnBackToDesign').addEventListener('click', () => this.showScreen('racerDesign'));
+    // Saved Racers → back to Start
+    document.getElementById('btnBackFromSaved').addEventListener('click', () => this.showScreen('start'));
+
     // Speed buttons
     document.querySelectorAll('.speed-btns button').forEach(b => {
       b.addEventListener('click', () => {
@@ -664,23 +696,25 @@ class Game {
       });
     });
 
-    // Reset
+    // Reset - back to start screen
     document.getElementById('btnReset').addEventListener('click', () => {
-      this.state = 'menu';
+      this.state = 'start';
       document.getElementById('gameUI').style.display = 'none';
-      document.getElementById('startScreen').style.display = 'flex';
+      this.showScreen('start');
       this.gen = 0;
       this.bestFitHistory = [];
       this.avgFitHistory = [];
       this.allTimeBest = 0;
       this.bestBrain = null;
+      this.watchMode = false;
+      this.watchBrain = null;
       this.selectedPreset = null;
       telemReset();
       document.querySelectorAll('.track-card').forEach(c => c.classList.remove('selected'));
       document.getElementById('btnStart').disabled = true;
     });
 
-    // Start button
+    // Start training button
     document.getElementById('btnStart').addEventListener('click', () => this.startSim());
 
     // Custom draw button
@@ -707,6 +741,19 @@ class Game {
       this.handleMainClick(e.changedTouches[0]);
     });
 
+    // Save racer button
+    document.getElementById('btnSaveRacer').addEventListener('click', () => this.saveCurrentRacer());
+
+    // Toggle racer info overlay
+    const btnToggle = document.getElementById('btnToggleInfo');
+    btnToggle.addEventListener('click', () => {
+      this.showRacerInfo = !this.showRacerInfo;
+      btnToggle.style.borderColor = this.showRacerInfo ? '#4488ff' : '';
+      btnToggle.style.color = this.showRacerInfo ? '#fff' : '';
+      btnToggle.style.background = this.showRacerInfo ? '#4488ff' : '';
+    });
+
+    // ---- Design phase sliders (racer design screen) ----
     // Evolution parameter sliders
     this.bindSlider('ctrlPop', 'valPop', v => { CFG.POP = v; return v; });
     this.bindSlider('ctrlMutRate', 'valMutRate', v => { CFG.MUT_RATE = v / 100; return v + '%'; });
@@ -715,13 +762,13 @@ class Game {
     this.bindSlider('ctrlTime', 'valTime', v => { CFG.GEN_TIME = v; return v + 's'; });
     this.bindSlider('ctrlWidth', 'valWidth', v => { CFG.TRACK_W = v; return v; });
 
-    // Reward weight sliders
-    this.bindSlider('rwdSpeed', 'valRwdSpeed', v => { REWARD_CFG.weights.speed = v / 100; return (v / 100).toFixed(2); });
-    this.bindSlider('rwdSafety', 'valRwdSafety', v => { REWARD_CFG.weights.safety = v / 100; return (v / 100).toFixed(2); });
-    this.bindSlider('rwdEfficiency', 'valRwdEfficiency', v => { REWARD_CFG.weights.efficiency = v / 100; return (v / 100).toFixed(2); });
-    this.bindSlider('rwdSmoothness', 'valRwdSmoothness', v => { REWARD_CFG.weights.smoothness = v / 100; return (v / 100).toFixed(2); });
+    // Reward weight sliders (design phase)
+    this.bindSlider('rwdSpeed', 'valRwdSpeed', v => { REWARD_CFG.weights.speed = v / 100; this.syncLiveSliders(); return (v / 100).toFixed(2); });
+    this.bindSlider('rwdSafety', 'valRwdSafety', v => { REWARD_CFG.weights.safety = v / 100; this.syncLiveSliders(); return (v / 100).toFixed(2); });
+    this.bindSlider('rwdEfficiency', 'valRwdEfficiency', v => { REWARD_CFG.weights.efficiency = v / 100; this.syncLiveSliders(); return (v / 100).toFixed(2); });
+    this.bindSlider('rwdSmoothness', 'valRwdSmoothness', v => { REWARD_CFG.weights.smoothness = v / 100; this.syncLiveSliders(); return (v / 100).toFixed(2); });
 
-    // Body design sliders (physics: immediate effect)
+    // Body design sliders
     this.bindSlider('bodySteer', 'valBodySteer', v => { CFG.TURN = v / 1000; return (v / 1000).toFixed(3); });
     this.bindSlider('bodyFriction', 'valBodyFriction', v => { CFG.DRAG = v / 1000; return (v / 1000).toFixed(3); });
     this.bindSlider('bodyMaxSpd', 'valBodyMaxSpd', v => { CFG.MAX_SPEED = v / 10; return (v / 10).toFixed(1); });
@@ -730,7 +777,7 @@ class Game {
     this.bindSlider('bodyCog', 'valBodyCog', v => { CFG.COG_OFFSET = v / 100; return (v / 100).toFixed(2); });
     this.bindSlider('bodyLatency', 'valBodyLatency', v => { CFG.LATENCY = v; return v; });
 
-    // Sensor & hidden (require NN reset — only apply on button click)
+    // Sensor & hidden
     this.bindSlider('bodySensors', 'valBodySensors', v => { this._pendingSensors = v; this.renderSensorPreview(); return v; });
     this.bindSlider('bodyRange', 'valBodyRange', v => { this._pendingRange = v; return v; });
     this.bindSlider('bodyHidden', 'valBodyHidden', v => { this._pendingHidden = v; return v; });
@@ -739,36 +786,28 @@ class Game {
     this._pendingRange = CFG.SENSOR_RANGE;
     this._pendingHidden = CFG.HIDDEN;
 
-    // Apply design button (triggers NN rebuild)
-    const applyDesign = () => {
-      CFG.SENSORS = this._pendingSensors;
-      CFG.SENSOR_RANGE = this._pendingRange;
-      CFG.SENSOR_ANGLES = generateSensorAngles(CFG.SENSORS);
-      CFG.HIDDEN = this._pendingHidden;
-      // Reset evolution
-      if (this.state === 'sim') {
-        this.gen = 0;
-        this.bestFitHistory = [];
-        this.avgFitHistory = [];
-        this.allTimeBest = 0;
-        this.bestBrain = null;
-        telemReset();
-        this.newGeneration();
-        this.tickerMsg = '🔄 設計変更を適用しました — 新しいAIで再スタート！';
-      }
-    };
-    const btnApply = document.getElementById('btnApplyDesign');
-    if (btnApply) btnApply.addEventListener('click', applyDesign);
-    const btnApplyM = document.getElementById('btnApplyDesignM');
-    if (btnApplyM) btnApplyM.addEventListener('click', applyDesign);
+    // ---- Live panel sliders (during simulation) ----
+    this.bindSlider('rwdSpeedLive', 'valRwdSpeedLive', v => { REWARD_CFG.weights.speed = v / 100; return (v / 100).toFixed(2); });
+    this.bindSlider('rwdSafetyLive', 'valRwdSafetyLive', v => { REWARD_CFG.weights.safety = v / 100; return (v / 100).toFixed(2); });
+    this.bindSlider('rwdEfficiencyLive', 'valRwdEfficiencyLive', v => { REWARD_CFG.weights.efficiency = v / 100; return (v / 100).toFixed(2); });
+    this.bindSlider('rwdSmoothnessLive', 'valRwdSmoothnessLive', v => { REWARD_CFG.weights.smoothness = v / 100; return (v / 100).toFixed(2); });
 
-    // Rule add buttons
+    this.bindSlider('ctrlPopLive', 'valPopLive', v => { CFG.POP = v; return v; });
+    this.bindSlider('ctrlMutRateLive', 'valMutRateLive', v => { CFG.MUT_RATE = v / 100; return v + '%'; });
+    this.bindSlider('ctrlMutStrLive', 'valMutStrLive', v => { CFG.MUT_STR = v / 100; return (v / 100).toFixed(2); });
+    this.bindSlider('ctrlEliteLive', 'valEliteLive', v => { CFG.ELITE = v; return v; });
+    this.bindSlider('ctrlTimeLive', 'valTimeLive', v => { CFG.GEN_TIME = v; return v + 's'; });
+
+    // Rule add buttons (design phase)
     const addRuleBtn = document.getElementById('btnAddRule');
     if (addRuleBtn) addRuleBtn.addEventListener('click', () => { addRewardRule(); syncRuleLists(); });
+    // Rule add button (live)
+    const addRuleBtnLive = document.getElementById('btnAddRuleLive');
+    if (addRuleBtnLive) addRuleBtnLive.addEventListener('click', () => { addRewardRule(); syncRuleLists(); });
     const addRuleBtnM = document.getElementById('btnAddRuleM');
     if (addRuleBtnM) addRuleBtnM.addEventListener('click', () => { addRewardRule(); syncRuleLists(); });
 
-    // Mobile tabs
+    // Mobile tabs - with canvas resize fix
     document.querySelectorAll('.mob-tabs button').forEach(b => {
       b.addEventListener('click', () => {
         document.querySelectorAll('.mob-tabs button').forEach(x => x.classList.remove('active'));
@@ -776,11 +815,76 @@ class Game {
         document.querySelectorAll('.mob-content .panel-section').forEach(p => p.classList.remove('active'));
         const panel = document.querySelector(`.mob-content [data-panel="${b.dataset.tab}"]`);
         if (panel) panel.classList.add('active');
+        // Re-resize canvases when switching tabs (root fix for display issue)
+        requestAnimationFrame(() => this.resizeAll());
       });
     });
 
     // Initial rule list render
     syncRuleLists();
+  }
+
+  // Sync live panel sliders with design phase values
+  syncLiveSliders() {
+    const syncSlider = (id, valId, value, display) => {
+      const s = document.getElementById(id);
+      const v = document.getElementById(valId);
+      if (s) s.value = value;
+      if (v) v.textContent = display;
+    };
+    syncSlider('rwdSpeedLive', 'valRwdSpeedLive', Math.round(REWARD_CFG.weights.speed * 100), REWARD_CFG.weights.speed.toFixed(2));
+    syncSlider('rwdSafetyLive', 'valRwdSafetyLive', Math.round(REWARD_CFG.weights.safety * 100), REWARD_CFG.weights.safety.toFixed(2));
+    syncSlider('rwdEfficiencyLive', 'valRwdEfficiencyLive', Math.round(REWARD_CFG.weights.efficiency * 100), REWARD_CFG.weights.efficiency.toFixed(2));
+    syncSlider('rwdSmoothnessLive', 'valRwdSmoothnessLive', Math.round(REWARD_CFG.weights.smoothness * 100), REWARD_CFG.weights.smoothness.toFixed(2));
+    syncSlider('ctrlPopLive', 'valPopLive', CFG.POP, CFG.POP);
+    syncSlider('ctrlMutRateLive', 'valMutRateLive', Math.round(CFG.MUT_RATE * 100), Math.round(CFG.MUT_RATE * 100) + '%');
+    syncSlider('ctrlMutStrLive', 'valMutStrLive', Math.round(CFG.MUT_STR * 100), CFG.MUT_STR.toFixed(2));
+    syncSlider('ctrlEliteLive', 'valEliteLive', CFG.ELITE, CFG.ELITE);
+    syncSlider('ctrlTimeLive', 'valTimeLive', CFG.GEN_TIME, CFG.GEN_TIME + 's');
+  }
+
+  // Apply design settings from the design phase
+  applyDesignFromPhase() {
+    CFG.SENSORS = this._pendingSensors;
+    CFG.SENSOR_RANGE = this._pendingRange;
+    CFG.SENSOR_ANGLES = generateSensorAngles(CFG.SENSORS);
+    CFG.HIDDEN = this._pendingHidden;
+    this.syncLiveSliders();
+  }
+
+  // Screen management
+  showScreen(screen) {
+    const screens = ['startScreen', 'racerDesignScreen', 'courseDesignScreen', 'savedRacersScreen'];
+    screens.forEach(s => {
+      const el = document.getElementById(s);
+      if (el) el.style.display = 'none';
+    });
+    document.getElementById('gameUI').style.display = 'none';
+
+    switch (screen) {
+      case 'start':
+        this.state = 'start';
+        document.getElementById('startScreen').style.display = 'flex';
+        break;
+      case 'racerDesign':
+        this.state = 'design';
+        document.getElementById('racerDesignScreen').style.display = 'flex';
+        this.renderSensorPreview();
+        break;
+      case 'courseDesign':
+        this.state = 'courseDesign';
+        document.getElementById('courseDesignScreen').style.display = 'flex';
+        break;
+      case 'savedRacers':
+        this.state = 'savedRacers';
+        document.getElementById('savedRacersScreen').style.display = 'flex';
+        break;
+      case 'sim':
+        this.state = 'sim';
+        document.getElementById('gameUI').style.display = 'flex';
+        this.resizeAll();
+        break;
+    }
   }
 
   bindSlider(sliderId, valId, fn) {
@@ -912,16 +1016,16 @@ class Game {
   enterDrawMode() {
     this.state = 'draw';
     this.drawPoints = [];
-    document.getElementById('startScreen').style.display = 'none';
+    document.getElementById('courseDesignScreen').style.display = 'none';
     document.getElementById('drawOverlay').style.display = 'flex';
     this.resizeAll();
     this.renderDrawMode();
   }
 
   exitDrawMode() {
-    this.state = 'menu';
+    this.state = 'courseDesign';
     document.getElementById('drawOverlay').style.display = 'none';
-    document.getElementById('startScreen').style.display = 'flex';
+    document.getElementById('courseDesignScreen').style.display = 'flex';
   }
 
   handleDrawClick(e) {
@@ -1048,12 +1152,16 @@ class Game {
     this.allTimeBest = 0;
     this.bestBrain = null;
     this.trackCache = null;
+    this.watchMode = false;
+    this.watchBrain = null;
     telemReset();
 
-    document.getElementById('startScreen').style.display = 'none';
-    document.getElementById('gameUI').style.display = 'flex';
-    this.state = 'sim';
-    this.resizeAll();
+    // Hide all screens, show game UI
+    ['startScreen', 'racerDesignScreen', 'courseDesignScreen', 'savedRacersScreen'].forEach(id => {
+      document.getElementById(id).style.display = 'none';
+    });
+    this.syncLiveSliders();
+    this.showScreen('sim');
     this.newGeneration();
   }
 
@@ -1062,9 +1170,16 @@ class Game {
     this.genTimer = 0;
     this.cars = [];
     const t = this.track;
-    for (let i = 0; i < CFG.POP; i++) {
-      const brain = brains ? brains[i] : new NeuralNet(CFG.SENSORS + 1, CFG.HIDDEN, 2);
+
+    if (this.watchMode && this.watchBrain) {
+      // In watch mode, create a single car with the saved brain
+      const brain = this.watchBrain.copy();
       this.cars.push(new Car(t.startX, t.startY, t.startAngle, brain));
+    } else {
+      for (let i = 0; i < CFG.POP; i++) {
+        const brain = brains ? brains[i] : new NeuralNet(CFG.SENSORS + 1, CFG.HIDDEN, 2);
+        this.cars.push(new Car(t.startX, t.startY, t.startAngle, brain));
+      }
     }
     this.selectedCar = null;
     this.updateStats();
@@ -1113,6 +1228,19 @@ class Game {
   }
 
   endGeneration() {
+    // In watch mode, just restart the single car
+    if (this.watchMode) {
+      let best = 0;
+      for (const c of this.cars) {
+        if (c.fitness > best) best = c.fitness;
+      }
+      this.bestFitHistory.push(best);
+      this.avgFitHistory.push(best);
+      this.tickerMsg = `👁 鑑賞モード — スコア: ${best.toFixed(1)}`;
+      this.newGeneration();
+      return;
+    }
+
     let best = 0, sum = 0;
     for (const c of this.cars) {
       if (c.fitness > best) best = c.fitness;
@@ -1347,6 +1475,34 @@ class Game {
           ctx.beginPath(); ctx.arc(ex, ey, 2 / scale, 0, PI2);
           ctx.fillStyle = ctx.strokeStyle; ctx.fill();
         }
+      }
+
+      // Racer info overlay (show/hide toggle)
+      if (this.showRacerInfo && car.alive) {
+        const fontSize = Math.max(8, 11 / scale);
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+
+        const labelY = car.y - 12 / scale;
+        const score = car.fitness.toFixed(1);
+        const cp = car.cpPassed;
+
+        // Background
+        const text = `${score} (CP:${cp})`;
+        const tw = ctx.measureText(text).width;
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(car.x - tw / 2 - 2 / scale, labelY - fontSize - 1 / scale, tw + 4 / scale, fontSize + 2 / scale);
+
+        // Text color based on fitness
+        const maxFit = this.bestCar ? this.bestCar.fitness : 1;
+        const fitRatio = maxFit > 0 ? car.fitness / maxFit : 0;
+        if (isBest) ctx.fillStyle = '#ffcc00';
+        else if (fitRatio > 0.7) ctx.fillStyle = '#00ff88';
+        else if (fitRatio > 0.3) ctx.fillStyle = '#4488ff';
+        else ctx.fillStyle = '#ff8866';
+
+        ctx.fillText(text, car.x, labelY);
       }
     }
   }
@@ -1730,6 +1886,144 @@ class Game {
       ctx.textAlign = 'center';
       ctx.fillText(`世代 (${numGens})`, w / 2, h - 6 * devicePixelRatio);
     }
+  }
+
+  // ---- Save/Load Racers ----
+  saveCurrentRacer() {
+    if (!this.bestBrain) {
+      this.tickerMsg = '⚠️ まだ保存できるレーサーがいません。学習を進めてください。';
+      return;
+    }
+    const name = `レーサー_世代${this.gen}_${new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
+    const racerData = {
+      name,
+      gen: this.gen,
+      fitness: this.allTimeBest,
+      date: new Date().toISOString(),
+      brain: {
+        inN: this.bestBrain.inN,
+        hidN: this.bestBrain.hidN,
+        outN: this.bestBrain.outN,
+        wIH: Array.from(this.bestBrain.wIH),
+        bH: Array.from(this.bestBrain.bH),
+        wHO: Array.from(this.bestBrain.wHO),
+        bO: Array.from(this.bestBrain.bO),
+      },
+      config: {
+        sensors: CFG.SENSORS,
+        sensorRange: CFG.SENSOR_RANGE,
+        hidden: CFG.HIDDEN,
+        maxSpeed: CFG.MAX_SPEED,
+        accel: CFG.ACCEL,
+        brake: CFG.BRAKE,
+        turn: CFG.TURN,
+        drag: CFG.DRAG,
+      },
+      rewards: JSON.parse(JSON.stringify(REWARD_CFG)),
+    };
+
+    const saved = JSON.parse(localStorage.getItem('neurodriver_racers') || '[]');
+    saved.push(racerData);
+    localStorage.setItem('neurodriver_racers', JSON.stringify(saved));
+    this.tickerMsg = `💾 「${name}」を保存しました！`;
+  }
+
+  loadSavedRacers() {
+    try {
+      return JSON.parse(localStorage.getItem('neurodriver_racers') || '[]');
+    } catch {
+      return [];
+    }
+  }
+
+  deleteSavedRacer(index) {
+    const saved = this.loadSavedRacers();
+    saved.splice(index, 1);
+    localStorage.setItem('neurodriver_racers', JSON.stringify(saved));
+    this.renderSavedRacers();
+  }
+
+  renderSavedRacers() {
+    const grid = document.getElementById('savedRacerGrid');
+    if (!grid) return;
+    const saved = this.loadSavedRacers();
+    grid.innerHTML = '';
+
+    if (saved.length === 0) {
+      grid.innerHTML = '<div class="no-saved">保存されたレーサーはありません。<br>学習フェーズで「💾 保存」ボタンを押してレーサーを保存してください。</div>';
+      return;
+    }
+
+    saved.forEach((racer, idx) => {
+      const card = document.createElement('div');
+      card.className = 'saved-racer-card';
+      const date = new Date(racer.date).toLocaleDateString('ja-JP');
+      card.innerHTML = `
+        <div class="racer-name">🏎️ ${racer.name}</div>
+        <div class="racer-info">
+          世代: ${racer.gen} | 最高スコア: ${racer.fitness.toFixed(1)}<br>
+          保存日: ${date}<br>
+          センサー: ${racer.config.sensors} | 隠れ層: ${racer.config.hidden}
+        </div>
+        <div class="racer-actions">
+          <button class="btn-watch">👁 鑑賞</button>
+          <button class="btn-delete-racer">🗑 削除</button>
+        </div>
+      `;
+      card.querySelector('.btn-watch').addEventListener('click', () => this.watchSavedRacer(idx));
+      card.querySelector('.btn-delete-racer').addEventListener('click', () => this.deleteSavedRacer(idx));
+      grid.appendChild(card);
+    });
+  }
+
+  watchSavedRacer(index) {
+    const saved = this.loadSavedRacers();
+    if (index >= saved.length) return;
+    const racer = saved[index];
+
+    // Restore config
+    CFG.SENSORS = racer.config.sensors;
+    CFG.SENSOR_RANGE = racer.config.sensorRange;
+    CFG.SENSOR_ANGLES = generateSensorAngles(CFG.SENSORS);
+    CFG.HIDDEN = racer.config.hidden;
+    CFG.MAX_SPEED = racer.config.maxSpeed;
+    CFG.ACCEL = racer.config.accel;
+    CFG.BRAKE = racer.config.brake;
+    CFG.TURN = racer.config.turn;
+    CFG.DRAG = racer.config.drag;
+
+    // Restore rewards
+    REWARD_CFG.weights = { ...racer.rewards.weights };
+    REWARD_CFG.rules = racer.rewards.rules || [];
+
+    // Restore brain
+    const b = racer.brain;
+    const brain = new NeuralNet(b.inN, b.hidN, b.outN);
+    brain.wIH.set(new Float32Array(b.wIH));
+    brain.bH.set(new Float32Array(b.bH));
+    brain.wHO.set(new Float32Array(b.wHO));
+    brain.bO.set(new Float32Array(b.bO));
+
+    this.watchMode = true;
+    this.watchBrain = brain;
+
+    // Use oval track for watching
+    const cx = 420, cy = 280;
+    const ctrl = PRESETS[0].ctrl(cx, cy);
+    const smooth = smoothCenterline(ctrl, 8);
+    this.track = buildTrack(smooth, CFG.TRACK_W / 2, CFG.CP_COUNT);
+    this.gen = 0;
+    this.bestFitHistory = [];
+    this.avgFitHistory = [];
+    this.allTimeBest = 0;
+    this.bestBrain = brain.copy();
+    this.trackCache = null;
+    telemReset();
+
+    this.syncLiveSliders();
+    this.showScreen('sim');
+    this.tickerMsg = `👁 「${racer.name}」を鑑賞中`;
+    this.newGeneration();
   }
 
   // ---- Main Loop ----
