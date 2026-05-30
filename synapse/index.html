@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#050510">
+  <title>SYNAPSE — ニューラル迷宮</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+</head>
+<body>
+  <canvas id="c"></canvas>
+
+  <!-- Learning Curve Graph -->
+  <canvas id="graph"></canvas>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div id="title-bar">
+      <h1>SYNAPSE</h1>
+      <span id="subtitle">ニューラル迷宮</span>
+    </div>
+
+    <div id="stats-panel">
+      <div class="stat"><span class="stat-label">Episode</span><span id="stat-episode" class="stat-value">0</span></div>
+      <div class="stat"><span class="stat-label">Steps</span><span id="stat-steps" class="stat-value">0</span></div>
+      <div class="stat"><span class="stat-label">Reward</span><span id="stat-reward" class="stat-value">0.00</span></div>
+      <div class="stat"><span class="stat-label">成功率</span><span id="stat-success" class="stat-value">0%</span></div>
+      <div class="stat"><span class="stat-label">ε</span><span id="stat-epsilon" class="stat-value">1.00</span></div>
+    </div>
+
+    <div id="toolbar">
+      <button class="tool-btn active" data-tool="observe" title="観察モード — カメラ操作">🔭</button>
+      <button class="tool-btn" data-tool="wall" title="壁を配置">🧱</button>
+      <button class="tool-btn" data-tool="erase" title="壁を消去">🧹</button>
+      <button class="tool-btn" data-tool="goal" title="ゴール移動">🎯</button>
+      <button class="tool-btn" data-tool="probe" title="脳を操作 — ニューロンを凍結/解放">🧠</button>
+    </div>
+
+    <div id="controls-panel">
+      <div class="control-group">
+        <label>速度 <span id="val-speed">1</span>x</label>
+        <input type="range" id="ctrl-speed" min="1" max="20" value="1" step="1">
+      </div>
+      <div class="control-group">
+        <label>学習率 <span id="val-lr">0.001</span></label>
+        <input type="range" id="ctrl-lr" min="-4" max="-1" value="-3" step="0.1">
+      </div>
+      <div class="control-group">
+        <label>割引率 γ <span id="val-gamma">0.95</span></label>
+        <input type="range" id="ctrl-gamma" min="0.5" max="0.99" value="0.95" step="0.01">
+      </div>
+      <div class="control-group chk">
+        <label for="ctrl-shaping">報酬形成</label>
+        <input type="checkbox" id="ctrl-shaping" checked>
+      </div>
+    </div>
+
+    <div id="action-buttons">
+      <button id="btn-reset">🔄 リセット</button>
+      <button id="btn-maze">🏗️ 迷路生成</button>
+      <button id="btn-clear">🗑️ クリア</button>
+    </div>
+  </div>
+
+  <!-- Brain tooltip -->
+  <div id="brain-tooltip" class="hidden"></div>
+
+  <!-- Toast container -->
+  <div id="toast-container"></div>
+
+  <!-- Tutorial overlay -->
+  <div id="tutorial-overlay">
+    <div id="tutorial-content">
+      <h2>SYNAPSE</h2>
+      <p class="tutorial-sub">ニューラル迷宮</p>
+      <p class="tutorial-desc">AIエージェントがニューラルネットワークで迷路を学習する過程を<br>リアルタイムで観察・介入する実験的ゲーム</p>
+      <div class="tutorial-items">
+        <div class="tutorial-item"><span>🔭</span><strong>観察</strong> カメラを自由に操作して学習を眺める</div>
+        <div class="tutorial-item"><span>🧱</span><strong>壁</strong> グリッドをクリックして壁を配置</div>
+        <div class="tutorial-item"><span>🧹</span><strong>消去</strong> 壁を削除して道を開く</div>
+        <div class="tutorial-item"><span>🎯</span><strong>ゴール</strong> 目標地点を移動させる</div>
+        <div class="tutorial-item"><span>🧠</span><strong>脳操作</strong> ニューロンをクリックして凍結/解放</div>
+      </div>
+      <button id="btn-start">▶ はじめる</button>
+    </div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="engine.js"></script>
+  <script>if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js');</script>
+</body>
+</html>
