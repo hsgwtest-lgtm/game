@@ -561,9 +561,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
       // 軌跡 (可視化用)
       this.trail = [];
 
-      // 色 (HSL)
+      // 色 (HSL) — 明るく鮮やかでスタイリッシュ
       this.hue = (id * 137.5) % 360;
-      this.color = new THREE.Color().setHSL(this.hue / 360, 0.8, 0.6);
+      this.color = new THREE.Color().setHSL(this.hue / 360, 0.95, 0.75);
     }
 
     /** 入力ベクトル構築
@@ -573,7 +573,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
      *  勾配上昇に相当する行動を学習できる。
      */
     getState() {
-      const gx = Math.floor(this.x), gy = Math.floor(this.y);
+      const gx = clamp(Math.floor(this.x), 0, GRID - 1);
+      const gy = clamp(Math.floor(this.y), 0, GRID - 1);
       return new Float32Array([
         this.x / GRID - 0.5,
         this.y / GRID - 0.5,
@@ -643,7 +644,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
       let r = 0;
 
       // 空間報酬マップ
-      const gx = Math.floor(this.x), gy = Math.floor(this.y);
+      const gx = clamp(Math.floor(this.x), 0, GRID - 1);
+      const gy = clamp(Math.floor(this.y), 0, GRID - 1);
       r += w.spatial * getReward(gx, gy);
 
       // 移動距離報酬
@@ -664,6 +666,20 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
       const clampedVx = clamp(this.vx * 2, -1, 1);
       const clampedVy = clamp(this.vy * 2, -1, 1);
       r += w.stability * (1 - Math.abs(clampedVx - state[6]) - Math.abs(clampedVy - state[7])) * 0.1;
+
+      // 群集報酬 (他のエージェントに近づく)
+      if (w.swarm !== 0) {
+        let minDist = Infinity;
+        for (const other of agents) {
+          if (other.id === this.id) continue;
+          const dx = other.x - this.x, dy = other.y - this.y;
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d < minDist) minDist = d;
+        }
+        if (minDist < Infinity) {
+          r += w.swarm * Math.exp(-minDist / 5) * 0.5;
+        }
+      }
 
       return r;
     }
@@ -687,6 +703,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
       this.y = Math.random() * GRID;
       this.vx = 0;
       this.vy = 0;
+
+      // 軌跡をクリア (リスポーン時の不要な線を防ぐ)
+      this.trail = [];
 
       return result;
     }
@@ -755,6 +774,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
           if (traj.totalReward > maxReward) maxReward = traj.totalReward;
         }
         const avg = sumReward / trajectories.length;
+        const prevBest = bestFitness;
         if (maxReward > bestFitness) {
           bestFitness = maxReward;
         }
@@ -771,7 +791,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         if (epoch % 50 === 0) {
           addLog(`🧬 Epoch ${epoch} | Best: ${bestFitness.toFixed(2)} | Avg: ${avg.toFixed(2)}`);
         }
-        if (maxReward > bestFitness * 0.95 && epoch > 10) {
+        if (maxReward > prevBest && prevBest > 0 && epoch > 10) {
           addLog('🚀 新しい最高性能に到達！');
         }
       }
@@ -871,6 +891,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     // 報酬テクスチャ (DataTexture)
     const data = new Uint8Array(GRID * GRID * 4);
     rewardDataTexture = new THREE.DataTexture(data, GRID, GRID, THREE.RGBAFormat);
+    rewardDataTexture.flipY = true;
     rewardDataTexture.needsUpdate = true;
     rewardDataTexture.magFilter = THREE.LinearFilter;
     rewardDataTexture.minFilter = THREE.LinearFilter;
@@ -1021,14 +1042,15 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     const count = agents.length;
     if (count === 0) return;
 
-    // エージェント: 八面体
-    const agentGeo = new THREE.OctahedronGeometry(CFG.agentSize, 0);
+    // エージェント: 球体 (愛らしくスタイリッシュ)
+    const agentGeo = new THREE.SphereGeometry(CFG.agentSize, 12, 8);
     const agentMat = new THREE.MeshPhongMaterial({
-      color: 0x00e5ff,
-      emissive: 0x003344,
-      shininess: 80,
+      color: 0xffffff,
+      emissive: 0x00e5ff,
+      emissiveIntensity: 0.6,
+      shininess: 120,
       transparent: true,
-      opacity: 0.9,
+      opacity: 0.95,
     });
 
     agentInstances = new THREE.InstancedMesh(agentGeo, agentMat, count);
@@ -1056,7 +1078,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
       const trailMat = new THREE.LineBasicMaterial({
         color: agents[i].color,
         transparent: true,
-        opacity: 0.4,
+        opacity: 0.6,
         linewidth: 1,
       });
 
@@ -1079,11 +1101,13 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
       dummy.position.set(
         a.x * CELL_SIZE,
-        baseY + 0.5 + Math.sin(totalSteps * 0.05 + i) * 0.1,
+        baseY + 0.6 + Math.sin(totalSteps * 0.08 + i * 2.1) * 0.15 + Math.abs(Math.sin(totalSteps * 0.12 + i)) * 0.1,
         a.y * CELL_SIZE
       );
       dummy.rotation.y = Math.atan2(a.vx, a.vy);
-      dummy.scale.setScalar(i === selectedAgent ? 1.3 : 1.0);
+      const baseScale = i === selectedAgent ? 1.5 : 1.1;
+      const pulseScale = 1 + Math.sin(totalSteps * 0.06 + i * 1.7) * 0.08;
+      dummy.scale.setScalar(baseScale * pulseScale);
       dummy.updateMatrix();
       agentInstances.setMatrixAt(i, dummy.matrix);
 
