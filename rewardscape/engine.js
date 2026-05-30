@@ -156,7 +156,7 @@ import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.164.1/exampl
         if (dist > radius) continue;
         const gx = cx + dx, gy = cy + dy;
         if (gx < 0 || gx >= GRID || gy < 0 || gy >= GRID) continue;
-        const falloff = 1 - dist / radius;  // ガウシアン的な減衰
+        const falloff = 1 - dist / radius;  // 二次減衰 (falloff^2)
         const amount = strength * falloff * falloff;
         const idx = gy * GRID + gx;
         switch (mode) {
@@ -261,7 +261,9 @@ import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.164.1/exampl
         this.preActivations.push(new Float32Array(sizes[i]));
       }
 
-      // He初期化
+      // He初期化 (Kaiming initialization)
+      // ReLU活性化関数では勾配消失を防ぐため、
+      // 重みの標準偏差を sqrt(2/fanIn) に設定する。
       for (let l = 1; l < this.numLayers; l++) {
         const fanIn = sizes[l - 1], fanOut = sizes[l];
         const scale = Math.sqrt(2.0 / fanIn);
@@ -395,9 +397,15 @@ import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.164.1/exampl
           outputGrad[action] += 1; // +δ(a,j)
 
           // advantage * ∇log π + entropyCoeff * ∇H
-          // H = -Σ p log p, ∇H/∂logit = p(1-p) - Σ_{j≠i} p_j*p_i (近似)
+          // H = -Σ p log p
+          // ∇H/∂logit_j = p_j * (expectedLogProb - log p_j)
+          // (softmax微分を考慮した正しいエントロピー勾配)
+          let expectedLogProb = 0;
+          for (let j = 0; j < probs.length; j++) {
+            expectedLogProb += probs[j] * Math.log(Math.max(probs[j], 1e-8));
+          }
           for (let j = 0; j < outputGrad.length; j++) {
-            const entropyGrad = -probs[j] * (Math.log(Math.max(probs[j], 1e-8)) + 1);
+            const entropyGrad = probs[j] * (expectedLogProb - Math.log(Math.max(probs[j], 1e-8)));
             outputGrad[j] = advantage * outputGrad[j] + entropyCoeff * entropyGrad;
           }
 
@@ -647,7 +655,10 @@ import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.164.1/exampl
       r += w.speed * dist * 0.5;
 
       // 安定性報酬 (急激な方向転換にペナルティ)
-      r += w.stability * (1 - Math.abs(this.vx - state[6] / 2) - Math.abs(this.vy - state[7] / 2)) * 0.1;
+      // state[6,7]はclamp済み速度なので、同じ空間で比較するため現在速度もclamp
+      const clampedVx = clamp(this.vx * 2, -1, 1);
+      const clampedVy = clamp(this.vy * 2, -1, 1);
+      r += w.stability * (1 - Math.abs(clampedVx - state[6]) - Math.abs(clampedVy - state[7])) * 0.1;
 
       return r;
     }
@@ -943,6 +954,7 @@ import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.164.1/exampl
     for (let i = 0; i < GRID * GRID; i++) {
       if (Math.abs(rewardMap[i]) > maxAbs) maxAbs = Math.abs(rewardMap[i]);
     }
+    rewardMaxAbs = Math.max(maxAbs, 0.01);
     const scale = maxAbs > 0 ? 1 / maxAbs : 1;
 
     for (let i = 0; i < GRID * GRID; i++) {
@@ -1253,12 +1265,7 @@ import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.164.1/exampl
 
     const cellW = w / GRID, cellH = h / GRID;
 
-    // ヒートマップ
-    let maxAbs = 0;
-    for (let i = 0; i < GRID * GRID; i++) {
-      if (Math.abs(rewardMap[i]) > maxAbs) maxAbs = Math.abs(rewardMap[i]);
-    }
-    rewardMaxAbs = Math.max(maxAbs, 0.01);
+    // ヒートマップ (rewardMaxAbsはupdateRewardTexture()で計算済み)
 
     for (let y = 0; y < GRID; y++) {
       for (let x = 0; x < GRID; x++) {
@@ -1290,7 +1297,7 @@ import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.164.1/exampl
    *  リアルタイムで描画する。
    */
   function drawNeural() {
-    if (currentView !== 'brain' && !document.getElementById('neural-overlay').classList.contains('hidden') === false) return;
+    if (currentView !== 'brain' && document.getElementById('neural-overlay').classList.contains('hidden')) return;
 
     const ctx = neuralCtx;
     const w = ctx.canvas.width, h = ctx.canvas.height;
