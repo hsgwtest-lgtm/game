@@ -64,16 +64,40 @@ button{cursor:pointer;border:none;font-family:inherit;font-size:inherit}
 .main-area{display:flex;flex:1;overflow:hidden}
 .canvas-wrap{flex:1;position:relative;min-width:0}
 #mainCanvas{width:100%;height:100%;display:block;background:#0a0a18;touch-action:none}
+
+/* ===== LEFT PANEL (Design) ===== */
+.left-panel{width:280px;display:flex;flex-direction:column;border-right:1px solid var(--border);overflow-y:auto;background:var(--panel)}
+/* ===== RIGHT PANEL (Analysis) ===== */
 .side-panel{width:320px;display:flex;flex-direction:column;border-left:1px solid var(--border);overflow-y:auto;background:var(--panel)}
+
 .panel-section{padding:12px;border-bottom:1px solid var(--border)}
 .panel-title{font-size:.75rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
 #neuralCanvas{width:100%;aspect-ratio:1.7;border-radius:6px;background:#0a0a18}
 #fitnessCanvas{width:100%;aspect-ratio:2;border-radius:6px;background:#0a0a18}
+#telemetryCanvas{width:100%;aspect-ratio:2.2;border-radius:6px;background:#0a0a18}
+#attentionCanvas{width:100%;aspect-ratio:2;border-radius:6px;background:#0a0a18}
 .controls{display:grid;grid-template-columns:1fr;gap:6px}
 .ctrl-row{display:flex;align-items:center;gap:8px;font-size:.78rem}
 .ctrl-row label{flex:0 0 90px;color:var(--text2);text-align:right}
 .ctrl-row input[type=range]{flex:1;accent-color:var(--green);height:4px}
 .ctrl-row .val{flex:0 0 36px;text-align:right;font-weight:600;font-size:.75rem;color:var(--green)}
+
+/* ===== REWARD RULES ===== */
+.rule-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.rule-item{display:flex;align-items:center;gap:4px;padding:6px 8px;background:#0d0d20;border-radius:6px;font-size:.72rem}
+.rule-item select,.rule-item input{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:.7rem;padding:2px 4px}
+.rule-item select{max-width:80px}
+.rule-item input[type=number]{width:48px;text-align:center}
+.rule-item .rule-remove{background:none;color:var(--red);font-size:.85rem;padding:0 4px;cursor:pointer;border:none}
+.btn-add-rule{background:var(--bg);color:var(--blue);border:1px dashed var(--border)!important;font-size:.75rem;padding:6px;border-radius:6px;margin-top:4px;cursor:pointer;width:100%}
+.btn-add-rule:hover{border-color:var(--blue)!important}
+
+/* ===== APPLY BUTTON ===== */
+.btn-apply{background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff;font-size:.8rem;font-weight:700;padding:8px 16px;border-radius:8px;width:100%;margin-top:6px;transition:all .2s;letter-spacing:.03em}
+.btn-apply:hover{transform:scale(1.02);box-shadow:0 0 16px rgba(68,136,255,.3)}
+
+/* ===== SENSOR PREVIEW ===== */
+#sensorPreview{width:100%;aspect-ratio:1;max-width:160px;margin:8px auto;border-radius:50%;background:#0a0a18;display:block}
 
 /* ===== STATUS BAR ===== */
 .status-bar{display:flex;align-items:center;gap:16px;padding:6px 14px;background:var(--panel);border-top:1px solid var(--border);font-size:.75rem;color:var(--text2)}
@@ -82,13 +106,15 @@ button{cursor:pointer;border:none;font-family:inherit;font-size:inherit}
 
 /* ===== MOBILE ===== */
 @media(max-width:800px){
+  .left-panel{display:none}
   .side-panel{display:none}
   .header{gap:6px;padding:6px 8px}
   .stat{font-size:.7rem}
   #mobilePanel{display:block;border-top:1px solid var(--border);background:var(--panel)}
   .mob-tabs{display:flex;border-bottom:1px solid var(--border)}
-  .mob-tabs button{flex:1;padding:8px;font-size:.8rem;background:transparent;color:var(--text2);border:none;border-bottom:2px solid transparent}
+  .mob-tabs button{flex:1;padding:8px;font-size:.7rem;background:transparent;color:var(--text2);border:none;border-bottom:2px solid transparent}
   .mob-tabs button.active{color:var(--green);border-bottom-color:var(--green)}
+  .mob-tabs button:focus-visible{outline:2px solid var(--green);outline-offset:-2px;background:rgba(0,255,136,.08)}
   .mob-content{max-height:35vh;overflow-y:auto}
   .mob-content .panel-section{display:none}
   .mob-content .panel-section.active{display:block}
@@ -103,8 +129,8 @@ button{cursor:pointer;border:none;font-family:inherit;font-size:inherit}
 <!-- ===== START SCREEN ===== -->
 <div id="startScreen">
   <div class="title">NeuroDriver</div>
-  <div class="subtitle">🧠 AIが走りを学ぶ進化シミュレーター</div>
-  <div class="desc">ニューラルネットワークで制御されたAIカーが、遺伝的アルゴリズムにより走行を学習。脳の活動・学習過程をリアルタイムで可視化します。</div>
+  <div class="subtitle">🧠 AI学習サンドボックス — 設計して、走らせて、分析する</div>
+  <div class="desc">ニューラルネットワークで制御されたAIカーが、遺伝的アルゴリズムにより走行を学習。報酬関数・車体設計・脳の意思決定をリアルタイムで可視化・カスタマイズできます。</div>
   <div class="track-grid" id="trackGrid"></div>
   <button class="btn-custom" id="btnCustom">✏️ カスタムコースを描く</button>
   <button class="btn-start" id="btnStart" disabled>▶ トレーニング開始</button>
@@ -144,20 +170,39 @@ button{cursor:pointer;border:none;font-family:inherit;font-size:inherit}
     <button class="btn-reset" id="btnReset">🔄 リセット</button>
   </div>
   <div class="main-area">
-    <div class="canvas-wrap">
-      <canvas id="mainCanvas"></canvas>
-    </div>
-    <div class="side-panel">
+    <!-- LEFT PANEL: Design -->
+    <div class="left-panel" id="leftPanel">
       <div class="panel-section">
-        <div class="panel-title">🧠 ニューラルネットワーク</div>
-        <canvas id="neuralCanvas"></canvas>
+        <div class="panel-title">📐 報酬関数設計</div>
+        <div class="controls">
+          <div class="ctrl-row"><label>速度重視</label><input type="range" id="rwdSpeed" min="0" max="100" value="30"><span class="val" id="valRwdSpeed">0.30</span></div>
+          <div class="ctrl-row"><label>安全重視</label><input type="range" id="rwdSafety" min="0" max="100" value="20"><span class="val" id="valRwdSafety">0.20</span></div>
+          <div class="ctrl-row"><label>効率重視</label><input type="range" id="rwdEfficiency" min="0" max="100" value="80"><span class="val" id="valRwdEfficiency">0.80</span></div>
+          <div class="ctrl-row"><label>滑らかさ</label><input type="range" id="rwdSmoothness" min="0" max="100" value="10"><span class="val" id="valRwdSmoothness">0.10</span></div>
+        </div>
+        <div class="panel-title" style="margin-top:10px">条件ルール</div>
+        <div class="rule-list" id="ruleList"></div>
+        <button class="btn-add-rule" id="btnAddRule">＋ ルールを追加</button>
       </div>
       <div class="panel-section">
-        <div class="panel-title">📊 学習グラフ</div>
-        <canvas id="fitnessCanvas"></canvas>
+        <div class="panel-title">🚗 車体設計</div>
+        <div class="controls">
+          <div class="ctrl-row"><label>センサー数</label><input type="range" id="bodySensors" min="3" max="12" value="5"><span class="val" id="valBodySensors">5</span></div>
+          <div class="ctrl-row"><label>センサー範囲</label><input type="range" id="bodyRange" min="80" max="300" value="160"><span class="val" id="valBodyRange">160</span></div>
+          <div class="ctrl-row"><label>ステア応答</label><input type="range" id="bodySteer" min="20" max="100" value="55"><span class="val" id="valBodySteer">0.055</span></div>
+          <div class="ctrl-row"><label>摩擦係数</label><input type="range" id="bodyFriction" min="950" max="999" value="985"><span class="val" id="valBodyFriction">0.985</span></div>
+          <div class="ctrl-row"><label>最高速度</label><input type="range" id="bodyMaxSpd" min="20" max="80" value="45"><span class="val" id="valBodyMaxSpd">4.5</span></div>
+          <div class="ctrl-row"><label>加速力</label><input type="range" id="bodyAccel" min="5" max="30" value="14"><span class="val" id="valBodyAccel">0.14</span></div>
+          <div class="ctrl-row"><label>ブレーキ力</label><input type="range" id="bodyBrake" min="2" max="15" value="6"><span class="val" id="valBodyBrake">0.06</span></div>
+          <div class="ctrl-row"><label>重心位置</label><input type="range" id="bodyCog" min="-100" max="100" value="0"><span class="val" id="valBodyCog">0.00</span></div>
+          <div class="ctrl-row"><label>隠れ層ノード</label><input type="range" id="bodyHidden" min="4" max="20" value="8"><span class="val" id="valBodyHidden">8</span></div>
+          <div class="ctrl-row"><label>レイテンシ</label><input type="range" id="bodyLatency" min="0" max="5" value="0"><span class="val" id="valBodyLatency">0</span></div>
+        </div>
+        <canvas id="sensorPreview"></canvas>
+        <button class="btn-apply" id="btnApplyDesign">🔄 設計を適用（世代リセット）</button>
       </div>
       <div class="panel-section">
-        <div class="panel-title">⚙️ パラメータ</div>
+        <div class="panel-title">⚙️ 進化パラメータ</div>
         <div class="controls">
           <div class="ctrl-row"><label>個体数</label><input type="range" id="ctrlPop" min="10" max="60" value="30"><span class="val" id="valPop">30</span></div>
           <div class="ctrl-row"><label>突然変異率</label><input type="range" id="ctrlMutRate" min="5" max="50" value="15"><span class="val" id="valMutRate">15%</span></div>
@@ -168,23 +213,63 @@ button{cursor:pointer;border:none;font-family:inherit;font-size:inherit}
         </div>
       </div>
     </div>
+
+    <div class="canvas-wrap">
+      <canvas id="mainCanvas"></canvas>
+    </div>
+
+    <!-- RIGHT PANEL: Analysis -->
+    <div class="side-panel">
+      <div class="panel-section">
+        <div class="panel-title">🧠 ニューラルネットワーク</div>
+        <canvas id="neuralCanvas"></canvas>
+      </div>
+      <div class="panel-section">
+        <div class="panel-title">📊 テレメトリ</div>
+        <canvas id="telemetryCanvas"></canvas>
+      </div>
+      <div class="panel-section">
+        <div class="panel-title">🔥 アテンション</div>
+        <canvas id="attentionCanvas"></canvas>
+      </div>
+      <div class="panel-section">
+        <div class="panel-title">📈 学習グラフ</div>
+        <canvas id="fitnessCanvas"></canvas>
+      </div>
+    </div>
   </div>
   <!-- Mobile panels -->
   <div id="mobilePanel">
     <div class="mob-tabs">
       <button class="active" data-tab="brain">🧠 脳</button>
-      <button data-tab="graph">📊 学習</button>
+      <button data-tab="telemetry">📊 テレメトリ</button>
+      <button data-tab="reward">📐 報酬</button>
+      <button data-tab="body">🚗 車体</button>
       <button data-tab="ctrl">⚙️ 設定</button>
     </div>
     <div class="mob-content">
       <div class="panel-section active" data-panel="brain">
         <canvas id="neuralCanvasM"></canvas>
       </div>
-      <div class="panel-section" data-panel="graph">
-        <canvas id="fitnessCanvasM"></canvas>
+      <div class="panel-section" data-panel="telemetry">
+        <canvas id="telemetryCanvasM"></canvas>
+        <canvas id="attentionCanvasM" style="margin-top:8px"></canvas>
+      </div>
+      <div class="panel-section" data-panel="reward">
+        <div class="panel-title">📐 報酬関数設計</div>
+        <div class="controls" id="mobileRewardControls"></div>
+        <div class="panel-title" style="margin-top:10px">条件ルール</div>
+        <div class="rule-list" id="ruleListM"></div>
+        <button class="btn-add-rule" id="btnAddRuleM">＋ ルールを追加</button>
+      </div>
+      <div class="panel-section" data-panel="body">
+        <div class="panel-title">🚗 車体設計</div>
+        <div class="controls" id="mobileBodyControls"></div>
+        <button class="btn-apply" id="btnApplyDesignM">🔄 設計を適用（世代リセット）</button>
       </div>
       <div class="panel-section" data-panel="ctrl">
         <div class="controls" id="mobileControls"></div>
+        <canvas id="fitnessCanvasM" style="margin-top:8px"></canvas>
       </div>
     </div>
   </div>
