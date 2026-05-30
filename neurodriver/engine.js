@@ -141,7 +141,8 @@ function computeReward(car, checkpoints) {
   const w = REWARD_CFG.weights;
   const totalWeight = (w.speed + w.safety + w.efficiency + w.smoothness);
 
-  // When all weights are 0, base reward is 0 — cars get no reward for progressing
+  // When all weights are 0, base weighted reward is 0 — cars get no directional reward.
+  // Rule-based bonuses/penalties still apply even with zero weights.
   let baseReward = 0;
 
   if (totalWeight > 0) {
@@ -1994,7 +1995,7 @@ class Game {
 
     // Restore rewards
     REWARD_CFG.weights = { ...racer.rewards.weights };
-    REWARD_CFG.rules = racer.rewards.rules || [];
+    REWARD_CFG.rules = JSON.parse(JSON.stringify(racer.rewards.rules || []));
 
     // Restore brain
     const b = racer.brain;
