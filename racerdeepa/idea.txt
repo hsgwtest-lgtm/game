@@ -1,0 +1,867 @@
+================================================================
+  DeepRacer PWA — 完全作り直し指示書
+  送信先: Claude Opus 4.6
+  作成者: えいいち（会話コンテキスト引き継ぎ版）
+================================================================
+
+## あなたへの重要な前提
+
+私はすでに以下の2つの動作するPWAを持っている：
+
+1. **neurodrivera** (https://hsgwtest-lgtm.github.io/game/neurodrivera/)
+   - Canvas 2D で描画するトップビュー自動車走行シミュレーター
+   - 車体＋レイキャストセンサー（前方5本）が実装済み
+   - 車はNNで制御されている（入力=センサー距離、出力=ステア・スロットル）
+   - GAによる世代学習が動いている
+   - コース（閉じたサーキット）をウェイポイントで定義している
+
+2. **softevo7** (https://hsgwtest-lgtm.github.io/game/softevo7/)
+   - 生物の神経回路をリアルタイムにCanvasで可視化するシミュレーター
+   - ニューロン（円）：活性化値を色の濃さ・グロー効果で表現
+   - シナプス（線）：重みを線の太さ・色（正=青/負=赤）で表現
+   - 各ノードに実数値テキストをオーバーレイ表示している
+   - 世代・個体の切り替えUIが洗練されている
+   - ダーク・サイエンティフィック UIテーマ（#0a0e1a背景、シアンアクセント）
+
+これまでに出力した「やっつけ仕事」のdeepracer（スライダー3本だけで
+コースも車も走らないUI）は完全に捨てる。
+
+両プロジェクトの**技術・UIを完全に統合**した、本物のDeepRacer体験を
+単一index.htmlで実装してほしい。
+
+================================================================
+## DeepRacerとは何か（体験設計の根拠）
+================================================================
+
+DeepRacerはユーザーが「報酬関数」を設計し、その価値観に従って
+強化学習エージェント（車）が自律的に学習するML教育サービス。
+
+### ユーザーが体験すべき感動の順序：
+
+1. 「車がめちゃくちゃ走ってる（コースアウトしまくり）」← 学習前の混乱
+2. 「世代が進むにつれ、なんとなく走れてきた」← 学習の進行を視覚で実感
+3. 「NN可視化パネルで、コーナーで特定ニューロンが光る！」← 内部状態の理解
+4. 「スライダーでスピード重視に変えたらコーナーで飛び出した笑」← 因果の体感
+5. 「この太い青い線がコーナー検知の回路だ」← AIが何を学んだか見える
+
+本家DeepRacerにはない、**学習過程の透明な可視化**がこのPWAの価値。
+
+================================================================
+## 技術仕様（完全詳細）
+================================================================
+
+### ファイル構成
+- 単一 index.html（CSS・JS全てインライン）
+- 外部依存ゼロ（CDN・フォント不使用）
+- GitHub Pages + iOS Safari PWA対応
+
+---
+
+### 画面レイアウト（縦型、iPhone想定 375px幅）
+
+```
+┌────────────────────────────────────┐
+│ ● DEEP RACER  GEN:12  BEST:847    │  ← ヘッダー（常時表示）
+├────────────────────────────────────┤
+│                                    │
+│  ┌──────────────────────────────┐  │
+│  │                              │  │
+│  │     コースキャンバス          │  │  ← メインCanvas（正方形 ~340px）
+│  │  （トップビュー）            │  │
+│  │  複数車同時走行              │  │
+│  │  レイキャスト可視化付き      │  │
+│  └──────────────────────────────┘  │
+├────────────────────────────────────┤
+│  NN VISUALIZER  [BEST車固定]       │
+│  ┌──────────────────────────────┐  │
+│  │ [L]  [前] [前] [前] [R]      │  │  ← Input層（センサー）
+│  │  ●    ●   ●   ●   ●        │  │
+│  │ 0.82 0.34 0.91 0.10 0.55   │  │  ← 実数値ラベル
+│  │       ╲  │  ╱              │  │
+│  │    ● ● ● ● ● ●            │  │  ← Hidden層（6ノード）
+│  │   -0.3 0.7 -0.1 0.9 0.2 0.5│  │
+│  │         ╲ │ ╱              │  │
+│  │        ●     ●             │  │  ← Output層
+│  │      STEER  THROTTLE        │  │
+│  │      0.31   0.78            │  │
+│  └──────────────────────────────┘  │
+├────────────────────────────────────┤
+│  REWARD FUNCTION  [SIMPLE][CUSTOM] │  ← タブ切替
+│  ┄┄┄ SIMPLE モード ┄┄┄┄┄┄┄┄┄┄┄  │
+│  CENTER   ████████░░  70           │
+│  SPEED    ████░░░░░░  40           │
+│  SMOOTH   ██████░░░░  60           │
+│  PROGRESS █████████░  80           │
+│  HEADING  █████░░░░░  50           │
+│  SURVIVE  ███░░░░░░░  30           │
+│  ┄┄┄ CUSTOM モード ┄┄┄┄┄┄┄┄┄┄┄  │
+│  ┌──────────────────────────────┐  │
+│  │ function reward(params) {   │  │
+│  │   const {distFromCenter,... │  │
+│  │   return ...;               │  │
+│  │ }                           │  │
+│  └──────────────────────────────┘  │
+│  [▶ APPLY] [PRESET▼] ✅ VALID      │
+├────────────────────────────────────┤
+│  REWARD HISTORY （折れ線グラフ）   │
+│  ↑報酬                            │
+│  │    ╭─────────                  │
+│  │  ╭─╯                           │
+│  │╭─╯                             │
+│  └──────────────────────→世代      │
+├────────────────────────────────────┤
+│  [▶ TRAIN]  [■ STOP]  [↺ RESET]  │
+└────────────────────────────────────┘
+```
+
+---
+
+### 1. コース定義
+
+楕円形の閉じたサーキットをウェイポイント配列で定義する。
+（neurodriveraのコース実装を参考にすること）
+
+```javascript
+// コース中心線のウェイポイント（Canvas座標）
+// 例：楕円 center(170,170) rx=120 ry=90 の24点
+const WAYPOINTS = [];
+for (let i = 0; i < 24; i++) {
+  const angle = (i / 24) * Math.PI * 2;
+  WAYPOINTS.push({
+    x: 170 + 120 * Math.cos(angle),
+    y: 170 + 90 * Math.sin(angle)
+  });
+}
+
+const TRACK_WIDTH = 40; // コース幅px
+```
+
+コース描画：
+- コース面塗りつぶし（幅TRACK_WIDTH）: #1a2535
+- 境界線（外・内）: #00d4ff 細線
+- センターライン: 点線 #334155
+- ウェイポイント表示: オプション（デバッグ用）
+
+---
+
+### 2. 車（Agent）クラス
+
+```javascript
+class Agent {
+  constructor(genome) {
+    this.x = WAYPOINTS[0].x;
+    this.y = WAYPOINTS[0].y;
+    this.heading = 0;      // ラジアン
+    this.speed = 0;
+    this.genome = genome;  // NNの全重みをフラット配列で持つ
+    this.nn = new NeuralNet(genome);
+    this.alive = true;
+    this.fitness = 0;
+    this.steps = 0;
+    this.distanceTraveled = 0;
+    this.closestWaypointIdx = 0;
+    this.lapProgress = 0;  // 0〜1
+  }
+
+  // センサー（レイキャスト）5本
+  // 角度オフセット: [-60, -30, 0, +30, +60] 度
+  // 戻り値: [0.0〜1.0] × 5（壁まで遠いほど1.0に近い）
+  getSensorReadings() { ... }
+
+  // NNの推論 → ステアリング・スロットルを適用
+  update() {
+    const sensors = this.getSensorReadings();
+    const [steer, throttle] = this.nn.forward(sensors);
+    this.heading += steer * 0.08;
+    this.speed = throttle * 3.0; // max 3.0 px/frame
+    this.x += Math.cos(this.heading) * this.speed;
+    this.y += Math.sin(this.heading) * this.speed;
+    this.steps++;
+    // コース逸脱チェック → this.alive = false
+    // 進捗更新 → this.lapProgress更新
+    // フィットネス更新
+    this.updateFitness();
+  }
+
+  updateFitness() {
+    // ユーザーのスライダーウェイトを使った報酬計算
+    // reward = Σ(各項目スコア × weight)
+    const distFromCenter = this.getDistFromCenter(); // 0〜TRACK_WIDTH/2
+    const centerScore = 1.0 - (distFromCenter / (TRACK_WIDTH / 2));
+    const speedScore = this.speed / 3.0;
+    const steerScore = 1.0 - Math.abs(this.lastSteer);
+    
+    this.fitness += (
+      centerScore * rewardWeights.center +
+      speedScore  * rewardWeights.speed +
+      steerScore  * rewardWeights.zigzag
+    );
+  }
+}
+```
+
+車の描画：
+- 小さな三角形（向きあり）
+- 通常個体: rgba(100,160,255,0.7)（薄い青）
+- ベスト個体（前世代1位）: #00d4ff + グロー効果
+- レイキャスト5本: ベスト個体のみ表示
+  - 壁まで届いた点: 小さな丸
+  - 線色: rgba(0,212,255,0.3)
+
+---
+
+### 3. ニューラルネット
+
+```javascript
+class NeuralNet {
+  // 構造: 5 → 6 → 2
+  // 活性化: Hidden=tanh, Output=[tanh(steer), sigmoid(throttle)]
+  // 重み数: 5×6 + 6×2 = 42個 → genome配列
+
+  constructor(genome) {
+    // genome[0..29] = W1(5×6), genome[30..41] = W2(6×2)
+  }
+
+  forward(inputs) {
+    // hidden: tanh(W1 × inputs)
+    // output: [tanh(W2[0] × hidden), sigmoid(W2[1] × hidden)]
+    // 戻り値: [steering -1〜+1, throttle 0〜1]
+    
+    // ★ 可視化用に活性化値を保存する
+    this.inputActivations = inputs;
+    this.hiddenActivations = hidden; // 6個
+    this.outputActivations = output; // 2個
+    this.weights1 = W1; // 5×6
+    this.weights2 = W2; // 6×2
+    
+    return output;
+  }
+}
+```
+
+---
+
+### 4. 遺伝的アルゴリズム（GA）
+
+```javascript
+const GA_CONFIG = {
+  POPULATION: 12,      // 同時走行エージェント数
+  ELITE_RATE: 0.3,     // 上位30%を次世代に継承
+  MUTATION_RATE: 0.10, // 突然変異確率（世代が進むと減少）
+  MUTATION_SCALE: 0.3, // ガウスノイズの標準偏差
+  MAX_STEPS: 800,      // 1エピソードの最大ステップ数
+};
+
+// 世代交代ロジック：
+// 1. 全エージェントalive=falseになったら次世代へ
+// 2. エリート選択（fitness上位30%）
+// 3. 残りをエリートの交叉＋突然変異で埋める
+// 4. 突然変異率 = MUTATION_RATE * 0.95^generation（徐々に収束）
+// 5. 世代をまたいで最優秀ゲノムを保持（Hall of Fame）
+```
+
+---
+
+### 5. NN可視化（softevo7から完全移植・拡張）
+
+これが本プロジェクトの核心。softevo7のニューロン描画を
+DeepRacerのコンテキストに完全移植すること。
+
+#### ノード（円）の描画仕様：
+```
+半径: 18px
+枠線: #334155 (1px)
+塗り: activation値に応じてグラデーション
+  - 正の値: rgba(0, 212, 255, activation) → シアン
+  - 負の値: rgba(255, 77, 109, |activation|) → 赤
+グロー: activation > 0.5 の場合
+  ctx.shadowColor = '#00d4ff'
+  ctx.shadowBlur = 12 * activation
+
+テキスト（円の中央）:
+  フォント: '10px "Courier New", monospace'
+  色: #ffffff
+  内容: activation値を小数2桁で表示（例: "0.73", "-0.21"）
+```
+
+#### エッジ（シナプス線）の描画仕様：
+```
+太さ: |weight| * 3.0 (px)、最小0.3、最大4.0
+色:
+  - weight > 0: rgba(0, 120, 255, |weight|*0.8) → 青
+  - weight < 0: rgba(255, 50, 80, |weight|*0.8) → 赤
+透明度: |weight| に比例（弱い結合は薄く表示）
+```
+
+#### ラベル（Input層・Output層）：
+```
+Input層（上から下）:
+  "L60°" / "L30°" / "FWD" / "R30°" / "R60°"
+  センサー値も数値で表示（右側に小さく）
+
+Output層:
+  "STEER" (上) / "THROTTLE" (下)
+```
+
+#### 更新タイミング：
+- 毎フレーム、ベスト個体（best agent）のNN状態を読み取り再描画
+- 走行中リアルタイムで変化する（神経回路が「考えている」様子が見える）
+
+---
+
+### 6. 報酬設計UI（2モード切替：本家DeepRacerの自由度を再現）
+
+これがこのPWAの最大の差別化機能。
+本家DeepRacerでユーザーがPythonで報酬関数を書くように、
+このPWAではUIモードを2段階で提供する。
+
+---
+
+#### モード切替タブ（タブUIで切替）
+
+```
+┌─────────────────────────────────────┐
+│ REWARD FUNCTION  [SIMPLE] [CUSTOM]  │  ← タブ切替
+└─────────────────────────────────────┘
+```
+
+---
+
+#### [SIMPLE モード]（スライダー6本）
+
+本家の「報酬関数の簡単な例」に対応する直感操作。
+項目を3→6本に拡張し、DeepRacerの22変数のうち実装可能な主要6軸を網羅。
+
+```html
+<!-- SIMPLE モードのスライダー -->
+
+<!-- 軸1: センター維持（distance_from_center） -->
+<div class="slider-row">
+  <span class="sl-label">CENTER</span>
+  <span class="sl-desc">センターライン維持</span>
+  <input type="range" id="sl-center" min="0" max="100" value="70">
+  <span id="val-center">70</span>
+</div>
+
+<!-- 軸2: スピード（speed） -->
+<div class="slider-row">
+  <span class="sl-label">SPEED</span>
+  <span class="sl-desc">高速走行を奨励</span>
+  <input type="range" id="sl-speed" min="0" max="100" value="40">
+  <span id="val-speed">40</span>
+</div>
+
+<!-- 軸3: ジグザグ防止（steering_angle） -->
+<div class="slider-row">
+  <span class="sl-label">SMOOTH</span>
+  <span class="sl-desc">ステアリング安定</span>
+  <input type="range" id="sl-smooth" min="0" max="100" value="60">
+  <span id="val-smooth">60</span>
+</div>
+
+<!-- 軸4: 進捗報酬（progress） -->
+<div class="slider-row">
+  <span class="sl-label">PROGRESS</span>
+  <span class="sl-desc">コース進捗を報酬に</span>
+  <input type="range" id="sl-progress" min="0" max="100" value="80">
+  <span id="val-progress">80</span>
+</div>
+
+<!-- 軸5: ウェイポイント方向（heading vs waypoint） -->
+<div class="slider-row">
+  <span class="sl-label">HEADING</span>
+  <span class="sl-desc">コース方向への整合</span>
+  <input type="range" id="sl-heading" min="0" max="100" value="50">
+  <span id="val-heading">50</span>
+</div>
+
+<!-- 軸6: 生存ボーナス（steps / alive） -->
+<div class="slider-row">
+  <span class="sl-label">SURVIVE</span>
+  <span class="sl-desc">コースに留まる持続性</span>
+  <input type="range" id="sl-survive" min="0" max="100" value="30">
+  <span id="val-survive">30</span>
+</div>
+```
+
+SIMPLEモードの報酬計算（Agent.updateFitness内で毎ステップ実行）：
+
+```javascript
+function computeReward_simple(agent) {
+  const w = rewardWeights; // 各スライダー値（0〜1に正規化済み）
+
+  // 軸1: センター維持（0〜1、センターほど1.0）
+  const distRatio = agent.distFromCenter / (TRACK_WIDTH / 2);
+  const centerScore = Math.max(0, 1.0 - distRatio);
+
+  // 軸2: スピード（0〜1、最大速度で1.0）
+  const speedScore = agent.speed / MAX_SPEED;
+
+  // 軸3: ステアリング安定（急ハンドルをペナルティ）
+  const smoothScore = 1.0 - Math.min(1.0, Math.abs(agent.lastSteer) / 1.0);
+
+  // 軸4: 進捗（lapProgressが増加したら加点）
+  const progressScore = agent.lapProgress; // 0〜1
+
+  // 軸5: ウェイポイント方向整合
+  // 次のウェイポイントへの方向と現在headingの差分（小さいほど高報酬）
+  const waypointDir = agent.getWaypointHeading(); // ラジアン
+  const headingDiff = Math.abs(normalizeAngle(agent.heading - waypointDir));
+  const headingScore = 1.0 - Math.min(1.0, headingDiff / Math.PI);
+
+  // 軸6: 生存ボーナス（生きているだけで小さな報酬）
+  const surviveScore = 1.0; // alive中は常に1.0
+
+  return (
+    centerScore   * w.center   +
+    speedScore    * w.speed    +
+    smoothScore   * w.smooth   +
+    progressScore * w.progress +
+    headingScore  * w.heading  +
+    surviveScore  * w.survive
+  );
+}
+```
+
+---
+
+#### [CUSTOM モード]（JSコードエディタ）
+
+本家DeepRacerのPython報酬関数エディタをJSで再現。
+ユーザーがJavaScriptで報酬関数を直接記述し、evalで実行する。
+
+```
+┌─────────────────────────────────────────┐
+│ CUSTOM REWARD FUNCTION                  │
+│ ┌─────────────────────────────────────┐ │
+│ │ // 利用可能な変数（paramsオブジェクト）│ │
+│ │ function reward(params) {           │ │
+│ │   const {                           │ │
+│ │     distFromCenter,  // 0〜tw/2     │ │
+│ │     trackWidth,      // コース幅px  │ │
+│ │     speed,           // 0〜3.0      │ │
+│ │     steerAngle,      // -1〜+1     │ │
+│ │     progress,        // 0〜1       │ │
+│ │     headingError,    // 0〜π       │ │
+│ │     steps,           // 経過ステップ│ │
+│ │     lapProgress,     // 0〜1       │ │
+│ │     allWheelsOnTrack,// boolean    │ │
+│ │     isReversed,      // boolean    │ │
+│ │   } = params;                       │ │
+│ │                                     │ │
+│ │   if (!allWheelsOnTrack) return 0;  │ │
+│ │   return distFromCenter < 0.3 *     │ │
+│ │     trackWidth ? 1.0 : 0.1;         │ │
+│ │ }                                   │ │
+│ └─────────────────────────────────────┘ │
+│  [▶ APPLY]  [RESET TO DEFAULT]          │
+│  ステータス: ✅ 有効 / ❌ エラー行N     │
+└─────────────────────────────────────────┘
+```
+
+CUSTOMモードの実装仕様：
+
+```javascript
+// テキストエリアの内容をevalして関数を取得
+let customRewardFn = null;
+
+function applyCustomReward() {
+  const code = document.getElementById('custom-editor').value;
+  try {
+    // セキュリティ: new Function でサンドボックス的に評価
+    // （PWA内完結のため、evalで問題なし）
+    customRewardFn = new Function('params', 
+      code.replace(/^function reward\(params\)\s*\{/, '')
+          .replace(/\}$/, '')
+    );
+    setEditorStatus('✅ VALID', 'cyan');
+  } catch(e) {
+    customRewardFn = null;
+    setEditorStatus(`❌ ERROR: ${e.message}`, 'red');
+  }
+}
+
+function computeReward_custom(agent) {
+  if (!customRewardFn) return 0;
+  try {
+    const params = {
+      distFromCenter:    agent.distFromCenter,
+      trackWidth:        TRACK_WIDTH,
+      speed:             agent.speed,
+      steerAngle:        agent.lastSteer,      // -1〜+1
+      progress:          agent.lapProgress,
+      headingError:      agent.headingError,   // 0〜π
+      steps:             agent.steps,
+      lapProgress:       agent.lapProgress,
+      allWheelsOnTrack:  agent.alive,
+      isReversed:        agent.isReversed,
+      x: agent.x, y: agent.y,
+      closestWaypointIdx: agent.closestWaypointIdx,
+    };
+    const r = customRewardFn(params);
+    // NaN/Infinity/負の値をガード
+    return (typeof r === 'number' && isFinite(r)) ? Math.max(0, r) : 0;
+  } catch(e) {
+    return 0;
+  }
+}
+```
+
+エディタのスタイル：
+```css
+#custom-editor {
+  width: 100%;
+  height: 180px;
+  background: #0d1117;
+  color: #00d4ff;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  border: 1px solid #334155;
+  border-radius: 2px;
+  padding: 8px;
+  resize: vertical;
+  -webkit-text-fill-color: #00d4ff; /* iOS Safari対応 */
+  caret-color: #00d4ff;
+}
+.editor-status {
+  font-size: 10px;
+  font-family: monospace;
+  margin-top: 4px;
+  letter-spacing: 0.05em;
+}
+```
+
+---
+
+#### モード共通の制御ロジック
+
+```javascript
+// 現在のモードに応じて報酬計算関数を切替
+function computeReward(agent) {
+  return rewardMode === 'simple'
+    ? computeReward_simple(agent)
+    : computeReward_custom(agent);
+}
+
+// タブ切替
+document.getElementById('tab-simple').onclick = () => {
+  rewardMode = 'simple';
+  document.getElementById('panel-simple').style.display = 'block';
+  document.getElementById('panel-custom').style.display = 'none';
+};
+document.getElementById('tab-custom').onclick = () => {
+  rewardMode = 'custom';
+  document.getElementById('panel-simple').style.display = 'none';
+  document.getElementById('panel-custom').style.display = 'block';
+};
+```
+
+---
+
+#### プリセット集（CUSTOMモードのサンプル）
+
+APPLYボタンの横に [PRESET▼] ドロップダウンを置き、
+以下のサンプルをワンタップでエディタに挿入できるようにする：
+
+```javascript
+const PRESETS = {
+  'センター重視': `
+// センターに近いほど高報酬
+function reward(params) {
+  const { distFromCenter, trackWidth, allWheelsOnTrack } = params;
+  if (!allWheelsOnTrack) return 0;
+  return 1.0 - (distFromCenter / (trackWidth * 0.5));
+}`,
+
+  'スピード重視': `
+// 速く走るほど高報酬。センターを外れたらペナルティ
+function reward(params) {
+  const { speed, distFromCenter, trackWidth, allWheelsOnTrack } = params;
+  if (!allWheelsOnTrack) return 0;
+  const speedReward = speed / 3.0;
+  const centerPenalty = distFromCenter > 0.4 * trackWidth ? 0.3 : 1.0;
+  return speedReward * centerPenalty;
+}`,
+
+  '進捗マイルストーン': `
+// 一定ステップ数ごとに進捗が期待値を超えたらボーナス
+function reward(params) {
+  const { steps, lapProgress, allWheelsOnTrack } = params;
+  if (!allWheelsOnTrack) return 0;
+  let reward = lapProgress;
+  if (steps % 100 === 0 && lapProgress > steps / 800) {
+    reward += 5.0; // マイルストーンボーナス
+  }
+  return reward;
+}`,
+
+  'ジグザグ防止': `
+// ステアリングが穏やかなほど高報酬
+function reward(params) {
+  const { steerAngle, allWheelsOnTrack, speed } = params;
+  if (!allWheelsOnTrack) return 0;
+  const steerPenalty = Math.abs(steerAngle) > 0.5 ? 0.5 : 1.0;
+  return speed / 3.0 * steerPenalty;
+}`,
+
+  'ウェイポイント方向': `
+// コースの進行方向と車のheadingが合っているほど高報酬
+function reward(params) {
+  const { headingError, allWheelsOnTrack, distFromCenter, trackWidth } = params;
+  if (!allWheelsOnTrack) return 0;
+  const dirScore = 1.0 - Math.min(1.0, headingError / Math.PI);
+  const centerScore = 1.0 - distFromCenter / (trackWidth * 0.5);
+  return dirScore * 0.6 + centerScore * 0.4;
+}`,
+};
+```
+
+プリセット選択時、エディタ内容をそのまま置換（確認ダイアログなし）。
+
+---
+
+### 7. 学習グラフ（報酬推移）
+
+Canvas 2Dで描画するミニグラフ。
+
+```javascript
+// データ構造
+let rewardHistory = []; // [{gen: N, best: X, avg: Y}, ...]
+
+// 描画仕様
+// 横軸: 世代数
+// 縦軸: 報酬（自動スケール）
+// ベスト線: #00d4ff（シアン）
+// 平均線: rgba(0,212,255,0.4)（薄いシアン）
+// グリッド: #1e293b
+// 現在世代を縦線でマーク
+```
+
+高さ: 80px程度（コンパクトに）
+
+---
+
+### 8. ゲームループ
+
+```javascript
+let animFrameId = null;
+let isTraining = false;
+let generation = 0;
+let agents = [];
+let bestGenome = null;
+let bestFitness = 0;
+
+function gameLoop() {
+  // 1. 全alive agentをupdate()
+  // 2. コース・車をcanvasに描画
+  // 3. NN可視化を更新（ベスト個体）
+  // 4. ヘッダー数値を更新（GEN, BEST）
+  // 5. 全員alive=falseなら nextGeneration()
+  animFrameId = requestAnimationFrame(gameLoop);
+}
+
+function nextGeneration() {
+  // fitness上位でソート
+  // rewardHistoryに追記
+  // 学習グラフ再描画
+  // 新世代生成（GA）
+  // generation++
+}
+
+// ボタン
+document.getElementById('btn-train').onclick = () => {
+  if (!isTraining) { isTraining = true; initAgents(); gameLoop(); }
+};
+document.getElementById('btn-stop').onclick = () => {
+  isTraining = false;
+  cancelAnimationFrame(animFrameId);
+};
+document.getElementById('btn-reset').onclick = () => {
+  cancelAnimationFrame(animFrameId);
+  isTraining = false; generation = 0; rewardHistory = [];
+  bestGenome = null; bestFitness = 0;
+  // 描画リセット
+};
+```
+
+---
+
+### 9. デザイン仕様（ダーク・サイエンティフィック）
+
+これはえいいちの全作品に一貫するUI哲学。妥協しないこと。
+
+#### カラーパレット（CSS変数化必須）：
+```css
+:root {
+  --bg-primary:    #0a0e1a;   /* ページ背景 */
+  --bg-panel:      #111827;   /* パネル背景 */
+  --bg-canvas:     #0d1117;   /* Canvas背景 */
+  --accent-cyan:   #00d4ff;   /* メインアクセント */
+  --accent-red:    #ff4d6d;   /* 警告・負の重み */
+  --accent-blue:   #3b82f6;   /* 正の重み */
+  --text-primary:  #e2e8f0;   /* 主テキスト */
+  --text-muted:    #64748b;   /* 補助テキスト */
+  --border:        #1e293b;   /* ボーダー */
+  --grid:          #1e293b;   /* グリッド線 */
+}
+```
+
+#### タイポグラフィ：
+- 数値・ラベル・NN表示: `'Courier New', Courier, monospace`
+- タイトル・見出し: 大文字、letter-spacing: 0.2em
+- フォントは外部CDN不使用（システムmonospace）
+
+#### ヘッダー：
+```
+● DEEP RACER         GEN: 12    BEST: 847.3
+```
+- ● は点滅アニメーション（学習中: シアン点滅 / 停止中: 赤）
+- 背景: --bg-primary、下ボーダー: 1px solid --border
+
+#### パネルのスタイル：
+```css
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+.panel-title {
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+```
+
+#### スライダースタイル：
+```css
+input[type=range] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(to right, var(--accent-cyan) var(--pct), var(--border) var(--pct));
+  border-radius: 2px;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px;
+  background: var(--accent-cyan);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--accent-cyan);
+}
+```
+
+#### コントロールボタン：
+```css
+.btn {
+  background: transparent;
+  border: 1px solid var(--accent-cyan);
+  color: var(--accent-cyan);
+  font-family: monospace;
+  letter-spacing: 0.1em;
+  padding: 10px 20px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.btn:active { background: rgba(0,212,255,0.15); }
+.btn-danger { border-color: var(--accent-red); color: var(--accent-red); }
+```
+
+---
+
+### 10. iOS PWA必須設定
+
+```html
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DeepRacer">
+<meta name="theme-color" content="#0a0e1a">
+<meta name="viewport" content="width=device-width, initial-scale=1.0,
+  maximum-scale=1.0, user-scalable=no">
+```
+
+---
+
+### 11. パフォーマンス注意事項
+
+- Canvas context はキャッシュ（getContextは一度だけ）
+- NN可視化はseparateなCanvas要素（コースCanvasと分離）
+- iOS Safariでの60fps維持を優先
+- エージェント数12程度でも重い場合: 8に減らすオプション
+
+================================================================
+## 実装チェックリスト（これが全部できていれば合格）
+================================================================
+
+コース・走行：
+[ ] 楕円サーキットがCanvas上に美しく描画されている
+[ ] 複数車（12台）が同時に走行している
+[ ] 学習前はコースアウトしまくる（混乱状態が見える）
+[ ] 世代が進むと走れるようになる（学習の進行が見える）
+[ ] ベスト個体が光って強調されている
+[ ] ベスト個体にレイキャスト5本が可視化されている
+
+NN可視化：
+[ ] Input層5ノード（センサー値）が描画されている
+[ ] Hidden層6ノード（tanh活性化値）が描画されている
+[ ] Output層2ノード（ステア・スロットル）が描画されている
+[ ] 全ノードの円内に実数値（小数2桁）がテキスト表示されている
+[ ] エッジの太さが|重み|に比例している
+[ ] エッジの色が正=青・負=赤になっている
+[ ] ノードの色が活性化値の強さに比例している（グロー効果あり）
+[ ] リアルタイムで毎フレーム更新されている
+
+報酬設計：
+[ ] [SIMPLE][CUSTOM]タブ切替UIが機能している
+[ ] SIMPLEモード: スライダー6本（CENTER/SPEED/SMOOTH/PROGRESS/HEADING/SURVIVE）が動作する
+[ ] SIMPLEモード: 各スライダーの変更が次ステップから即時反映される
+[ ] CUSTOMモード: テキストエリアにJSコードを書いて[APPLY]で即時適用できる
+[ ] CUSTOMモード: 構文エラー時に赤ステータス表示、正常時に緑ステータス表示
+[ ] CUSTOMモード: [PRESET▼]から5種類のサンプル関数を選んで挿入できる
+[ ] paramsオブジェクトに10個の変数（distFromCenter/trackWidth/speed/steerAngle/
+    progress/headingError/steps/lapProgress/allWheelsOnTrack/isReversed）が渡される
+[ ] customRewardFnの戻り値がNaN/Infinityの場合に0にフォールバックされる
+
+学習グラフ：
+[ ] 世代ごとのベスト報酬が折れ線で表示されている
+[ ] グラフが右方向に延びていく（学習の進行が記録される）
+
+UI・デザイン：
+[ ] --bg-primary #0a0e1a の暗い背景
+[ ] シアン（#00d4ff）アクセントが統一されている
+[ ] monospaceフォントで計測器感が出ている
+[ ] ヘッダーのGEN・BEST数値がリアルタイム更新される
+[ ] ● が学習中にシアン点滅している
+[ ] iOS Safariでタッチ操作が全て動作する
+[ ] PWAメタタグが全て設定されている
+
+================================================================
+## 絶対にやってはいけないこと
+================================================================
+
+- スライダーだけ置いてコースが動かないUIを出すな
+- NN可視化パネルを省略するな（最重要機能）
+- 実数値テキストを各ノードに表示するのを忘れるな
+- CUSTOMモードのコードエディタを省略するな（本家DeepRacerの核心体験）
+- プリセット5種類を省略するな（初心者の入口）
+- paramsオブジェクトの変数を減らすな（10変数全て渡せ）
+- デザインを妥協してシステムデフォルトUIにするな
+- 「省略します」「後で追加します」は不可。一発で完成品を出すこと
+- コメントを省くな（GitHub Copilotとの協働を想定）
+
+================================================================
+## 出力形式
+================================================================
+
+行数制限: なし（完全実装）
+ファイル数制限：なし
+
+================================================================
+  以上。このスクリプトの品質で評価する。期待している。
+================================================================
