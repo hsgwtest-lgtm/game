@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#00ff88">
+<title>NeuroDriver α</title>
+<link rel="manifest" href="manifest.json">
+<style>
+/* ============================================================
+   NeuroDriver α — Stylesheet
+   Dark sci-fi theme with neon green/cyan accents
+   ============================================================ */
+:root {
+  --bg: #0a0a0f;
+  --panel: #0f0f1a;
+  --card: #12122a;
+  --border: #1e1e3a;
+  --text: #d0d0e8;
+  --text2: #6a6a90;
+  --green: #00ff88;
+  --cyan: #00cfff;
+  --red: #ff4466;
+  --gold: #ffcc00;
+  --glow-green: rgba(0, 255, 136, 0.15);
+  --glow-cyan: rgba(0, 207, 255, 0.15);
+  --radius: 12px;
+  --font: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+  user-select: none;
+  -webkit-user-select: none;
+}
+button { cursor: pointer; border: none; font-family: inherit; font-size: inherit; outline: none; }
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  background: var(--green);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 6px var(--glow-green);
+}
+canvas { display: block; }
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ===== Phase Screens (shared) ===== */
+.screen {
+  position: fixed; inset: 0; z-index: 100;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  background: var(--bg);
+  overflow-y: auto;
+  padding: 40px 20px;
+}
+.screen.active { display: flex; }
+
+.screen-title {
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 900;
+  background: linear-gradient(135deg, var(--green), var(--cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0.3em;
+  text-align: center;
+}
+.screen-sub {
+  color: var(--text2);
+  font-size: 0.95rem;
+  margin-bottom: 2em;
+  text-align: center;
+  max-width: 500px;
+  line-height: 1.5;
+}
+
+/* ===== Phase Indicator (stepper) ===== */
+.stepper {
+  display: flex; align-items: center; gap: 6px;
+  margin-bottom: 2em; flex-wrap: wrap; justify-content: center;
+}
+.step {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.78rem;
+  color: var(--text2);
+  padding: 6px 16px;
+  border-radius: 20px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  transition: all 0.25s;
+  font-weight: 600;
+}
+.step.active { color: var(--green); border-color: var(--green); background: rgba(0,255,136,0.06); box-shadow: 0 0 12px var(--glow-green); }
+.step.done { color: var(--text); border-color: var(--text2); }
+.step-arrow { color: var(--text2); font-size: 0.7rem; }
+
+/* ===== Buttons ===== */
+.btn-primary {
+  background: linear-gradient(135deg, var(--green), #00cc66);
+  color: #000; font-weight: 700; padding: 14px 48px;
+  border-radius: 50px; font-size: 1.05rem;
+  letter-spacing: 0.03em; transition: all 0.2s;
+  box-shadow: 0 0 20px var(--glow-green);
+}
+.btn-primary:hover { transform: scale(1.04); box-shadow: 0 0 30px rgba(0,255,136,0.4); }
+.btn-primary:disabled { opacity: 0.35; transform: none; cursor: default; }
+
+.btn-secondary {
+  background: var(--panel); color: var(--text2);
+  padding: 10px 28px; border-radius: 50px;
+  border: 1px solid var(--border) !important;
+  font-weight: 600; font-size: 0.9rem;
+  transition: all 0.2s;
+}
+.btn-secondary:hover { border-color: var(--text) !important; color: var(--text); }
+
+.btn-small {
+  padding: 5px 14px; border-radius: 8px;
+  font-size: 0.78rem; font-weight: 600;
+  transition: all 0.15s;
+}
+
+/* ===== Cards ===== */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+}
+.card-title {
+  font-size: 0.82rem; font-weight: 700;
+  color: var(--green); margin-bottom: 12px;
+  display: flex; align-items: center; gap: 6px;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+
+/* ===== Slider Group ===== */
+.slider-group { margin-bottom: 12px; }
+.slider-label {
+  display: flex; justify-content: space-between;
+  font-size: 0.78rem; color: var(--text2); margin-bottom: 4px;
+}
+.slider-label .val { color: var(--cyan); font-family: var(--mono); font-weight: 600; }
+
+/* ===== START SCREEN ===== */
+#startScreen { justify-content: center; }
+#startScreen .logo-icon {
+  font-size: 3rem; margin-bottom: 0.4em;
+}
+.start-btns { display: flex; flex-direction: column; gap: 12px; align-items: center; margin-top: 1em; }
+
+/* ===== COURSE SCREEN ===== */
+.track-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px; max-width: 580px; width: 90%;
+  margin-bottom: 1.5em;
+}
+.track-card {
+  background: var(--card); border: 2px solid var(--border);
+  border-radius: var(--radius); padding: 14px;
+  text-align: center; cursor: pointer; transition: all 0.2s;
+}
+.track-card:hover, .track-card.selected {
+  border-color: var(--green); box-shadow: 0 0 20px var(--glow-green);
+}
+.track-card.selected { background: rgba(0,255,136,0.04); }
+.track-card canvas {
+  width: 100%; aspect-ratio: 1.4;
+  border-radius: 8px; margin-bottom: 8px;
+  background: var(--bg);
+}
+.track-card .name { font-weight: 700; font-size: 0.9rem; }
+.track-card .diff { font-size: 0.72rem; color: var(--text2); margin-top: 4px; }
+.width-control { max-width: 300px; width: 80%; margin-bottom: 1.5em; }
+
+/* ===== RACER DESIGN SCREEN ===== */
+.design-layout {
+  display: flex; gap: 20px; max-width: 920px;
+  width: 95%; flex-wrap: wrap; justify-content: center;
+  margin-bottom: 1.5em;
+}
+.design-layout .card { flex: 1; min-width: 260px; max-width: 420px; }
+#racerPreviewCanvas {
+  width: 100%; aspect-ratio: 1.5;
+  border-radius: 8px; background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+/* ===== DRAW OVERLAY ===== */
+#drawOverlay {
+  position: fixed; inset: 0; z-index: 200;
+  display: none; flex-direction: column;
+  background: var(--bg);
+}
+#drawOverlay.active { display: flex; }
+.draw-header {
+  padding: 10px 16px; display: flex;
+  align-items: center; justify-content: space-between;
+  background: var(--panel); border-bottom: 1px solid var(--border);
+}
+.draw-info { color: var(--text2); font-size: 0.82rem; }
+#drawCanvas { flex: 1; width: 100%; cursor: crosshair; touch-action: none; }
+.draw-btns { display: flex; gap: 8px; }
+
+/* ===== GAME SCREEN (Training phase) ===== */
+#gameScreen {
+  display: none; flex-direction: row;
+  height: 100vh; width: 100vw;
+  position: fixed; inset: 0; z-index: 50;
+}
+#gameScreen.active { display: flex; }
+
+.game-main {
+  flex: 2; display: flex; flex-direction: column;
+  min-width: 0;
+}
+.game-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px;
+  background: var(--panel); border-bottom: 1px solid var(--border);
+  flex-wrap: wrap; min-height: 44px;
+}
+.game-header .logo { font-weight: 800; font-size: 0.95rem; color: var(--green); }
+.stat { font-size: 0.78rem; color: var(--text2); font-family: var(--mono); }
+.stat b { color: var(--text); font-weight: 600; }
+
+.speed-controls { display: flex; gap: 4px; margin-left: auto; }
+.speed-controls button {
+  width: 38px; height: 28px; border-radius: 6px;
+  font-size: 0.72rem; font-weight: 700;
+  background: var(--panel); color: var(--text2);
+  border: 1px solid var(--border) !important;
+  transition: all 0.15s;
+}
+.speed-controls button.active { background: var(--green); color: #000; border-color: var(--green) !important; }
+
+.header-btn {
+  background: var(--panel); border: 1px solid var(--border) !important;
+  padding: 4px 12px; border-radius: 6px;
+  font-size: 0.75rem; font-weight: 600; margin-left: 4px;
+}
+.header-btn.pause { color: var(--cyan); }
+.header-btn.save { color: var(--gold); }
+.header-btn.back { color: var(--red); }
+
+#mainCanvas { flex: 1; width: 100%; background: var(--bg); }
+
+/* ===== Side Panel ===== */
+.side-panel {
+  flex: 1; max-width: 380px; min-width: 280px;
+  display: flex; flex-direction: column;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  overflow: hidden;
+}
+.tab-bar {
+  display: flex; border-bottom: 1px solid var(--border);
+}
+.tab-btn {
+  flex: 1; padding: 10px 0;
+  font-size: 0.78rem; font-weight: 700;
+  color: var(--text2); background: transparent;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.tab-btn.active { color: var(--green); border-bottom-color: var(--green); }
+.tab-content { flex: 1; overflow-y: auto; padding: 14px; }
+.tab-page { display: none; }
+.tab-page.active { display: block; }
+
+/* Stats panel */
+.stat-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px; margin-bottom: 16px;
+}
+.stat-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px;
+  text-align: center;
+}
+.stat-card .label { font-size: 0.68rem; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; }
+.stat-card .value { font-size: 1.3rem; font-weight: 800; color: var(--green); font-family: var(--mono); margin-top: 4px; }
+.stat-card .value.cyan { color: var(--cyan); }
+
+#fitnessCanvas { width: 100%; aspect-ratio: 2; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); }
+
+/* Brain panel */
+#brainCanvas { width: 100%; aspect-ratio: 1.5; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); }
+
+/* Sensors panel */
+#sensorCanvas { width: 100%; aspect-ratio: 1.5; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); margin-bottom: 12px; }
+.sensor-bars { display: flex; flex-direction: column; gap: 6px; }
+.sensor-bar-row { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; }
+.sensor-bar-row .lbl { width: 24px; color: var(--text2); font-family: var(--mono); text-align: right; }
+.sensor-bar-track { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.sensor-bar-fill { height: 100%; border-radius: 3px; transition: width 0.1s; }
+
+/* ===== WATCH SCREEN ===== */
+.saved-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px; max-width: 700px; width: 90%; margin-bottom: 1.5em;
+}
+.saved-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px;
+  cursor: pointer; transition: all 0.2s;
+}
+.saved-card:hover { border-color: var(--green); box-shadow: 0 0 16px var(--glow-green); }
+.saved-card .racer-name { font-weight: 700; font-size: 1rem; color: var(--green); margin-bottom: 6px; }
+.saved-card .racer-info { font-size: 0.76rem; color: var(--text2); line-height: 1.7; font-family: var(--mono); }
+.saved-card .racer-actions { display: flex; gap: 6px; margin-top: 12px; }
+.no-saved { color: var(--text2); font-size: 0.9rem; text-align: center; padding: 40px 0; }
+
+/* ===== Notifications ===== */
+.notification {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  z-index: 999; padding: 12px 28px;
+  border-radius: 10px; font-weight: 700;
+  font-size: 0.9rem; pointer-events: none;
+  opacity: 0; transition: opacity 0.4s;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+.notification.show { opacity: 1; }
+.notification.success { background: var(--green); color: #000; }
+.notification.record { background: var(--gold); color: #000; }
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  #gameScreen { flex-direction: column; }
+  .side-panel { max-width: 100%; min-width: 0; border-left: none; border-top: 1px solid var(--border); max-height: 40vh; }
+  .game-main { flex: 1; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===== NOTIFICATION ===== -->
+<div id="notification" class="notification"></div>
+
+<!-- ===== PHASE 0: START SCREEN ===== -->
+<div id="startScreen" class="screen active">
+  <div class="logo-icon">🧠</div>
+  <div class="screen-title">NeuroDriver α</div>
+  <div class="screen-sub">
+    ニューラルネットワークとGAで進化するAIレーサー。<br>
+    設計 → コース → 学習 → 鑑賞
+  </div>
+  <div class="start-btns">
+    <button class="btn-primary" id="btnNewRacer">レーサーを設計する</button>
+    <button class="btn-secondary" id="btnViewSaved">保存済みレーサー</button>
+  </div>
+</div>
+
+<!-- ===== PHASE 1: COURSE DESIGN ===== -->
+<div id="courseScreen" class="screen">
+  <div class="stepper">
+    <span class="step active">① コース</span>
+    <span class="step-arrow">▸</span>
+    <span class="step">② レーサー</span>
+    <span class="step-arrow">▸</span>
+    <span class="step">③ 学習</span>
+    <span class="step-arrow">▸</span>
+    <span class="step">④ 鑑賞</span>
+  </div>
+  <div class="screen-title">コース選択</div>
+  <div class="screen-sub">プリセットを選択するか、自分でコースを描きます</div>
+  <div class="track-grid" id="trackGrid"></div>
+  <div class="width-control">
+    <div class="slider-group">
+      <div class="slider-label"><span>コース幅</span><span class="val" id="trackWidthVal">60</span></div>
+      <input type="range" id="trackWidth" min="30" max="100" value="60">
+    </div>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+    <button class="btn-secondary" id="btnDrawCustom">✏️ カスタム描画</button>
+    <button class="btn-primary" id="btnToCourseNext">次へ →</button>
+  </div>
+</div>
+
+<!-- ===== DRAW OVERLAY ===== -->
+<div id="drawOverlay">
+  <div class="draw-header">
+    <span class="draw-info">クリックで中心線のポイントを追加（最低4点）</span>
+    <div class="draw-btns">
+      <button class="btn-small btn-secondary" id="btnDrawUndo">↩ 戻す</button>
+      <button class="btn-small btn-secondary" id="btnDrawCancel" style="color:var(--red)">キャンセル</button>
+      <button class="btn-small btn-primary" id="btnDrawDone" disabled>完了</button>
+    </div>
+  </div>
+  <canvas id="drawCanvas"></canvas>
+</div>
+
+<!-- ===== PHASE 2: RACER DESIGN ===== -->
+<div id="designScreen" class="screen">
+  <div class="stepper">
+    <span class="step done">① コース</span>
+    <span class="step-arrow">▸</span>
+    <span class="step active">② レーサー</span>
+    <span class="step-arrow">▸</span>
+    <span class="step">③ 学習</span>
+    <span class="step-arrow">▸</span>
+    <span class="step">④ 鑑賞</span>
+  </div>
+  <div class="screen-title">レーサー設計</div>
+  <div class="screen-sub">センサー・車体パラメータ・報酬関数を調整してAIの個性を決めます</div>
+  <div class="design-layout">
+    <!-- Sensors & Body -->
+    <div class="card">
+      <div class="card-title">📡 センサー＆車体</div>
+      <div class="slider-group">
+        <div class="slider-label"><span>センサー数</span><span class="val" id="sensorCountVal">5</span></div>
+        <input type="range" id="sensorCount" min="3" max="9" value="5" step="2">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label"><span>センサー範囲</span><span class="val" id="sensorRangeVal">160</span></div>
+        <input type="range" id="sensorRange" min="60" max="300" value="160">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label"><span>最高速度</span><span class="val" id="maxSpeedVal">4.5</span></div>
+        <input type="range" id="maxSpeed" min="2" max="8" value="4.5" step="0.5">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label"><span>加速力</span><span class="val" id="accelVal">0.14</span></div>
+        <input type="range" id="accel" min="0.05" max="0.3" value="0.14" step="0.01">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label"><span>旋回力</span><span class="val" id="turnVal">0.055</span></div>
+        <input type="range" id="turn" min="0.02" max="0.1" value="0.055" step="0.005">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label"><span>NN隠れ層ノード</span><span class="val" id="hiddenVal">8</span></div>
+        <input type="range" id="hidden" min="4" max="20" value="8">
+      </div>
+      <canvas id="racerPreviewCanvas"></canvas>
+    </div>
+    <!-- Reward Function -->
+    <div class="card">
+      <div class="card-title">🎯 報酬関数</div>
+      <div class="screen-sub" style="font-size:0.76rem;margin-bottom:14px;text-align:left;max-width:none">
+        各要素の重要度を調整します。<br>AIがどのような走行を学習するかが変わります。
+      </div>
+      <div class="slider-group">
+        <div class="slider-label"><span>🏎️ 速度重視</span><span class="val" id="rwSpeedVal">1.0</span></div>
+        <input type="range" id="rwSpeed" min="0" max="2" value="1.0" step="0.1">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label"><span>🛡️ 安全重視</span><span class="val" id="rwSafetyVal">0.5</span></div>
+        <input type="range" id="rwSafety" min="0" max="2" value="0.5" step="0.1">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label"><span>📏 効率重視</span><span class="val" id="rwEfficiencyVal">0.7</span></div>
+        <input type="range" id="rwEfficiency" min="0" max="2" value="0.7" step="0.1">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label"><span>🌊 滑らかさ</span><span class="val" id="rwSmoothnessVal">0.3</span></div>
+        <input type="range" id="rwSmoothness" min="0" max="2" value="0.3" step="0.1">
+      </div>
+      <div style="margin-top:16px;padding:14px;background:var(--bg);border-radius:10px;border:1px solid var(--border)">
+        <div style="font-size:0.75rem;color:var(--text2);margin-bottom:8px;font-weight:600">📊 報酬バランス</div>
+        <canvas id="rewardRadar" width="200" height="200" style="width:100%;max-width:200px;display:block;margin:0 auto"></canvas>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+    <button class="btn-secondary" id="btnBackToCourse">← コース</button>
+    <button class="btn-primary" id="btnStartTraining">学習開始 🚀</button>
+  </div>
+</div>
+
+<!-- ===== PHASE 3: TRAINING (Game screen) ===== -->
+<div id="gameScreen">
+  <div class="game-main">
+    <div class="game-header">
+      <span class="logo">NeuroDriver α</span>
+      <span class="stat">世代: <b id="genNum">0</b></span>
+      <span class="stat">最高: <b id="bestScore">0.00</b></span>
+      <span class="stat">生存: <b id="aliveCount">0</b></span>
+      <div class="speed-controls">
+        <button class="active" data-speed="1">1x</button>
+        <button data-speed="3">3x</button>
+        <button data-speed="8">8x</button>
+        <button data-speed="0">MAX</button>
+      </div>
+      <button class="header-btn pause" id="btnPause">⏸</button>
+      <button class="header-btn save" id="btnSaveBest">💾 ベスト保存</button>
+      <button class="header-btn back" id="btnBackToStart">✕ 終了</button>
+    </div>
+    <canvas id="mainCanvas"></canvas>
+  </div>
+  <div class="side-panel">
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="stats">Stats</button>
+      <button class="tab-btn" data-tab="brain">Brain</button>
+      <button class="tab-btn" data-tab="sensors">Sensors</button>
+    </div>
+    <div class="tab-content">
+      <div class="tab-page active" data-page="stats">
+        <div class="stat-grid">
+          <div class="stat-card"><div class="label">世代</div><div class="value" id="statGen">0</div></div>
+          <div class="stat-card"><div class="label">最高スコア</div><div class="value" id="statBest">0.00</div></div>
+          <div class="stat-card"><div class="label">平均スコア</div><div class="value cyan" id="statAvg">0.00</div></div>
+          <div class="stat-card"><div class="label">全体ベスト</div><div class="value" id="statAllTime" style="color:var(--gold)">0.00</div></div>
+        </div>
+        <div class="card-title" style="font-size:0.72rem">📈 学習曲線</div>
+        <canvas id="fitnessCanvas"></canvas>
+      </div>
+      <div class="tab-page" data-page="brain">
+        <div class="card-title" style="font-size:0.72rem">🧠 ニューラルネットワーク</div>
+        <canvas id="brainCanvas"></canvas>
+        <div style="margin-top:10px;font-size:0.72rem;color:var(--text2)">
+          最優秀個体のNN重み。色: <span style="color:#44ff88">正</span> / <span style="color:#ff4466">負</span>。太さ = 重みの大きさ。
+        </div>
+      </div>
+      <div class="tab-page" data-page="sensors">
+        <div class="card-title" style="font-size:0.72rem">📡 センサー値</div>
+        <canvas id="sensorCanvas"></canvas>
+        <div class="sensor-bars" id="sensorBars"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PHASE 4: WATCH SCREEN ===== -->
+<div id="watchScreen" class="screen">
+  <div class="stepper">
+    <span class="step done">① コース</span>
+    <span class="step-arrow">▸</span>
+    <span class="step done">② レーサー</span>
+    <span class="step-arrow">▸</span>
+    <span class="step done">③ 学習</span>
+    <span class="step-arrow">▸</span>
+    <span class="step active">④ 鑑賞</span>
+  </div>
+  <div class="screen-title">保存済みレーサー</div>
+  <div class="screen-sub">学習済みAIレーサーを選んで走行を観察</div>
+  <div class="saved-grid" id="savedGrid"></div>
+  <button class="btn-secondary" id="btnBackFromWatch">← スタートに戻る</button>
+</div>
+
+<script src="engine.js"></script>
+</body>
+</html>
