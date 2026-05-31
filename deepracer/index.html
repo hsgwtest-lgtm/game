@@ -169,13 +169,13 @@ const MAX_STEPS = 800;
 const COURSE_W = 420;
 const COURSE_H = 420;
 const TRACK_RADIUS_OUTER = 160;
-const TRACK_RADIUS_INNER = 100;
+const TRACK_RADIUS_INNER = 120;
 const TRACK_WIDTH = TRACK_RADIUS_OUTER - TRACK_RADIUS_INNER;
 const CX = COURSE_W / 2;
 const CY = COURSE_H / 2;
 const SENSOR_ANGLES = [-60, -30, 0, 30, 60]; // degrees
 const SENSOR_MAX = 80;
-const NUM_WEIGHTS = 5 * 6 + 6 + 6 * 2 + 2; // weights + biases = 30+6+12+2 = 50
+const NUM_WEIGHTS = 5 * 6 + 6 + 6 * 2 + 2; // (5×6)+(6)+(6×2)+(2) = 30+6+12+2 = 50
 const ELITE_FRAC = 0.3;
 const MUTATION_RATE_INIT = 0.10;
 const MUTATION_DECAY = 0.997;
@@ -203,7 +203,7 @@ for (let i = 0; i < NUM_WAYPOINTS; i++) {
     y: CY + SEMI_MINOR * Math.sin(a)
   });
 }
-const HALF_TRACK = 20; // half of track width
+const HALF_TRACK = TRACK_WIDTH / 2; // half of track width, derived from radii
 
 // ===== Course geometry helpers =====
 function closestWaypoint(px, py) {
@@ -334,7 +334,7 @@ function stepAgent(agent, weights) {
   // 5. Waypoint progress
   const cw = closestWaypoint(agent.x, agent.y);
   const nextExpected = (agent.wpIndex + 1) % NUM_WAYPOINTS;
-  if (cw.index === nextExpected || cw.index === (nextExpected + 1) % NUM_WAYPOINTS) {
+  if (cw.index === nextExpected || cw.index === ((nextExpected + 1) % NUM_WAYPOINTS)) {
     agent.wpIndex = cw.index;
     // Check lap completion
     if (agent.wpIndex === 0 && agent.steps > 50) {
@@ -777,7 +777,7 @@ function mainLoop() {
   // Update best time display
   const best = state.agents[bestIdx];
   document.getElementById('bestTime').textContent =
-    best.laps > 0 ? best.laps + 'LAP' : best.steps + 'st';
+    best.laps > 0 ? best.laps + 'LAP' : best.steps + 'stp';
 
   // Generation complete?
   if (allDead) {
