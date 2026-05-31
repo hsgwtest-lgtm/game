@@ -1499,4 +1499,7 @@ class Game {
 // ============================================================
 window.addEventListener('DOMContentLoaded', () => {
   new Game();
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
 });
