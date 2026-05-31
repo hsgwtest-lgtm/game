@@ -1,0 +1,1419 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DeepRacer">
+<meta name="theme-color" content="#0a0e1a">
+<title>DEEP RACER</title>
+<style>
+/* ============================================================
+   CSS Variables — Dark Scientific Theme
+   ============================================================ */
+:root {
+  --bg-primary:    #0a0e1a;
+  --bg-panel:      #111827;
+  --bg-canvas:     #0d1117;
+  --accent-cyan:   #00d4ff;
+  --accent-red:    #ff4d6d;
+  --accent-blue:   #3b82f6;
+  --text-primary:  #e2e8f0;
+  --text-muted:    #64748b;
+  --border:        #1e293b;
+  --grid:          #1e293b;
+}
+
+/* ============================================================
+   Reset & Base
+   ============================================================ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Courier New', Courier, monospace;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none; user-select: none;
+  touch-action: manipulation;
+}
+
+/* ============================================================
+   Header
+   ============================================================ */
+#header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px; letter-spacing: 0.15em;
+  text-transform: uppercase;
+  position: sticky; top: 0; z-index: 10;
+}
+#header .title { display: flex; align-items: center; gap: 8px; }
+#status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent-red);
+  display: inline-block;
+}
+#status-dot.active {
+  background: var(--accent-cyan);
+  animation: blink 1s infinite;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+#header .stats { display: flex; gap: 14px; font-size: 11px; color: var(--text-muted); }
+#header .stats span b { color: var(--accent-cyan); }
+
+/* ============================================================
+   Container
+   ============================================================ */
+#container {
+  max-width: 420px; margin: 0 auto;
+  padding: 8px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+
+/* ============================================================
+   Panels
+   ============================================================ */
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px;
+}
+.panel-title {
+  font-size: 10px; letter-spacing: 0.15em;
+  color: var(--text-muted); text-transform: uppercase;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+
+/* ============================================================
+   Canvas wrappers
+   ============================================================ */
+.canvas-wrap { position: relative; width: 100%; }
+.canvas-wrap canvas {
+  display: block; width: 100%;
+  background: var(--bg-canvas);
+  border-radius: 2px;
+}
+
+/* ============================================================
+   NN Visualizer
+   ============================================================ */
+#nn-canvas { height: auto; }
+
+/* ============================================================
+   Tab UI (Reward Function)
+   ============================================================ */
+.tab-bar {
+  display: flex; gap: 0; margin-bottom: 10px;
+}
+.tab-btn {
+  flex: 1; padding: 7px 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-family: monospace; font-size: 10px;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tab-btn:first-child { border-radius: 2px 0 0 2px; }
+.tab-btn:last-child  { border-radius: 0 2px 2px 0; }
+.tab-btn.active {
+  background: rgba(0,212,255,0.1);
+  color: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+}
+
+/* ============================================================
+   Sliders (SIMPLE mode)
+   ============================================================ */
+.slider-row {
+  display: grid;
+  grid-template-columns: 68px 1fr 30px;
+  align-items: center; gap: 6px;
+  margin-bottom: 6px;
+}
+.sl-label {
+  font-size: 10px; letter-spacing: 0.1em;
+  color: var(--accent-cyan);
+}
+.sl-val {
+  font-size: 10px; color: var(--text-muted);
+  text-align: right;
+}
+input[type=range] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 4px;
+  background: var(--border);
+  border-radius: 2px; outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 16px; height: 16px;
+  background: var(--accent-cyan);
+  border-radius: 50%; cursor: pointer;
+  box-shadow: 0 0 8px var(--accent-cyan);
+}
+input[type=range]::-moz-range-thumb {
+  width: 16px; height: 16px;
+  background: var(--accent-cyan);
+  border: none; border-radius: 50%; cursor: pointer;
+  box-shadow: 0 0 8px var(--accent-cyan);
+}
+
+/* ============================================================
+   Custom Editor (CUSTOM mode)
+   ============================================================ */
+#custom-editor {
+  width: 100%; height: 180px;
+  background: #0d1117;
+  color: var(--accent-cyan);
+  font-family: 'Courier New', monospace;
+  font-size: 11px; line-height: 1.5;
+  border: 1px solid var(--border);
+  border-radius: 2px; padding: 8px;
+  resize: vertical;
+  -webkit-text-fill-color: var(--accent-cyan);
+  caret-color: var(--accent-cyan);
+  -webkit-user-select: text; user-select: text;
+}
+.editor-bar {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 6px;
+}
+.editor-status {
+  font-size: 10px; font-family: monospace;
+  letter-spacing: 0.05em; flex: 1;
+}
+#preset-select {
+  background: var(--bg-canvas); color: var(--text-muted);
+  border: 1px solid var(--border); border-radius: 2px;
+  font-family: monospace; font-size: 10px;
+  padding: 4px 6px;
+}
+
+/* ============================================================
+   Reward Graph
+   ============================================================ */
+#graph-canvas { height: 80px; }
+
+/* ============================================================
+   Control Buttons
+   ============================================================ */
+.controls {
+  display: flex; gap: 8px; justify-content: center;
+  padding: 8px 0;
+}
+.btn {
+  background: transparent;
+  border: 1px solid var(--accent-cyan);
+  color: var(--accent-cyan);
+  font-family: monospace; font-size: 11px;
+  letter-spacing: 0.1em;
+  padding: 10px 20px;
+  border-radius: 2px; cursor: pointer;
+  transition: background 0.1s;
+}
+.btn:active { background: rgba(0,212,255,0.15); }
+.btn-danger { border-color: var(--accent-red); color: var(--accent-red); }
+.btn-danger:active { background: rgba(255,77,109,0.15); }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     Header
+     ============================================================ -->
+<div id="header">
+  <div class="title">
+    <span id="status-dot"></span>
+    <span>DEEP RACER</span>
+  </div>
+  <div class="stats">
+    <span>GEN: <b id="hud-gen">0</b></span>
+    <span>BEST: <b id="hud-best">0</b></span>
+  </div>
+</div>
+
+<!-- ============================================================
+     Main Container
+     ============================================================ -->
+<div id="container">
+
+  <!-- Course Canvas -->
+  <div class="panel">
+    <div class="panel-title">COURSE — TOP VIEW</div>
+    <div class="canvas-wrap">
+      <canvas id="course-canvas" width="340" height="340"></canvas>
+    </div>
+  </div>
+
+  <!-- NN Visualizer -->
+  <div class="panel">
+    <div class="panel-title">NN VISUALIZER — BEST AGENT</div>
+    <div class="canvas-wrap">
+      <canvas id="nn-canvas" width="340" height="200"></canvas>
+    </div>
+  </div>
+
+  <!-- Reward Function -->
+  <div class="panel">
+    <div class="panel-title">REWARD FUNCTION</div>
+
+    <!-- Tab bar -->
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tab-simple">SIMPLE</button>
+      <button class="tab-btn" id="tab-custom">CUSTOM</button>
+    </div>
+
+    <!-- SIMPLE panel -->
+    <div id="panel-simple">
+      <div class="slider-row">
+        <span class="sl-label">CENTER</span>
+        <input type="range" id="sl-center" min="0" max="100" value="70">
+        <span class="sl-val" id="val-center">70</span>
+      </div>
+      <div class="slider-row">
+        <span class="sl-label">SPEED</span>
+        <input type="range" id="sl-speed" min="0" max="100" value="40">
+        <span class="sl-val" id="val-speed">40</span>
+      </div>
+      <div class="slider-row">
+        <span class="sl-label">SMOOTH</span>
+        <input type="range" id="sl-smooth" min="0" max="100" value="60">
+        <span class="sl-val" id="val-smooth">60</span>
+      </div>
+      <div class="slider-row">
+        <span class="sl-label">PROGRESS</span>
+        <input type="range" id="sl-progress" min="0" max="100" value="80">
+        <span class="sl-val" id="val-progress">80</span>
+      </div>
+      <div class="slider-row">
+        <span class="sl-label">HEADING</span>
+        <input type="range" id="sl-heading" min="0" max="100" value="50">
+        <span class="sl-val" id="val-heading">50</span>
+      </div>
+      <div class="slider-row">
+        <span class="sl-label">SURVIVE</span>
+        <input type="range" id="sl-survive" min="0" max="100" value="30">
+        <span class="sl-val" id="val-survive">30</span>
+      </div>
+    </div>
+
+    <!-- CUSTOM panel -->
+    <div id="panel-custom" style="display:none">
+      <textarea id="custom-editor" spellcheck="false">// 利用可能な変数（paramsオブジェクト）
+function reward(params) {
+  const {
+    distFromCenter,  // 0〜trackWidth/2
+    trackWidth,      // コース幅px
+    speed,           // 0〜3.0
+    steerAngle,      // -1〜+1
+    progress,        // 0〜1
+    headingError,    // 0〜π
+    steps,           // 経過ステップ
+    lapProgress,     // 0〜1
+    allWheelsOnTrack,// boolean
+    isReversed,      // boolean
+  } = params;
+
+  if (!allWheelsOnTrack) return 0;
+  return distFromCenter < 0.3 * trackWidth ? 1.0 : 0.1;
+}</textarea>
+      <div class="editor-bar">
+        <button class="btn" id="btn-apply" style="padding:6px 12px;font-size:10px;">▶ APPLY</button>
+        <select id="preset-select">
+          <option value="">PRESET ▼</option>
+          <option value="center">センター重視</option>
+          <option value="speed">スピード重視</option>
+          <option value="milestone">進捗マイルストーン</option>
+          <option value="zigzag">ジグザグ防止</option>
+          <option value="waypoint">ウェイポイント方向</option>
+        </select>
+        <span class="editor-status" id="editor-status" style="color:var(--text-muted);">— READY</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reward History Graph -->
+  <div class="panel">
+    <div class="panel-title">REWARD HISTORY</div>
+    <div class="canvas-wrap">
+      <canvas id="graph-canvas" width="340" height="80"></canvas>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn" id="btn-train">▶ TRAIN</button>
+    <button class="btn btn-danger" id="btn-stop">■ STOP</button>
+    <button class="btn" id="btn-reset">↺ RESET</button>
+  </div>
+
+</div><!-- /container -->
+
+<!-- ============================================================
+     JavaScript — Complete Implementation
+     ============================================================ -->
+<script>
+/* ============================================================
+   Constants & Configuration
+   ============================================================ */
+const TRACK_WIDTH = 40;                // コース幅(px)
+const MAX_SPEED   = 3.0;               // 最大速度(px/frame)
+const SENSOR_RANGE = 100;              // レイキャスト距離(px)
+const SENSOR_ANGLES = [-60, -30, 0, 30, 60]; // センサー角度(度)
+const DEG = Math.PI / 180;
+
+const GA = {
+  POPULATION:     12,
+  ELITE_RATE:     0.3,
+  MUTATION_RATE:  0.10,
+  MUTATION_SCALE: 0.3,
+  MAX_STEPS:      800,
+};
+
+// NN構造: 5入力 → 6隠れ → 2出力
+const NN_IN  = 5;
+const NN_HID = 6;
+const NN_OUT = 2;
+const GENOME_LEN = NN_IN * NN_HID + NN_HID + NN_HID * NN_OUT + NN_OUT; // weights + biases
+
+/* ============================================================
+   Course — Elliptical Circuit (Waypoints)
+   ============================================================ */
+const WAYPOINTS = [];
+const WP_COUNT = 36;
+const CX = 170, CY = 170, RX = 120, RY = 90;
+for (let i = 0; i < WP_COUNT; i++) {
+  const angle = (i / WP_COUNT) * Math.PI * 2;
+  WAYPOINTS.push({
+    x: CX + RX * Math.cos(angle),
+    y: CY + RY * Math.sin(angle)
+  });
+}
+
+// Build wall segments from waypoints
+function buildTrackWalls() {
+  const inner = [], outer = [];
+  const n = WAYPOINTS.length;
+  for (let i = 0; i < n; i++) {
+    const prev = WAYPOINTS[(i - 1 + n) % n];
+    const next = WAYPOINTS[(i + 1) % n];
+    const dx = next.x - prev.x, dy = next.y - prev.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const nx = -dy / len, ny = dx / len;
+    const hw = TRACK_WIDTH / 2;
+    inner.push({ x: WAYPOINTS[i].x + nx * hw, y: WAYPOINTS[i].y + ny * hw });
+    outer.push({ x: WAYPOINTS[i].x - nx * hw, y: WAYPOINTS[i].y - ny * hw });
+  }
+  const walls = [];
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    walls.push({ x1: inner[i].x, y1: inner[i].y, x2: inner[j].x, y2: inner[j].y });
+    walls.push({ x1: outer[i].x, y1: outer[i].y, x2: outer[j].x, y2: outer[j].y });
+  }
+  return { walls, inner, outer };
+}
+
+const TRACK = buildTrackWalls();
+
+/* ============================================================
+   Utility Functions
+   ============================================================ */
+function randF(a, b) { return a + Math.random() * (b - a); }
+function randGauss() {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+}
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function normalizeAngle(a) {
+  while (a > Math.PI) a -= 2 * Math.PI;
+  while (a < -Math.PI) a += 2 * Math.PI;
+  return a;
+}
+
+// Ray-segment intersection: returns distance or -1
+function raySeg(ox, oy, dx, dy, x1, y1, x2, y2) {
+  const sx = x2 - x1, sy = y2 - y1;
+  const denom = dx * sy - dy * sx;
+  if (Math.abs(denom) < 1e-10) return -1;
+  const t = ((x1 - ox) * sy - (y1 - oy) * sx) / denom;
+  const u = ((x1 - ox) * dy - (y1 - oy) * dx) / denom;
+  if (t >= 0 && u >= 0 && u <= 1) return t;
+  return -1;
+}
+
+// Point-to-segment distance (for collision)
+function ptSegDist(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - x1, py - y1);
+  let t = clamp(((px - x1) * dx + (py - y1) * dy) / lenSq, 0, 1);
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
+
+// Check if point is inside track
+function isOnTrack(px, py) {
+  // Find closest waypoint, compute distance from center line
+  let minDist = Infinity;
+  const n = WAYPOINTS.length;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const d = ptSegDist(px, py, WAYPOINTS[i].x, WAYPOINTS[i].y, WAYPOINTS[j].x, WAYPOINTS[j].y);
+    if (d < minDist) minDist = d;
+  }
+  return minDist <= TRACK_WIDTH / 2;
+}
+
+// Distance from track center line
+function distFromCenterLine(px, py) {
+  let minDist = Infinity;
+  const n = WAYPOINTS.length;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const d = ptSegDist(px, py, WAYPOINTS[i].x, WAYPOINTS[i].y, WAYPOINTS[j].x, WAYPOINTS[j].y);
+    if (d < minDist) minDist = d;
+  }
+  return minDist;
+}
+
+/* ============================================================
+   Neural Network (5 → 6 → 2)
+   ============================================================ */
+class NeuralNet {
+  constructor(genome) {
+    // Decode genome into weight matrices and biases
+    let idx = 0;
+    // W1: NN_IN x NN_HID
+    this.w1 = [];
+    for (let i = 0; i < NN_IN; i++) {
+      this.w1[i] = [];
+      for (let h = 0; h < NN_HID; h++) {
+        this.w1[i][h] = genome[idx++];
+      }
+    }
+    // b1: NN_HID
+    this.b1 = [];
+    for (let h = 0; h < NN_HID; h++) this.b1[h] = genome[idx++];
+    // W2: NN_HID x NN_OUT
+    this.w2 = [];
+    for (let h = 0; h < NN_HID; h++) {
+      this.w2[h] = [];
+      for (let o = 0; o < NN_OUT; o++) {
+        this.w2[h][o] = genome[idx++];
+      }
+    }
+    // b2: NN_OUT
+    this.b2 = [];
+    for (let o = 0; o < NN_OUT; o++) this.b2[o] = genome[idx++];
+
+    // Store activations for visualization
+    this.inputActivations  = new Array(NN_IN).fill(0);
+    this.hiddenActivations = new Array(NN_HID).fill(0);
+    this.outputActivations = new Array(NN_OUT).fill(0);
+  }
+
+  forward(inputs) {
+    // Save inputs for visualization
+    for (let i = 0; i < NN_IN; i++) this.inputActivations[i] = inputs[i];
+
+    // Hidden layer: tanh(W1^T * inputs + b1)
+    const hidden = [];
+    for (let h = 0; h < NN_HID; h++) {
+      let sum = this.b1[h];
+      for (let i = 0; i < NN_IN; i++) sum += inputs[i] * this.w1[i][h];
+      hidden[h] = Math.tanh(sum);
+    }
+    this.hiddenActivations = hidden;
+
+    // Output layer: [tanh(steer), sigmoid(throttle)]
+    const output = [];
+    for (let o = 0; o < NN_OUT; o++) {
+      let sum = this.b2[o];
+      for (let h = 0; h < NN_HID; h++) sum += hidden[h] * this.w2[h][o];
+      if (o === 0) output[o] = Math.tanh(sum);           // steer: -1 ~ +1
+      else         output[o] = 1 / (1 + Math.exp(-sum)); // throttle: 0 ~ 1
+    }
+    this.outputActivations = output;
+    return output;
+  }
+}
+
+/* ============================================================
+   Agent (Car)
+   ============================================================ */
+class Agent {
+  constructor(genome) {
+    // Start at first waypoint
+    this.x = WAYPOINTS[0].x;
+    this.y = WAYPOINTS[0].y;
+    // Calculate initial heading toward second waypoint
+    this.heading = Math.atan2(
+      WAYPOINTS[1].y - WAYPOINTS[0].y,
+      WAYPOINTS[1].x - WAYPOINTS[0].x
+    );
+    this.speed = 0;
+    this.genome = genome;
+    this.nn = new NeuralNet(genome);
+    this.alive = true;
+    this.fitness = 0;
+    this.steps = 0;
+    this.distanceTraveled = 0;
+    this.closestWaypointIdx = 0;
+    this.lapProgress = 0;
+    this.lastSteer = 0;
+    this.distFromCenter = 0;
+    this.headingError = 0;
+    this.isReversed = false;
+    this.prevClosestIdx = 0;
+    this.totalProgress = 0;
+    this.sensorReadings = new Array(5).fill(1);
+    this.sensorEndpoints = [];
+  }
+
+  /* Get sensor (raycast) readings */
+  getSensorReadings() {
+    const readings = [];
+    const endpoints = [];
+    for (let s = 0; s < 5; s++) {
+      const angle = this.heading + SENSOR_ANGLES[s] * DEG;
+      const dx = Math.cos(angle);
+      const dy = Math.sin(angle);
+      let minDist = SENSOR_RANGE;
+      for (const w of TRACK.walls) {
+        const d = raySeg(this.x, this.y, dx, dy, w.x1, w.y1, w.x2, w.y2);
+        if (d >= 0 && d < minDist) minDist = d;
+      }
+      readings[s] = minDist / SENSOR_RANGE; // 0~1 (1=far)
+      endpoints[s] = {
+        x: this.x + dx * minDist,
+        y: this.y + dy * minDist
+      };
+    }
+    this.sensorReadings = readings;
+    this.sensorEndpoints = endpoints;
+    return readings;
+  }
+
+  /* Get heading toward next waypoint */
+  getWaypointHeading() {
+    const next = WAYPOINTS[(this.closestWaypointIdx + 1) % WAYPOINTS.length];
+    return Math.atan2(next.y - this.y, next.x - this.x);
+  }
+
+  /* Update closest waypoint index and progress */
+  updateProgress() {
+    const n = WAYPOINTS.length;
+    let minDist = Infinity, bestIdx = this.closestWaypointIdx;
+    // Search in a window around current closest
+    for (let offset = -3; offset <= 5; offset++) {
+      const idx = ((this.closestWaypointIdx + offset) % n + n) % n;
+      const dx = this.x - WAYPOINTS[idx].x;
+      const dy = this.y - WAYPOINTS[idx].y;
+      const d = dx * dx + dy * dy;
+      if (d < minDist) { minDist = d; bestIdx = idx; }
+    }
+
+    // Detect forward progress
+    const prevIdx = this.closestWaypointIdx;
+    this.closestWaypointIdx = bestIdx;
+
+    // Track progress (handle wrap-around)
+    let diff = bestIdx - prevIdx;
+    if (diff > n / 2) diff -= n;
+    if (diff < -n / 2) diff += n;
+    if (diff > 0) this.totalProgress += diff;
+    this.isReversed = diff < 0;
+
+    this.lapProgress = this.totalProgress / n;
+  }
+
+  /* Main update step */
+  update() {
+    if (!this.alive) return;
+
+    const sensors = this.getSensorReadings();
+    const [steer, throttle] = this.nn.forward(sensors);
+
+    this.lastSteer = steer;
+    this.heading += steer * 0.08;
+    this.speed = throttle * MAX_SPEED;
+
+    const prevX = this.x, prevY = this.y;
+    this.x += Math.cos(this.heading) * this.speed;
+    this.y += Math.sin(this.heading) * this.speed;
+
+    this.distanceTraveled += Math.hypot(this.x - prevX, this.y - prevY);
+    this.steps++;
+
+    // Distance from center line
+    this.distFromCenter = distFromCenterLine(this.x, this.y);
+
+    // Track boundary check
+    if (!isOnTrack(this.x, this.y)) {
+      this.alive = false;
+      return;
+    }
+
+    // Heading error toward next waypoint
+    const wpHeading = this.getWaypointHeading();
+    this.headingError = Math.abs(normalizeAngle(this.heading - wpHeading));
+
+    // Update waypoint progress
+    this.updateProgress();
+
+    // Max steps check
+    if (this.steps >= GA.MAX_STEPS) {
+      this.alive = false;
+      return;
+    }
+
+    // Accumulate fitness
+    this.fitness += computeReward(this);
+  }
+}
+
+/* ============================================================
+   Reward Weights (from sliders, normalized 0~1)
+   ============================================================ */
+let rewardWeights = {
+  center:   0.70,
+  speed:    0.40,
+  smooth:   0.60,
+  progress: 0.80,
+  heading:  0.50,
+  survive:  0.30,
+};
+
+let rewardMode = 'simple'; // 'simple' | 'custom'
+let customRewardFn = null;
+
+/* Read slider values */
+function readSliders() {
+  const ids = ['center', 'speed', 'smooth', 'progress', 'heading', 'survive'];
+  ids.forEach(id => {
+    const el = document.getElementById('sl-' + id);
+    const val = parseInt(el.value, 10);
+    rewardWeights[id] = val / 100;
+    document.getElementById('val-' + id).textContent = val;
+    // Update slider fill gradient
+    el.style.background = `linear-gradient(to right, var(--accent-cyan) ${val}%, var(--border) ${val}%)`;
+  });
+}
+
+/* Compute reward — SIMPLE mode */
+function computeReward_simple(agent) {
+  const w = rewardWeights;
+  const distRatio = agent.distFromCenter / (TRACK_WIDTH / 2);
+  const centerScore = Math.max(0, 1.0 - distRatio);
+  const speedScore  = agent.speed / MAX_SPEED;
+  const smoothScore = 1.0 - Math.min(1.0, Math.abs(agent.lastSteer));
+  const progressScore = agent.lapProgress;
+  const wpDir = agent.getWaypointHeading();
+  const headingDiff = Math.abs(normalizeAngle(agent.heading - wpDir));
+  const headingScore = 1.0 - Math.min(1.0, headingDiff / Math.PI);
+  const surviveScore = 1.0;
+
+  return (
+    centerScore   * w.center +
+    speedScore    * w.speed +
+    smoothScore   * w.smooth +
+    progressScore * w.progress +
+    headingScore  * w.heading +
+    surviveScore  * w.survive
+  );
+}
+
+/* Compute reward — CUSTOM mode */
+function computeReward_custom(agent) {
+  if (!customRewardFn) return 0;
+  try {
+    const params = {
+      distFromCenter:     agent.distFromCenter,
+      trackWidth:         TRACK_WIDTH,
+      speed:              agent.speed,
+      steerAngle:         agent.lastSteer,
+      progress:           agent.lapProgress,
+      headingError:       agent.headingError,
+      steps:              agent.steps,
+      lapProgress:        agent.lapProgress,
+      allWheelsOnTrack:   agent.alive,
+      isReversed:         agent.isReversed,
+      x:                  agent.x,
+      y:                  agent.y,
+      closestWaypointIdx: agent.closestWaypointIdx,
+    };
+    const r = customRewardFn(params);
+    return (typeof r === 'number' && isFinite(r)) ? Math.max(0, r) : 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
+/* Dispatch to current mode */
+function computeReward(agent) {
+  return rewardMode === 'simple'
+    ? computeReward_simple(agent)
+    : computeReward_custom(agent);
+}
+
+/* ============================================================
+   Genetic Algorithm
+   ============================================================ */
+function randomGenome() {
+  const g = [];
+  for (let i = 0; i < GENOME_LEN; i++) g.push(randF(-1, 1));
+  return g;
+}
+
+function mutateGenome(genome, rate, scale) {
+  return genome.map(g =>
+    Math.random() < rate ? g + randGauss() * scale : g
+  );
+}
+
+function crossover(a, b) {
+  const child = [];
+  for (let i = 0; i < GENOME_LEN; i++) {
+    child[i] = Math.random() < 0.5 ? a[i] : b[i];
+  }
+  return child;
+}
+
+function nextGeneration(agents) {
+  // Sort by fitness (descending)
+  agents.sort((a, b) => b.fitness - a.fitness);
+
+  // Record history
+  const bestFit = agents[0].fitness;
+  const avgFit  = agents.reduce((s, a) => s + a.fitness, 0) / agents.length;
+  rewardHistory.push({ gen: generation, best: bestFit, avg: avgFit });
+
+  // Update global best
+  if (bestFit > bestFitness) {
+    bestFitness = bestFit;
+    bestGenome  = agents[0].genome.slice();
+  }
+
+  // Adaptive mutation rate
+  const adaptedRate  = GA.MUTATION_RATE * Math.pow(0.95, generation);
+  const adaptedScale = GA.MUTATION_SCALE;
+
+  // Elites
+  const eliteCount = Math.max(1, Math.floor(GA.POPULATION * GA.ELITE_RATE));
+  const elites = agents.slice(0, eliteCount).map(a => a.genome.slice());
+
+  // Always keep hall-of-fame genome
+  if (bestGenome) elites[0] = bestGenome.slice();
+
+  // Generate new population
+  const newGenomes = [];
+  // Copy elites
+  for (const e of elites) newGenomes.push(e);
+
+  // Fill rest with crossover + mutation
+  while (newGenomes.length < GA.POPULATION) {
+    const p1 = elites[Math.floor(Math.random() * elites.length)];
+    const p2 = elites[Math.floor(Math.random() * elites.length)];
+    const child = crossover(p1, p2);
+    newGenomes.push(mutateGenome(child, adaptedRate, adaptedScale));
+  }
+
+  generation++;
+  return newGenomes.map(g => new Agent(g));
+}
+
+/* ============================================================
+   Presets (CUSTOM mode sample reward functions)
+   ============================================================ */
+const PRESETS = {
+  center: `// センターに近いほど高報酬
+function reward(params) {
+  const { distFromCenter, trackWidth, allWheelsOnTrack } = params;
+  if (!allWheelsOnTrack) return 0;
+  return 1.0 - (distFromCenter / (trackWidth * 0.5));
+}`,
+  speed: `// 速く走るほど高報酬。センターを外れたらペナルティ
+function reward(params) {
+  const { speed, distFromCenter, trackWidth, allWheelsOnTrack } = params;
+  if (!allWheelsOnTrack) return 0;
+  const speedReward = speed / 3.0;
+  const centerPenalty = distFromCenter > 0.4 * trackWidth ? 0.3 : 1.0;
+  return speedReward * centerPenalty;
+}`,
+  milestone: `// 一定ステップ数ごとに進捗が期待値を超えたらボーナス
+function reward(params) {
+  const { steps, lapProgress, allWheelsOnTrack } = params;
+  if (!allWheelsOnTrack) return 0;
+  let reward = lapProgress;
+  if (steps % 100 === 0 && lapProgress > steps / 800) {
+    reward += 5.0; // マイルストーンボーナス
+  }
+  return reward;
+}`,
+  zigzag: `// ステアリングが穏やかなほど高報酬
+function reward(params) {
+  const { steerAngle, allWheelsOnTrack, speed } = params;
+  if (!allWheelsOnTrack) return 0;
+  const steerPenalty = Math.abs(steerAngle) > 0.5 ? 0.5 : 1.0;
+  return speed / 3.0 * steerPenalty;
+}`,
+  waypoint: `// コースの進行方向と車のheadingが合っているほど高報酬
+function reward(params) {
+  const { headingError, allWheelsOnTrack, distFromCenter, trackWidth } = params;
+  if (!allWheelsOnTrack) return 0;
+  const dirScore = 1.0 - Math.min(1.0, headingError / Math.PI);
+  const centerScore = 1.0 - distFromCenter / (trackWidth * 0.5);
+  return dirScore * 0.6 + centerScore * 0.4;
+}`,
+};
+
+/* ============================================================
+   Game State
+   ============================================================ */
+let animFrameId = null;
+let isTraining  = false;
+let generation  = 0;
+let agents      = [];
+let bestGenome  = null;
+let bestFitness = 0;
+let rewardHistory = [];
+
+/* ============================================================
+   Canvas Setup
+   ============================================================ */
+const courseCanvas = document.getElementById('course-canvas');
+const courseCtx    = courseCanvas.getContext('2d');
+const nnCanvas    = document.getElementById('nn-canvas');
+const nnCtx       = nnCanvas.getContext('2d');
+const graphCanvas = document.getElementById('graph-canvas');
+const graphCtx    = graphCanvas.getContext('2d');
+
+// High-DPI scaling
+function setupCanvas(canvas, ctx) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  const w = canvas.getAttribute('width')  | 0;
+  const h = canvas.getAttribute('height') | 0;
+  canvas.width  = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width  = w + 'px';
+  canvas.style.height = h + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+setupCanvas(courseCanvas, courseCtx);
+setupCanvas(nnCanvas, nnCtx);
+setupCanvas(graphCanvas, graphCtx);
+
+/* ============================================================
+   Drawing — Track
+   ============================================================ */
+function drawTrack(ctx) {
+  const n = WAYPOINTS.length;
+
+  // Track surface fill
+  ctx.fillStyle = '#1a2535';
+  ctx.beginPath();
+  ctx.moveTo(TRACK.outer[0].x, TRACK.outer[0].y);
+  for (let i = 1; i < n; i++) ctx.lineTo(TRACK.outer[i].x, TRACK.outer[i].y);
+  ctx.closePath();
+  // Cut inner
+  ctx.moveTo(TRACK.inner[0].x, TRACK.inner[0].y);
+  for (let i = n - 1; i >= 0; i--) ctx.lineTo(TRACK.inner[i].x, TRACK.inner[i].y);
+  ctx.closePath();
+  ctx.fill('evenodd');
+
+  // Outer boundary
+  ctx.strokeStyle = '#00d4ff';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(TRACK.outer[0].x, TRACK.outer[0].y);
+  for (let i = 1; i < n; i++) ctx.lineTo(TRACK.outer[i].x, TRACK.outer[i].y);
+  ctx.closePath();
+  ctx.stroke();
+
+  // Inner boundary
+  ctx.beginPath();
+  ctx.moveTo(TRACK.inner[0].x, TRACK.inner[0].y);
+  for (let i = 1; i < n; i++) ctx.lineTo(TRACK.inner[i].x, TRACK.inner[i].y);
+  ctx.closePath();
+  ctx.stroke();
+
+  // Center line (dashed)
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([6, 6]);
+  ctx.beginPath();
+  ctx.moveTo(WAYPOINTS[0].x, WAYPOINTS[0].y);
+  for (let i = 1; i < n; i++) ctx.lineTo(WAYPOINTS[i].x, WAYPOINTS[i].y);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Start line
+  const s = TRACK.inner[0], e = TRACK.outer[0];
+  ctx.strokeStyle = '#ffcc00';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y);
+  ctx.stroke();
+}
+
+/* ============================================================
+   Drawing — Cars
+   ============================================================ */
+function drawCar(ctx, agent, isBest) {
+  if (!agent.alive && !isBest) return;
+
+  const x = agent.x, y = agent.y, h = agent.heading;
+
+  // Raycast lines (best only)
+  if (isBest && agent.alive) {
+    for (let s = 0; s < 5; s++) {
+      const ep = agent.sensorEndpoints[s];
+      if (!ep) continue;
+      ctx.strokeStyle = 'rgba(0,212,255,0.3)';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(x, y); ctx.lineTo(ep.x, ep.y);
+      ctx.stroke();
+      // Endpoint dot
+      ctx.fillStyle = 'rgba(0,212,255,0.6)';
+      ctx.beginPath();
+      ctx.arc(ep.x, ep.y, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Car body — triangle pointing in heading direction
+  const size = isBest ? 7 : 5;
+  const x1 = x + Math.cos(h) * size;
+  const y1 = y + Math.sin(h) * size;
+  const x2 = x + Math.cos(h + 2.5) * size * 0.6;
+  const y2 = y + Math.sin(h + 2.5) * size * 0.6;
+  const x3 = x + Math.cos(h - 2.5) * size * 0.6;
+  const y3 = y + Math.sin(h - 2.5) * size * 0.6;
+
+  ctx.save();
+  if (isBest) {
+    ctx.shadowColor = '#00d4ff';
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = '#00d4ff';
+  } else {
+    ctx.fillStyle = agent.alive ? 'rgba(100,160,255,0.7)' : 'rgba(100,160,255,0.15)';
+  }
+  ctx.beginPath();
+  ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.lineTo(x3, y3);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+/* ============================================================
+   Drawing — NN Visualization (softevo7 style)
+   ============================================================ */
+function drawNN(ctx, agent) {
+  const W = 340, H = 200;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0, 0, W, H);
+
+  if (!agent || !agent.nn) return;
+
+  const nn = agent.nn;
+  const layerSizes = [NN_IN, NN_HID, NN_OUT];
+  const layerX = [55, 170, 285];
+  const nodeR = 18;
+
+  // Calculate node positions
+  const positions = [];
+  for (let L = 0; L < 3; L++) {
+    positions[L] = [];
+    const count = layerSizes[L];
+    const totalH = (count - 1) * 32;
+    const startY = (H - totalH) / 2;
+    for (let n = 0; n < count; n++) {
+      positions[L].push({ x: layerX[L], y: startY + n * 32 });
+    }
+  }
+
+  // Input labels
+  const inputLabels = ['L60°', 'L30°', 'FWD', 'R30°', 'R60°'];
+  const outputLabels = ['STEER', 'THROTTLE'];
+
+  // Draw edges: Input → Hidden
+  for (let i = 0; i < NN_IN; i++) {
+    for (let h = 0; h < NN_HID; h++) {
+      const w = nn.w1[i][h];
+      const absW = Math.abs(w);
+      const thickness = clamp(absW * 3.0, 0.3, 4.0);
+      const alpha = clamp(absW * 0.8, 0.05, 0.9);
+      ctx.strokeStyle = w > 0
+        ? `rgba(0,120,255,${alpha})`
+        : `rgba(255,50,80,${alpha})`;
+      ctx.lineWidth = thickness;
+      ctx.beginPath();
+      ctx.moveTo(positions[0][i].x + nodeR, positions[0][i].y);
+      ctx.lineTo(positions[1][h].x - nodeR, positions[1][h].y);
+      ctx.stroke();
+    }
+  }
+
+  // Draw edges: Hidden → Output
+  for (let h = 0; h < NN_HID; h++) {
+    for (let o = 0; o < NN_OUT; o++) {
+      const w = nn.w2[h][o];
+      const absW = Math.abs(w);
+      const thickness = clamp(absW * 3.0, 0.3, 4.0);
+      const alpha = clamp(absW * 0.8, 0.05, 0.9);
+      ctx.strokeStyle = w > 0
+        ? `rgba(0,120,255,${alpha})`
+        : `rgba(255,50,80,${alpha})`;
+      ctx.lineWidth = thickness;
+      ctx.beginPath();
+      ctx.moveTo(positions[1][h].x + nodeR, positions[1][h].y);
+      ctx.lineTo(positions[2][o].x - nodeR, positions[2][o].y);
+      ctx.stroke();
+    }
+  }
+
+  // Draw nodes for each layer
+  const activations = [nn.inputActivations, nn.hiddenActivations, nn.outputActivations];
+
+  for (let L = 0; L < 3; L++) {
+    for (let n = 0; n < layerSizes[L]; n++) {
+      const pos = positions[L][n];
+      const act = activations[L][n] || 0;
+      const absAct = Math.abs(act);
+
+      // Glow effect for strong activations
+      if (absAct > 0.5) {
+        ctx.save();
+        ctx.shadowColor = act >= 0 ? '#00d4ff' : '#ff4d6d';
+        ctx.shadowBlur = 12 * absAct;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, nodeR, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0,0,0,0)';
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Node circle
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, nodeR, 0, Math.PI * 2);
+      // Fill based on activation
+      if (act >= 0) {
+        ctx.fillStyle = `rgba(0,212,255,${clamp(absAct, 0.05, 0.8)})`;
+      } else {
+        ctx.fillStyle = `rgba(255,77,109,${clamp(absAct, 0.05, 0.8)})`;
+      }
+      ctx.fill();
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Activation value text
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '10px "Courier New", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(act.toFixed(2), pos.x, pos.y);
+
+      // Labels
+      ctx.font = '9px "Courier New", monospace';
+      ctx.fillStyle = '#64748b';
+      if (L === 0) {
+        // Input labels on left
+        ctx.textAlign = 'right';
+        ctx.fillText(inputLabels[n], pos.x - nodeR - 4, pos.y);
+      } else if (L === 2) {
+        // Output labels on right
+        ctx.textAlign = 'left';
+        ctx.fillText(outputLabels[n], pos.x + nodeR + 4, pos.y);
+      }
+    }
+  }
+
+  // Layer titles
+  ctx.font = '8px "Courier New", monospace';
+  ctx.fillStyle = '#64748b';
+  ctx.textAlign = 'center';
+  ctx.fillText('INPUT', layerX[0], 14);
+  ctx.fillText('HIDDEN', layerX[1], 14);
+  ctx.fillText('OUTPUT', layerX[2], 14);
+}
+
+/* ============================================================
+   Drawing — Reward History Graph
+   ============================================================ */
+function drawGraph(ctx) {
+  const W = 340, H = 80;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0, 0, W, H);
+
+  if (rewardHistory.length < 2) {
+    ctx.fillStyle = '#64748b';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('Waiting for data...', W / 2, H / 2);
+    return;
+  }
+
+  const pad = { l: 35, r: 10, t: 10, b: 15 };
+  const gW = W - pad.l - pad.r;
+  const gH = H - pad.t - pad.b;
+
+  // Determine scale
+  let maxVal = 0;
+  for (const h of rewardHistory) {
+    if (h.best > maxVal) maxVal = h.best;
+    if (h.avg > maxVal)  maxVal = h.avg;
+  }
+  if (maxVal === 0) maxVal = 1;
+
+  // Grid
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.t + (i / 4) * gH;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + gW, y); ctx.stroke();
+  }
+
+  // Y-axis label
+  ctx.fillStyle = '#64748b';
+  ctx.font = '7px monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText(maxVal.toFixed(0), pad.l - 3, pad.t + 5);
+  ctx.fillText('0', pad.l - 3, pad.t + gH);
+
+  // X-axis label
+  ctx.textAlign = 'center';
+  ctx.fillText('GEN', W / 2, H - 2);
+
+  const n = rewardHistory.length;
+  const xStep = gW / Math.max(1, n - 1);
+
+  // Average line
+  ctx.strokeStyle = 'rgba(0,212,255,0.3)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const x = pad.l + i * xStep;
+    const y = pad.t + gH - (rewardHistory[i].avg / maxVal) * gH;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Best line
+  ctx.strokeStyle = '#00d4ff';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const x = pad.l + i * xStep;
+    const y = pad.t + gH - (rewardHistory[i].best / maxVal) * gH;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Current generation marker
+  if (n > 0) {
+    const lastX = pad.l + (n - 1) * xStep;
+    ctx.strokeStyle = 'rgba(0,212,255,0.4)';
+    ctx.lineWidth = 0.5;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(lastX, pad.t); ctx.lineTo(lastX, pad.t + gH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+/* ============================================================
+   Game Loop
+   ============================================================ */
+function initAgents() {
+  agents = [];
+  for (let i = 0; i < GA.POPULATION; i++) {
+    agents.push(new Agent(randomGenome()));
+  }
+}
+
+function gameLoop() {
+  if (!isTraining) return;
+
+  // Update all alive agents
+  let allDead = true;
+  for (const agent of agents) {
+    if (agent.alive) {
+      agent.update();
+      allDead = false;
+    }
+  }
+
+  // Render course
+  courseCtx.clearRect(0, 0, 340, 340);
+  courseCtx.fillStyle = '#0d1117';
+  courseCtx.fillRect(0, 0, 340, 340);
+  drawTrack(courseCtx);
+
+  // Find current best alive (or overall best by fitness)
+  let bestAgent = agents[0];
+  let bestAlive = null;
+  for (const a of agents) {
+    if (a.fitness > bestAgent.fitness) bestAgent = a;
+    if (a.alive && (!bestAlive || a.fitness > bestAlive.fitness)) bestAlive = a;
+  }
+  const displayBest = bestAlive || bestAgent;
+
+  // Draw all cars
+  for (const agent of agents) {
+    drawCar(courseCtx, agent, agent === displayBest);
+  }
+
+  // NN Visualization for best agent
+  drawNN(nnCtx, displayBest);
+
+  // Update HUD
+  document.getElementById('hud-gen').textContent = generation;
+  document.getElementById('hud-best').textContent = bestAgent.fitness.toFixed(1);
+
+  // Next generation if all dead
+  if (allDead) {
+    agents = nextGeneration(agents);
+    drawGraph(graphCtx);
+  }
+
+  animFrameId = requestAnimationFrame(gameLoop);
+}
+
+/* ============================================================
+   UI Event Handlers
+   ============================================================ */
+
+// Slider events
+['center', 'speed', 'smooth', 'progress', 'heading', 'survive'].forEach(id => {
+  const el = document.getElementById('sl-' + id);
+  el.addEventListener('input', readSliders);
+});
+readSliders(); // Initialize
+
+// Tab switching
+document.getElementById('tab-simple').addEventListener('click', function() {
+  rewardMode = 'simple';
+  this.classList.add('active');
+  document.getElementById('tab-custom').classList.remove('active');
+  document.getElementById('panel-simple').style.display = 'block';
+  document.getElementById('panel-custom').style.display = 'none';
+});
+document.getElementById('tab-custom').addEventListener('click', function() {
+  rewardMode = 'custom';
+  this.classList.add('active');
+  document.getElementById('tab-simple').classList.remove('active');
+  document.getElementById('panel-simple').style.display = 'none';
+  document.getElementById('panel-custom').style.display = 'block';
+});
+
+// Custom editor — Apply button
+document.getElementById('btn-apply').addEventListener('click', function() {
+  const code = document.getElementById('custom-editor').value;
+  try {
+    // Extract function body from the code
+    const bodyMatch = code.trim().match(/function\s+reward\s*\(\s*params\s*\)\s*\{([\s\S]*)\}\s*$/);
+    if (bodyMatch) {
+      customRewardFn = new Function('params', bodyMatch[1]);
+    } else {
+      // Try as a plain expression/body
+      customRewardFn = new Function('params', code);
+    }
+    // Validate with a test call
+    const testResult = customRewardFn({
+      distFromCenter: 5, trackWidth: TRACK_WIDTH, speed: 1.5,
+      steerAngle: 0, progress: 0.5, headingError: 0.1,
+      steps: 100, lapProgress: 0.5, allWheelsOnTrack: true,
+      isReversed: false, x: 170, y: 170, closestWaypointIdx: 0
+    });
+    if (typeof testResult !== 'number' || !isFinite(testResult)) {
+      throw new Error('Function must return a number');
+    }
+    document.getElementById('editor-status').textContent = '✅ VALID';
+    document.getElementById('editor-status').style.color = '#00d4ff';
+  } catch (e) {
+    customRewardFn = null;
+    document.getElementById('editor-status').textContent = '❌ ' + e.message;
+    document.getElementById('editor-status').style.color = '#ff4d6d';
+  }
+});
+
+// Preset selector
+document.getElementById('preset-select').addEventListener('change', function() {
+  if (this.value && PRESETS[this.value]) {
+    document.getElementById('custom-editor').value = PRESETS[this.value];
+    this.value = ''; // Reset dropdown
+    document.getElementById('editor-status').textContent = '— LOADED';
+    document.getElementById('editor-status').style.color = 'var(--text-muted)';
+  }
+});
+
+// Control buttons
+document.getElementById('btn-train').addEventListener('click', function() {
+  if (!isTraining) {
+    isTraining = true;
+    document.getElementById('status-dot').classList.add('active');
+    if (agents.length === 0) initAgents();
+    gameLoop();
+  }
+});
+
+document.getElementById('btn-stop').addEventListener('click', function() {
+  isTraining = false;
+  document.getElementById('status-dot').classList.remove('active');
+  if (animFrameId) cancelAnimationFrame(animFrameId);
+});
+
+document.getElementById('btn-reset').addEventListener('click', function() {
+  isTraining = false;
+  document.getElementById('status-dot').classList.remove('active');
+  if (animFrameId) cancelAnimationFrame(animFrameId);
+  generation = 0;
+  agents = [];
+  bestGenome = null;
+  bestFitness = 0;
+  rewardHistory = [];
+  document.getElementById('hud-gen').textContent = '0';
+  document.getElementById('hud-best').textContent = '0';
+  // Clear canvases
+  courseCtx.clearRect(0, 0, 340, 340);
+  courseCtx.fillStyle = '#0d1117';
+  courseCtx.fillRect(0, 0, 340, 340);
+  drawTrack(courseCtx);
+  nnCtx.clearRect(0, 0, 340, 200);
+  nnCtx.fillStyle = '#0d1117';
+  nnCtx.fillRect(0, 0, 340, 200);
+  graphCtx.clearRect(0, 0, 340, 80);
+  graphCtx.fillStyle = '#0d1117';
+  graphCtx.fillRect(0, 0, 340, 80);
+});
+
+/* ============================================================
+   Initial Draw
+   ============================================================ */
+drawTrack(courseCtx);
+drawNN(nnCtx, null);
+drawGraph(graphCtx);
+</script>
+</body>
+</html>
