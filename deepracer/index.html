@@ -1,0 +1,1366 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#00d4ff">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>Deep Racer</title>
+<style>
+/* ============================================================
+   Deep Racer — Dark Scientific Theme
+   ============================================================ */
+:root {
+  --bg-primary:    #0a0e1a;
+  --bg-panel:      #111827;
+  --bg-canvas:     #0d1117;
+  --accent-cyan:   #00d4ff;
+  --accent-red:    #ff4d6d;
+  --accent-blue:   #3b82f6;
+  --text-primary:  #e2e8f0;
+  --text-muted:    #64748b;
+  --border:        #1e293b;
+  --grid:          #1e293b;
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Courier New', Courier, monospace;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ===== Header ===== */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent-red);
+}
+.status-dot.active {
+  background: var(--accent-cyan);
+  animation: blink 1s ease-in-out infinite;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.header-title {
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.header-stats {
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.1em;
+}
+.header-stats span {
+  color: var(--accent-cyan);
+  font-weight: bold;
+}
+
+/* ===== Main Container ===== */
+.container {
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 8px;
+}
+
+/* ===== Panel ===== */
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+.panel-title {
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+
+/* ===== Canvas ===== */
+canvas {
+  display: block;
+  width: 100%;
+  border-radius: 4px;
+  background: var(--bg-canvas);
+}
+
+/* ===== Slider Rows ===== */
+.slider-row {
+  display: grid;
+  grid-template-columns: 70px 1fr 30px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.sl-label {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--accent-cyan);
+  font-weight: bold;
+}
+.sl-val {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: right;
+}
+input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px;
+  background: var(--accent-cyan);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 8px var(--accent-cyan);
+}
+
+/* ===== Tab Bar ===== */
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.tab-btn {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  padding: 6px 0;
+  cursor: pointer;
+  text-transform: uppercase;
+  border-radius: 2px;
+}
+.tab-btn.active {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  background: rgba(0,212,255,0.08);
+}
+
+/* ===== Custom Editor ===== */
+#custom-editor {
+  width: 100%;
+  height: 180px;
+  background: #0d1117;
+  color: var(--accent-cyan);
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 8px;
+  resize: vertical;
+  -webkit-text-fill-color: var(--accent-cyan);
+  caret-color: var(--accent-cyan);
+  outline: none;
+}
+.editor-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.editor-status {
+  font-size: 10px;
+  font-family: monospace;
+  letter-spacing: 0.05em;
+  margin-left: auto;
+}
+
+/* ===== Buttons ===== */
+.btn {
+  background: transparent;
+  border: 1px solid var(--accent-cyan);
+  color: var(--accent-cyan);
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.1em;
+  padding: 8px 16px;
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.btn:active { background: rgba(0,212,255,0.15); }
+.btn-danger { border-color: var(--accent-red); color: var(--accent-red); }
+.btn-danger:active { background: rgba(255,77,109,0.15); }
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 10px;
+}
+
+/* ===== Control Bar ===== */
+.control-bar {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  padding: 12px 0;
+}
+
+/* ===== Preset Select ===== */
+#preset-select {
+  background: #0d1117;
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  padding: 4px 6px;
+  border-radius: 2px;
+  outline: none;
+}
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-left">
+    <div class="status-dot" id="status-dot"></div>
+    <span class="header-title">Deep Racer</span>
+  </div>
+  <div class="header-stats">
+    GEN: <span id="hud-gen">0</span> &nbsp; BEST: <span id="hud-best">0</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Course Canvas -->
+  <div class="panel">
+    <div class="panel-title">Track — Top View</div>
+    <canvas id="cv-track" width="680" height="680"></canvas>
+  </div>
+
+  <!-- NN Visualizer -->
+  <div class="panel">
+    <div class="panel-title">NN Visualizer — Best Agent</div>
+    <canvas id="cv-nn" width="680" height="360"></canvas>
+  </div>
+
+  <!-- Reward Function -->
+  <div class="panel">
+    <div class="panel-title">Reward Function</div>
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tab-simple">Simple</button>
+      <button class="tab-btn" id="tab-custom">Custom</button>
+    </div>
+
+    <!-- SIMPLE Mode -->
+    <div id="panel-simple">
+      <div class="slider-row">
+        <span class="sl-label">CENTER</span>
+        <input type="range" id="sl-center" min="0" max="100" value="70">
+        <span class="sl-val" id="val-center">70</span>
+      </div>
+      <div class="slider-row">
+        <span class="sl-label">SPEED</span>
+        <input type="range" id="sl-speed" min="0" max="100" value="40">
+        <span class="sl-val" id="val-speed">40</span>
+      </div>
+      <div class="slider-row">
+        <span class="sl-label">SMOOTH</span>
+        <input type="range" id="sl-smooth" min="0" max="100" value="60">
+        <span class="sl-val" id="val-smooth">60</span>
+      </div>
+      <div class="slider-row">
+        <span class="sl-label">PROGRESS</span>
+        <input type="range" id="sl-progress" min="0" max="100" value="80">
+        <span class="sl-val" id="val-progress">80</span>
+      </div>
+      <div class="slider-row">
+        <span class="sl-label">HEADING</span>
+        <input type="range" id="sl-heading" min="0" max="100" value="50">
+        <span class="sl-val" id="val-heading">50</span>
+      </div>
+      <div class="slider-row">
+        <span class="sl-label">SURVIVE</span>
+        <input type="range" id="sl-survive" min="0" max="100" value="30">
+        <span class="sl-val" id="val-survive">30</span>
+      </div>
+    </div>
+
+    <!-- CUSTOM Mode -->
+    <div id="panel-custom" style="display:none">
+      <textarea id="custom-editor">// Available params object properties:
+// distFromCenter, trackWidth, speed, steerAngle,
+// progress, headingError, steps, lapProgress,
+// allWheelsOnTrack, isReversed
+function reward(params) {
+  const { distFromCenter, trackWidth, allWheelsOnTrack } = params;
+  if (!allWheelsOnTrack) return 0;
+  return 1.0 - (distFromCenter / (trackWidth * 0.5));
+}</textarea>
+      <div class="editor-controls">
+        <button class="btn btn-sm" id="btn-apply">▶ APPLY</button>
+        <select id="preset-select">
+          <option value="">PRESET▼</option>
+          <option value="center">センター重視</option>
+          <option value="speed">スピード重視</option>
+          <option value="milestone">進捗マイルストーン</option>
+          <option value="zigzag">ジグザグ防止</option>
+          <option value="waypoint">ウェイポイント方向</option>
+        </select>
+        <span class="editor-status" id="editor-status">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reward History Graph -->
+  <div class="panel">
+    <div class="panel-title">Reward History</div>
+    <canvas id="cv-graph" width="680" height="160"></canvas>
+  </div>
+
+  <!-- Controls -->
+  <div class="control-bar">
+    <button class="btn" id="btn-train">▶ TRAIN</button>
+    <button class="btn btn-danger" id="btn-stop">■ STOP</button>
+    <button class="btn" id="btn-reset">↺ RESET</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ============================================================
+//  Deep Racer — Complete Engine
+//  AI Racing with NN Visualization & Reward Design
+// ============================================================
+
+// ============================================================
+//  Constants & Configuration
+// ============================================================
+const PI2 = Math.PI * 2;
+const DEG = Math.PI / 180;
+
+const GA_CONFIG = {
+  POPULATION: 12,
+  ELITE_RATE: 0.3,
+  MUTATION_RATE: 0.10,
+  MUTATION_SCALE: 0.3,
+  MAX_STEPS: 800,
+};
+
+const TRACK_WIDTH = 40;
+const MAX_SPEED = 3.0;
+const SENSOR_RANGE = 120;
+const SENSOR_ANGLES = [-60, -30, 0, 30, 60]; // degrees
+
+// ============================================================
+//  Course Definition — Elliptical Circuit
+// ============================================================
+const WAYPOINTS = [];
+const WP_COUNT = 24;
+const CX = 170, CY = 170, RX = 120, RY = 90;
+for (let i = 0; i < WP_COUNT; i++) {
+  const angle = (i / WP_COUNT) * PI2;
+  WAYPOINTS.push({
+    x: CX + RX * Math.cos(angle),
+    y: CY + RY * Math.sin(angle),
+  });
+}
+
+// Precompute track boundary segments (inner + outer)
+function buildTrackEdges() {
+  const inner = [], outer = [];
+  for (let i = 0; i < WAYPOINTS.length; i++) {
+    const cur = WAYPOINTS[i];
+    const nxt = WAYPOINTS[(i + 1) % WAYPOINTS.length];
+    const dx = nxt.x - cur.x, dy = nxt.y - cur.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const nx = -dy / len * (TRACK_WIDTH / 2);
+    const ny =  dx / len * (TRACK_WIDTH / 2);
+    inner.push({ x: cur.x + nx, y: cur.y + ny });
+    outer.push({ x: cur.x - nx, y: cur.y - ny });
+  }
+  return { inner, outer };
+}
+const TRACK = buildTrackEdges();
+
+// Collect all wall segments for raycast
+function getWallSegments() {
+  const segs = [];
+  const addLoop = (pts) => {
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length];
+      segs.push(a.x, a.y, b.x, b.y);
+    }
+  };
+  addLoop(TRACK.inner);
+  addLoop(TRACK.outer);
+  return segs;
+}
+const WALL_SEGS = getWallSegments();
+
+// ============================================================
+//  Math Utilities
+// ============================================================
+function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+function dist(x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+function normalizeAngle(a) {
+  while (a > Math.PI) a -= PI2;
+  while (a < -Math.PI) a += PI2;
+  return a;
+}
+function randGauss() {
+  let u = 0, v = 0;
+  while (!u) u = Math.random();
+  v = Math.random();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(PI2 * v);
+}
+
+// Ray-segment intersection, returns t>=0 or -1
+function raySeg(ox, oy, dx, dy, x1, y1, x2, y2) {
+  const sx = x2 - x1, sy = y2 - y1;
+  const det = sx * dy - dx * sy;
+  if (Math.abs(det) < 1e-10) return -1;
+  const invD = 1 / det;
+  const t = (-sy * (x1 - ox) + sx * (y1 - oy)) * invD;
+  const s = (dx * (y1 - oy) - dy * (x1 - ox)) * invD;
+  return (t >= 0 && s >= 0 && s <= 1) ? t : -1;
+}
+
+// Point distance to nearest track centerline segment
+function pointTrackDist(px, py) {
+  let minD = Infinity;
+  for (let i = 0; i < WAYPOINTS.length; i++) {
+    const a = WAYPOINTS[i], b = WAYPOINTS[(i + 1) % WAYPOINTS.length];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const lenSq = dx * dx + dy * dy;
+    let t = lenSq < 1e-10 ? 0 : clamp(((px - a.x) * dx + (py - a.y) * dy) / lenSq, 0, 1);
+    const d = dist(px, py, a.x + t * dx, a.y + t * dy);
+    if (d < minD) minD = d;
+  }
+  return minD;
+}
+
+// Find closest waypoint index
+function closestWaypoint(px, py) {
+  let best = 0, bestD = Infinity;
+  for (let i = 0; i < WAYPOINTS.length; i++) {
+    const d = dist(px, py, WAYPOINTS[i].x, WAYPOINTS[i].y);
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return best;
+}
+
+// ============================================================
+//  Neural Network (5 → 6 → 2)
+// ============================================================
+const NN_IN = 5, NN_HID = 6, NN_OUT = 2;
+const GENOME_LEN = NN_IN * NN_HID + NN_HID * NN_OUT; // 30 + 12 = 42
+
+class NeuralNet {
+  constructor(genome) {
+    // W1: 5×6 = genome[0..29], W2: 6×2 = genome[30..41]
+    this.w1 = [];
+    this.w2 = [];
+    for (let h = 0; h < NN_HID; h++) {
+      this.w1[h] = [];
+      for (let i = 0; i < NN_IN; i++) {
+        this.w1[h][i] = genome[h * NN_IN + i];
+      }
+    }
+    for (let o = 0; o < NN_OUT; o++) {
+      this.w2[o] = [];
+      for (let h = 0; h < NN_HID; h++) {
+        this.w2[o][h] = genome[NN_IN * NN_HID + o * NN_HID + h];
+      }
+    }
+    // Activation storage for visualization
+    this.inputActivations = new Array(NN_IN).fill(0);
+    this.hiddenActivations = new Array(NN_HID).fill(0);
+    this.outputActivations = new Array(NN_OUT).fill(0);
+  }
+
+  forward(inputs) {
+    this.inputActivations = inputs.slice();
+    // Hidden layer: tanh
+    const hidden = [];
+    for (let h = 0; h < NN_HID; h++) {
+      let sum = 0;
+      for (let i = 0; i < NN_IN; i++) sum += this.w1[h][i] * inputs[i];
+      hidden[h] = Math.tanh(sum);
+    }
+    this.hiddenActivations = hidden.slice();
+    // Output layer: steer=tanh, throttle=sigmoid
+    const output = [];
+    for (let o = 0; o < NN_OUT; o++) {
+      let sum = 0;
+      for (let h = 0; h < NN_HID; h++) sum += this.w2[o][h] * hidden[h];
+      output[o] = o === 0 ? Math.tanh(sum) : 1 / (1 + Math.exp(-sum));
+    }
+    this.outputActivations = output.slice();
+    return output;
+  }
+}
+
+// ============================================================
+//  Agent (Car)
+// ============================================================
+class Agent {
+  constructor(genome) {
+    this.genome = genome;
+    this.nn = new NeuralNet(genome);
+    this.reset();
+  }
+
+  reset() {
+    // Start at first waypoint, heading toward second
+    const wp0 = WAYPOINTS[0], wp1 = WAYPOINTS[1];
+    this.x = wp0.x;
+    this.y = wp0.y;
+    this.heading = Math.atan2(wp1.y - wp0.y, wp1.x - wp0.x);
+    this.speed = 0;
+    this.alive = true;
+    this.fitness = 0;
+    this.steps = 0;
+    this.distanceTraveled = 0;
+    this.closestWaypointIdx = 0;
+    this.lapProgress = 0;
+    this.lastSteer = 0;
+    this.distFromCenter = 0;
+    this.headingError = 0;
+    this.isReversed = false;
+    this.sensorReadings = [1, 1, 1, 1, 1];
+    this.sensorHits = [];
+    this.prevWpIdx = 0;
+    this.wpPassed = 0;
+  }
+
+  getSensorReadings() {
+    const readings = [];
+    const hits = [];
+    for (let s = 0; s < SENSOR_ANGLES.length; s++) {
+      const ang = this.heading + SENSOR_ANGLES[s] * DEG;
+      const dx = Math.cos(ang), dy = Math.sin(ang);
+      let minT = SENSOR_RANGE;
+      for (let i = 0; i < WALL_SEGS.length; i += 4) {
+        const t = raySeg(this.x, this.y, dx, dy,
+          WALL_SEGS[i], WALL_SEGS[i + 1], WALL_SEGS[i + 2], WALL_SEGS[i + 3]);
+        if (t >= 0 && t < minT) minT = t;
+      }
+      readings.push(minT / SENSOR_RANGE); // 0〜1 normalized
+      hits.push({ x: this.x + dx * minT, y: this.y + dy * minT });
+    }
+    this.sensorReadings = readings;
+    this.sensorHits = hits;
+    return readings;
+  }
+
+  update() {
+    if (!this.alive) return;
+    const sensors = this.getSensorReadings();
+    const [steer, throttle] = this.nn.forward(sensors);
+    this.lastSteer = steer;
+    this.heading += steer * 0.08;
+    this.speed = throttle * MAX_SPEED;
+    const prevX = this.x, prevY = this.y;
+    this.x += Math.cos(this.heading) * this.speed;
+    this.y += Math.sin(this.heading) * this.speed;
+    this.distanceTraveled += dist(prevX, prevY, this.x, this.y);
+    this.steps++;
+
+    // Track distance from center
+    this.distFromCenter = pointTrackDist(this.x, this.y);
+
+    // Off-track check
+    if (this.distFromCenter > TRACK_WIDTH / 2) {
+      this.alive = false;
+      return;
+    }
+
+    // Update waypoint progress
+    const curWpIdx = closestWaypoint(this.x, this.y);
+    // Detect forward progress (waypoint index increases)
+    if (curWpIdx !== this.prevWpIdx) {
+      const diff = (curWpIdx - this.prevWpIdx + WP_COUNT) % WP_COUNT;
+      if (diff === 1) {
+        this.wpPassed++;
+      } else if (diff === WP_COUNT - 1) {
+        // Going backwards
+        this.isReversed = true;
+      }
+      this.prevWpIdx = curWpIdx;
+    }
+    this.closestWaypointIdx = curWpIdx;
+    this.lapProgress = this.wpPassed / WP_COUNT;
+
+    // Heading error (angle to next waypoint)
+    const nextWp = WAYPOINTS[(curWpIdx + 1) % WP_COUNT];
+    const targetHeading = Math.atan2(nextWp.y - this.y, nextWp.x - this.x);
+    this.headingError = Math.abs(normalizeAngle(this.heading - targetHeading));
+
+    // Max steps
+    if (this.steps >= GA_CONFIG.MAX_STEPS) {
+      this.alive = false;
+      return;
+    }
+
+    // Reward
+    this.fitness += computeReward(this);
+  }
+
+  getWaypointHeading() {
+    const nextWp = WAYPOINTS[(this.closestWaypointIdx + 1) % WP_COUNT];
+    return Math.atan2(nextWp.y - this.y, nextWp.x - this.x);
+  }
+}
+
+// ============================================================
+//  Reward System
+// ============================================================
+let rewardMode = 'simple';
+const rewardWeights = {
+  center: 0.70, speed: 0.40, smooth: 0.60,
+  progress: 0.80, heading: 0.50, survive: 0.30,
+};
+
+// Slider bindings
+const SLIDER_KEYS = ['center', 'speed', 'smooth', 'progress', 'heading', 'survive'];
+SLIDER_KEYS.forEach(key => {
+  const sl = document.getElementById('sl-' + key);
+  const val = document.getElementById('val-' + key);
+  sl.addEventListener('input', () => {
+    val.textContent = sl.value;
+    rewardWeights[key] = parseInt(sl.value) / 100;
+    // Update slider gradient
+    sl.style.background = `linear-gradient(to right, var(--accent-cyan) ${sl.value}%, var(--border) ${sl.value}%)`;
+  });
+  // Init gradient
+  sl.style.background = `linear-gradient(to right, var(--accent-cyan) ${sl.value}%, var(--border) ${sl.value}%)`;
+});
+
+function computeReward_simple(agent) {
+  const w = rewardWeights;
+  const distRatio = agent.distFromCenter / (TRACK_WIDTH / 2);
+  const centerScore = Math.max(0, 1.0 - distRatio);
+  const speedScore = agent.speed / MAX_SPEED;
+  const smoothScore = 1.0 - Math.min(1.0, Math.abs(agent.lastSteer));
+  const progressScore = agent.lapProgress;
+  const waypointDir = agent.getWaypointHeading();
+  const headingDiff = Math.abs(normalizeAngle(agent.heading - waypointDir));
+  const headingScore = 1.0 - Math.min(1.0, headingDiff / Math.PI);
+  const surviveScore = 1.0;
+
+  return (
+    centerScore   * w.center   +
+    speedScore    * w.speed    +
+    smoothScore   * w.smooth   +
+    progressScore * w.progress +
+    headingScore  * w.heading  +
+    surviveScore  * w.survive
+  );
+}
+
+// Custom reward function
+let customRewardFn = null;
+
+function computeReward_custom(agent) {
+  if (!customRewardFn) return 0;
+  try {
+    const params = {
+      distFromCenter:    agent.distFromCenter,
+      trackWidth:        TRACK_WIDTH,
+      speed:             agent.speed,
+      steerAngle:        agent.lastSteer,
+      progress:          agent.lapProgress,
+      headingError:      agent.headingError,
+      steps:             agent.steps,
+      lapProgress:       agent.lapProgress,
+      allWheelsOnTrack:  agent.alive,
+      isReversed:        agent.isReversed,
+      x: agent.x, y: agent.y,
+      closestWaypointIdx: agent.closestWaypointIdx,
+    };
+    const r = customRewardFn(params);
+    return (typeof r === 'number' && isFinite(r)) ? Math.max(0, r) : 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
+function computeReward(agent) {
+  return rewardMode === 'simple'
+    ? computeReward_simple(agent)
+    : computeReward_custom(agent);
+}
+
+// ============================================================
+//  Custom Editor & Presets
+// ============================================================
+const PRESETS = {
+  center: `// センターに近いほど高報酬
+function reward(params) {
+  const { distFromCenter, trackWidth, allWheelsOnTrack } = params;
+  if (!allWheelsOnTrack) return 0;
+  return 1.0 - (distFromCenter / (trackWidth * 0.5));
+}`,
+  speed: `// 速く走るほど高報酬。センターを外れたらペナルティ
+function reward(params) {
+  const { speed, distFromCenter, trackWidth, allWheelsOnTrack } = params;
+  if (!allWheelsOnTrack) return 0;
+  const speedReward = speed / 3.0;
+  const centerPenalty = distFromCenter > 0.4 * trackWidth ? 0.3 : 1.0;
+  return speedReward * centerPenalty;
+}`,
+  milestone: `// 一定ステップ数ごとに進捗が期待値を超えたらボーナス
+function reward(params) {
+  const { steps, lapProgress, allWheelsOnTrack } = params;
+  if (!allWheelsOnTrack) return 0;
+  let reward = lapProgress;
+  if (steps % 100 === 0 && lapProgress > steps / 800) {
+    reward += 5.0;
+  }
+  return reward;
+}`,
+  zigzag: `// ステアリングが穏やかなほど高報酬
+function reward(params) {
+  const { steerAngle, allWheelsOnTrack, speed } = params;
+  if (!allWheelsOnTrack) return 0;
+  const steerPenalty = Math.abs(steerAngle) > 0.5 ? 0.5 : 1.0;
+  return speed / 3.0 * steerPenalty;
+}`,
+  waypoint: `// コースの進行方向と車のheadingが合っているほど高報酬
+function reward(params) {
+  const { headingError, allWheelsOnTrack, distFromCenter, trackWidth } = params;
+  if (!allWheelsOnTrack) return 0;
+  const dirScore = 1.0 - Math.min(1.0, headingError / Math.PI);
+  const centerScore = 1.0 - distFromCenter / (trackWidth * 0.5);
+  return dirScore * 0.6 + centerScore * 0.4;
+}`,
+};
+
+document.getElementById('btn-apply').addEventListener('click', () => {
+  applyCustomReward();
+});
+
+document.getElementById('preset-select').addEventListener('change', (e) => {
+  const key = e.target.value;
+  if (PRESETS[key]) {
+    document.getElementById('custom-editor').value = PRESETS[key];
+    applyCustomReward();
+  }
+  e.target.value = '';
+});
+
+function applyCustomReward() {
+  const code = document.getElementById('custom-editor').value;
+  const statusEl = document.getElementById('editor-status');
+  try {
+    const body = code.replace(/^[\s\S]*?function\s+reward\s*\(\s*params\s*\)\s*\{/, '')
+                     .replace(/\}\s*$/, '');
+    customRewardFn = new Function('params', body);
+    // Test with dummy params
+    const testResult = customRewardFn({
+      distFromCenter: 0, trackWidth: TRACK_WIDTH, speed: 1,
+      steerAngle: 0, progress: 0.5, headingError: 0,
+      steps: 100, lapProgress: 0.5, allWheelsOnTrack: true,
+      isReversed: false, x: 0, y: 0, closestWaypointIdx: 0,
+    });
+    if (typeof testResult !== 'number' || !isFinite(testResult)) {
+      throw new Error('Return value must be a finite number');
+    }
+    statusEl.textContent = '✅ VALID';
+    statusEl.style.color = 'var(--accent-cyan)';
+  } catch (e) {
+    customRewardFn = null;
+    statusEl.textContent = '❌ ' + e.message;
+    statusEl.style.color = 'var(--accent-red)';
+  }
+}
+
+// Tab switching
+document.getElementById('tab-simple').addEventListener('click', () => {
+  rewardMode = 'simple';
+  document.getElementById('tab-simple').classList.add('active');
+  document.getElementById('tab-custom').classList.remove('active');
+  document.getElementById('panel-simple').style.display = 'block';
+  document.getElementById('panel-custom').style.display = 'none';
+});
+document.getElementById('tab-custom').addEventListener('click', () => {
+  rewardMode = 'custom';
+  document.getElementById('tab-custom').classList.add('active');
+  document.getElementById('tab-simple').classList.remove('active');
+  document.getElementById('panel-simple').style.display = 'none';
+  document.getElementById('panel-custom').style.display = 'block';
+  if (!customRewardFn) applyCustomReward();
+});
+
+// ============================================================
+//  Genetic Algorithm
+// ============================================================
+function randomGenome() {
+  const g = new Array(GENOME_LEN);
+  for (let i = 0; i < GENOME_LEN; i++) g[i] = (Math.random() * 2 - 1);
+  return g;
+}
+
+function crossover(a, b) {
+  const child = new Array(GENOME_LEN);
+  const cut = Math.floor(Math.random() * GENOME_LEN);
+  for (let i = 0; i < GENOME_LEN; i++) {
+    child[i] = i < cut ? a[i] : b[i];
+  }
+  return child;
+}
+
+function mutate(genome, rate, scale) {
+  const g = genome.slice();
+  for (let i = 0; i < g.length; i++) {
+    if (Math.random() < rate) {
+      g[i] += randGauss() * scale;
+    }
+  }
+  return g;
+}
+
+// ============================================================
+//  Game State
+// ============================================================
+let animFrameId = null;
+let isTraining = false;
+let generation = 0;
+let agents = [];
+let bestGenome = null;
+let bestFitness = 0;
+let bestAgentIdx = 0;
+let rewardHistory = [];
+
+function initAgents() {
+  agents = [];
+  for (let i = 0; i < GA_CONFIG.POPULATION; i++) {
+    const genome = bestGenome ? mutate(bestGenome, GA_CONFIG.MUTATION_RATE, GA_CONFIG.MUTATION_SCALE) : randomGenome();
+    agents.push(new Agent(genome));
+  }
+  // If we have a best genome, make the first agent use it directly (elite)
+  if (bestGenome) {
+    agents[0] = new Agent(bestGenome.slice());
+  }
+}
+
+function nextGeneration() {
+  // Sort by fitness
+  agents.sort((a, b) => b.fitness - a.fitness);
+
+  // Record history
+  const bestF = agents[0].fitness;
+  const avgF = agents.reduce((s, a) => s + a.fitness, 0) / agents.length;
+  rewardHistory.push({ gen: generation, best: bestF, avg: avgF });
+
+  // Update global best
+  if (bestF > bestFitness || !bestGenome) {
+    bestFitness = bestF;
+    bestGenome = agents[0].genome.slice();
+  }
+
+  generation++;
+
+  // Elite selection
+  const eliteCount = Math.max(2, Math.floor(GA_CONFIG.POPULATION * GA_CONFIG.ELITE_RATE));
+  const elites = agents.slice(0, eliteCount).map(a => a.genome.slice());
+
+  // Mutation rate decay
+  const curMutRate = GA_CONFIG.MUTATION_RATE * Math.pow(0.95, generation);
+
+  // Create next generation
+  const newGenomes = [];
+  // Always keep the best genome (Hall of Fame)
+  newGenomes.push(bestGenome.slice());
+  // Keep elites
+  for (let i = 0; i < eliteCount && newGenomes.length < GA_CONFIG.POPULATION; i++) {
+    newGenomes.push(elites[i]);
+  }
+  // Fill rest with crossover + mutation
+  while (newGenomes.length < GA_CONFIG.POPULATION) {
+    const p1 = elites[Math.floor(Math.random() * elites.length)];
+    const p2 = elites[Math.floor(Math.random() * elites.length)];
+    const child = mutate(crossover(p1, p2), curMutRate, GA_CONFIG.MUTATION_SCALE);
+    newGenomes.push(child);
+  }
+
+  // Create new agents
+  agents = newGenomes.map(g => new Agent(g));
+}
+
+// ============================================================
+//  Drawing — Track
+// ============================================================
+const cvTrack = document.getElementById('cv-track');
+const ctxTrack = cvTrack.getContext('2d');
+
+function drawTrack() {
+  const ctx = ctxTrack;
+  ctx.clearRect(0, 0, cvTrack.width, cvTrack.height);
+
+  // Track fill
+  ctx.beginPath();
+  ctx.lineWidth = TRACK_WIDTH;
+  ctx.strokeStyle = '#1a2535';
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.moveTo(WAYPOINTS[0].x * 2, WAYPOINTS[0].y * 2);
+  for (let i = 1; i <= WAYPOINTS.length; i++) {
+    const wp = WAYPOINTS[i % WAYPOINTS.length];
+    ctx.lineTo(wp.x * 2, wp.y * 2);
+  }
+  ctx.closePath();
+  ctx.lineWidth = TRACK_WIDTH * 2;
+  ctx.stroke();
+
+  // Inner boundary
+  ctx.beginPath();
+  ctx.strokeStyle = '#00d4ff';
+  ctx.lineWidth = 1;
+  ctx.moveTo(TRACK.inner[0].x * 2, TRACK.inner[0].y * 2);
+  for (let i = 1; i <= TRACK.inner.length; i++) {
+    const p = TRACK.inner[i % TRACK.inner.length];
+    ctx.lineTo(p.x * 2, p.y * 2);
+  }
+  ctx.closePath();
+  ctx.stroke();
+
+  // Outer boundary
+  ctx.beginPath();
+  ctx.strokeStyle = '#00d4ff';
+  ctx.lineWidth = 1;
+  ctx.moveTo(TRACK.outer[0].x * 2, TRACK.outer[0].y * 2);
+  for (let i = 1; i <= TRACK.outer.length; i++) {
+    const p = TRACK.outer[i % TRACK.outer.length];
+    ctx.lineTo(p.x * 2, p.y * 2);
+  }
+  ctx.closePath();
+  ctx.stroke();
+
+  // Center dashed line
+  ctx.beginPath();
+  ctx.setLineDash([6, 6]);
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 1;
+  ctx.moveTo(WAYPOINTS[0].x * 2, WAYPOINTS[0].y * 2);
+  for (let i = 1; i <= WAYPOINTS.length; i++) {
+    const wp = WAYPOINTS[i % WAYPOINTS.length];
+    ctx.lineTo(wp.x * 2, wp.y * 2);
+  }
+  ctx.closePath();
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawAgents() {
+  const ctx = ctxTrack;
+
+  // Find current best alive agent
+  let bestIdx = 0, bestFit = -Infinity;
+  for (let i = 0; i < agents.length; i++) {
+    if (agents[i].fitness > bestFit) {
+      bestFit = agents[i].fitness;
+      bestIdx = i;
+    }
+  }
+  bestAgentIdx = bestIdx;
+
+  // Draw all agents
+  for (let i = 0; i < agents.length; i++) {
+    const a = agents[i];
+    if (!a.alive) continue;
+    const isBest = (i === bestIdx);
+    const sx = a.x * 2, sy = a.y * 2;
+
+    // Raycast for best only
+    if (isBest) {
+      ctx.lineWidth = 1;
+      for (let s = 0; s < a.sensorHits.length; s++) {
+        const hit = a.sensorHits[s];
+        ctx.strokeStyle = 'rgba(0,212,255,0.3)';
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(hit.x * 2, hit.y * 2);
+        ctx.stroke();
+        // Hit dot
+        ctx.fillStyle = 'rgba(0,212,255,0.6)';
+        ctx.beginPath();
+        ctx.arc(hit.x * 2, hit.y * 2, 3, 0, PI2);
+        ctx.fill();
+      }
+    }
+
+    // Car triangle
+    const size = isBest ? 10 : 7;
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(a.heading);
+    ctx.beginPath();
+    ctx.moveTo(size, 0);
+    ctx.lineTo(-size * 0.6, -size * 0.5);
+    ctx.lineTo(-size * 0.6,  size * 0.5);
+    ctx.closePath();
+
+    if (isBest) {
+      ctx.shadowColor = '#00d4ff';
+      ctx.shadowBlur = 16;
+      ctx.fillStyle = '#00d4ff';
+    } else {
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(100,160,255,0.7)';
+    }
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+}
+
+// ============================================================
+//  Drawing — NN Visualization
+// ============================================================
+const cvNN = document.getElementById('cv-nn');
+const ctxNN = cvNN.getContext('2d');
+
+const NN_LABELS_IN = ['L60°', 'L30°', 'FWD', 'R30°', 'R60°'];
+const NN_LABELS_OUT = ['STEER', 'THROTTLE'];
+
+function drawNN() {
+  const ctx = ctxNN;
+  const W = cvNN.width, H = cvNN.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Get best agent's NN
+  const bestAgent = agents[bestAgentIdx];
+  if (!bestAgent) return;
+  const nn = bestAgent.nn;
+
+  const layers = [NN_IN, NN_HID, NN_OUT];
+  const layerX = [W * 0.15, W * 0.5, W * 0.85];
+  const nodeR = 18;
+
+  // Calculate node positions
+  const nodePos = [];
+  for (let l = 0; l < layers.length; l++) {
+    const n = layers[l];
+    const positions = [];
+    const totalH = (n - 1) * 52;
+    const startY = (H - totalH) / 2;
+    for (let i = 0; i < n; i++) {
+      positions.push({ x: layerX[l], y: startY + i * 52 });
+    }
+    nodePos.push(positions);
+  }
+
+  // Draw edges (synapses)
+  // Input → Hidden
+  for (let h = 0; h < NN_HID; h++) {
+    for (let i = 0; i < NN_IN; i++) {
+      const w = nn.w1[h][i];
+      drawEdge(ctx, nodePos[0][i], nodePos[1][h], w);
+    }
+  }
+  // Hidden → Output
+  for (let o = 0; o < NN_OUT; o++) {
+    for (let h = 0; h < NN_HID; h++) {
+      const w = nn.w2[o][h];
+      drawEdge(ctx, nodePos[1][h], nodePos[2][o], w);
+    }
+  }
+
+  // Draw nodes
+  // Input layer
+  for (let i = 0; i < NN_IN; i++) {
+    drawNode(ctx, nodePos[0][i], nn.inputActivations[i], NN_LABELS_IN[i]);
+  }
+  // Hidden layer
+  for (let h = 0; h < NN_HID; h++) {
+    drawNode(ctx, nodePos[1][h], nn.hiddenActivations[h], null);
+  }
+  // Output layer
+  for (let o = 0; o < NN_OUT; o++) {
+    drawNode(ctx, nodePos[2][o], nn.outputActivations[o], NN_LABELS_OUT[o]);
+  }
+}
+
+function drawEdge(ctx, from, to, weight) {
+  const absW = Math.abs(weight);
+  const thickness = clamp(absW * 3.0, 0.3, 4.0);
+  const alpha = clamp(absW * 0.8, 0.05, 0.9);
+  ctx.strokeStyle = weight > 0
+    ? `rgba(0,120,255,${alpha})`
+    : `rgba(255,50,80,${alpha})`;
+  ctx.lineWidth = thickness;
+  ctx.beginPath();
+  ctx.moveTo(from.x, from.y);
+  ctx.lineTo(to.x, to.y);
+  ctx.stroke();
+}
+
+function drawNode(ctx, pos, activation, label) {
+  const r = 18;
+  const absA = Math.min(Math.abs(activation), 1.0);
+
+  // Glow
+  if (absA > 0.5) {
+    ctx.shadowColor = '#00d4ff';
+    ctx.shadowBlur = 12 * absA;
+  }
+
+  // Fill based on activation
+  ctx.beginPath();
+  ctx.arc(pos.x, pos.y, r, 0, PI2);
+  if (activation >= 0) {
+    ctx.fillStyle = `rgba(0,212,255,${absA * 0.7 + 0.1})`;
+  } else {
+    ctx.fillStyle = `rgba(255,77,109,${absA * 0.7 + 0.1})`;
+  }
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Border
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Value text
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '10px "Courier New", monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(activation.toFixed(2), pos.x, pos.y);
+
+  // Label
+  if (label) {
+    ctx.fillStyle = '#64748b';
+    ctx.font = '9px "Courier New", monospace';
+    ctx.fillText(label, pos.x, pos.y + r + 12);
+  }
+}
+
+// ============================================================
+//  Drawing — Reward History Graph
+// ============================================================
+const cvGraph = document.getElementById('cv-graph');
+const ctxGraph = cvGraph.getContext('2d');
+
+function drawGraph() {
+  const ctx = ctxGraph;
+  const W = cvGraph.width, H = cvGraph.height;
+  const pad = { top: 15, bot: 20, left: 40, right: 10 };
+  ctx.clearRect(0, 0, W, H);
+
+  if (rewardHistory.length < 2) {
+    ctx.fillStyle = '#64748b';
+    ctx.font = '11px "Courier New", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('Waiting for training data...', W / 2, H / 2);
+    return;
+  }
+
+  const gW = W - pad.left - pad.right;
+  const gH = H - pad.top - pad.bot;
+
+  // Find max value
+  let maxVal = 1;
+  for (const r of rewardHistory) {
+    if (r.best > maxVal) maxVal = r.best;
+    if (r.avg > maxVal) maxVal = r.avg;
+  }
+  maxVal *= 1.1;
+
+  // Grid
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + (gH / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(W - pad.right, y);
+    ctx.stroke();
+    // Label
+    ctx.fillStyle = '#64748b';
+    ctx.font = '8px "Courier New", monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText((maxVal * (1 - i / 4)).toFixed(0), pad.left - 4, y + 3);
+  }
+
+  const xStep = gW / Math.max(1, rewardHistory.length - 1);
+
+  // Average line
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(0,212,255,0.4)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < rewardHistory.length; i++) {
+    const x = pad.left + i * xStep;
+    const y = pad.top + gH - (rewardHistory[i].avg / maxVal) * gH;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Best line
+  ctx.beginPath();
+  ctx.strokeStyle = '#00d4ff';
+  ctx.lineWidth = 2;
+  for (let i = 0; i < rewardHistory.length; i++) {
+    const x = pad.left + i * xStep;
+    const y = pad.top + gH - (rewardHistory[i].best / maxVal) * gH;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Current generation marker
+  if (rewardHistory.length > 0) {
+    const lastX = pad.left + (rewardHistory.length - 1) * xStep;
+    ctx.strokeStyle = 'rgba(0,212,255,0.3)';
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(lastX, pad.top);
+    ctx.lineTo(lastX, pad.top + gH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Axis label
+  ctx.fillStyle = '#64748b';
+  ctx.font = '8px "Courier New", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('GENERATION', W / 2, H - 3);
+}
+
+// ============================================================
+//  HUD Update
+// ============================================================
+function updateHUD() {
+  document.getElementById('hud-gen').textContent = generation;
+  document.getElementById('hud-best').textContent = bestFitness.toFixed(1);
+}
+
+// ============================================================
+//  Game Loop
+// ============================================================
+function gameLoop() {
+  if (!isTraining) return;
+
+  // Update all alive agents
+  let anyAlive = false;
+  for (const a of agents) {
+    if (a.alive) {
+      a.update();
+      anyAlive = true;
+    }
+  }
+
+  // Draw
+  drawTrack();
+  drawAgents();
+  drawNN();
+  updateHUD();
+
+  // Check if all dead
+  if (!anyAlive) {
+    nextGeneration();
+    drawGraph();
+    updateHUD();
+    initAgents();
+  }
+
+  animFrameId = requestAnimationFrame(gameLoop);
+}
+
+// ============================================================
+//  Controls
+// ============================================================
+document.getElementById('btn-train').addEventListener('click', () => {
+  if (!isTraining) {
+    isTraining = true;
+    document.getElementById('status-dot').classList.add('active');
+    if (agents.length === 0) initAgents();
+    gameLoop();
+  }
+});
+
+document.getElementById('btn-stop').addEventListener('click', () => {
+  isTraining = false;
+  document.getElementById('status-dot').classList.remove('active');
+  if (animFrameId) cancelAnimationFrame(animFrameId);
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  isTraining = false;
+  document.getElementById('status-dot').classList.remove('active');
+  if (animFrameId) cancelAnimationFrame(animFrameId);
+  generation = 0;
+  rewardHistory = [];
+  bestGenome = null;
+  bestFitness = 0;
+  agents = [];
+  // Clear canvases
+  ctxTrack.clearRect(0, 0, cvTrack.width, cvTrack.height);
+  ctxNN.clearRect(0, 0, cvNN.width, cvNN.height);
+  drawGraph();
+  updateHUD();
+  drawTrack();
+});
+
+// ============================================================
+//  Initial Draw
+// ============================================================
+drawTrack();
+drawGraph();
+
+// ============================================================
+//  Service Worker Registration
+// ============================================================
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
