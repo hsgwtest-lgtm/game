@@ -1332,7 +1332,7 @@ document.getElementById('btn-apply').addEventListener('click', function() {
   const code = document.getElementById('custom-editor').value;
   try {
     // Extract function body from the code
-    const bodyMatch = code.match(/function\s+reward\s*\(\s*params\s*\)\s*\{([\s\S]*)\}\s*$/);
+    const bodyMatch = code.trim().match(/function\s+reward\s*\(\s*params\s*\)\s*\{([\s\S]*)\}\s*$/);
     if (bodyMatch) {
       customRewardFn = new Function('params', bodyMatch[1]);
     } else {
