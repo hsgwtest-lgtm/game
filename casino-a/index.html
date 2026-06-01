@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style/global.css">
+  <title>Casino</title>
+  <style>
+    .lobby {
+      min-height: 100vh;
+      padding: 20px 16px 40px;
+    }
+    .lobby-header {
+      text-align: center;
+      padding: 30px 0 20px;
+      animation: fadeIn 1s ease;
+    }
+    .lobby-header h1 {
+      font-size: 2rem;
+      color: var(--gold);
+      letter-spacing: 3px;
+      text-shadow: 0 0 20px rgba(201,168,76,0.4);
+    }
+    .lobby-header .balance-display {
+      margin-top: 12px;
+      font-size: 1.3rem;
+      color: var(--gold-light);
+    }
+    .lobby-header .balance-display span {
+      font-weight: 600;
+    }
+    .games-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      max-width: 420px;
+      margin: 24px auto 0;
+    }
+    .game-card {
+      background: linear-gradient(145deg, #1a1a2e, #12121f);
+      border: 1px solid rgba(201,168,76,0.25);
+      border-radius: 14px;
+      padding: 24px 16px;
+      text-align: center;
+      text-decoration: none;
+      color: var(--text-primary);
+      transition: transform 0.2s, box-shadow 0.2s;
+      animation: fadeIn 0.6s ease both;
+    }
+    .game-card:nth-child(1) { animation-delay: 0.1s; }
+    .game-card:nth-child(2) { animation-delay: 0.2s; }
+    .game-card:nth-child(3) { animation-delay: 0.3s; }
+    .game-card:nth-child(4) { animation-delay: 0.4s; }
+    .game-card:nth-child(5) { animation-delay: 0.5s; }
+    .game-card:active {
+      transform: scale(0.96);
+    }
+    .game-card .icon {
+      font-size: 2.8rem;
+      display: block;
+      margin-bottom: 10px;
+    }
+    .game-card .name {
+      font-family: 'Playfair Display', serif;
+      font-size: 1rem;
+      color: var(--gold);
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    .game-card .min-bet {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .game-card.wide {
+      grid-column: 1 / -1;
+    }
+    .reset-btn {
+      display: block;
+      margin: 30px auto 0;
+      background: none;
+      border: 1px solid var(--text-muted);
+      color: var(--text-muted);
+      padding: 8px 20px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="lobby">
+    <div class="lobby-header">
+      <h1>🎰 CEBU CASINO</h1>
+      <div class="balance-display">💰 <span id="balance">¥10,000</span></div>
+    </div>
+    <div class="games-grid">
+      <a href="games/slots/slots.html" class="game-card">
+        <span class="icon">🎰</span>
+        <div class="name">SLOTS</div>
+        <div class="min-bet">min: ¥10</div>
+      </a>
+      <a href="games/blackjack/blackjack.html" class="game-card">
+        <span class="icon">🃏</span>
+        <div class="name">BLACKJACK</div>
+        <div class="min-bet">min: ¥100</div>
+      </a>
+      <a href="games/roulette/roulette.html" class="game-card">
+        <span class="icon">🎡</span>
+        <div class="name">ROULETTE</div>
+        <div class="min-bet">min: ¥100</div>
+      </a>
+      <a href="games/baccarat/baccarat.html" class="game-card">
+        <span class="icon">🎴</span>
+        <div class="name">BACCARAT</div>
+        <div class="min-bet">min: ¥100</div>
+      </a>
+      <a href="games/dragon-tiger/dragon-tiger.html" class="game-card wide">
+        <span class="icon">🐉</span>
+        <div class="name">DRAGON TIGER</div>
+        <div class="min-bet">min: ¥100</div>
+      </a>
+    </div>
+    <button class="reset-btn" id="resetBtn">Reset Balance</button>
+  </div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
