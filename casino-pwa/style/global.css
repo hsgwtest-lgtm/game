@@ -1,0 +1,280 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Crimson+Pro:wght@300;400;600&display=swap');
+
+:root {
+  --bg-deep: #0a0a0f;
+  --bg-table: #0d2818;
+  --gold: #c9a84c;
+  --gold-light: #f0d080;
+  --red-dragon: #c0392b;
+  --chip-white: #f5f5f0;
+  --text-primary: #f0e8d0;
+  --text-muted: #8a7a5a;
+  --shadow-gold: rgba(201, 168, 76, 0.3);
+  --shadow-dark: rgba(0, 0, 0, 0.6);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Crimson Pro', serif;
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+h1, h2, h3 {
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+}
+
+/* Balance bar */
+.balance-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50px;
+  background: linear-gradient(180deg, rgba(10,10,15,0.95) 0%, rgba(10,10,15,0.8) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  z-index: 1000;
+  border-bottom: 1px solid rgba(201,168,76,0.2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.balance-bar .logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 16px;
+  color: var(--gold);
+  letter-spacing: 2px;
+}
+
+.balance-bar .balance {
+  font-family: 'Crimson Pro', serif;
+  font-size: 16px;
+  color: var(--gold-light);
+}
+
+.balance-bar .balance .amount {
+  font-weight: 600;
+}
+
+/* Back button */
+.back-btn {
+  position: fixed;
+  top: 8px;
+  left: 10px;
+  z-index: 1001;
+  background: rgba(201,168,76,0.15);
+  border: 1px solid rgba(201,168,76,0.3);
+  color: var(--gold);
+  font-size: 14px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-family: 'Crimson Pro', serif;
+}
+
+.back-btn:active {
+  background: rgba(201,168,76,0.3);
+}
+
+/* Game overlay UI */
+.game-overlay {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.game-overlay > * {
+  pointer-events: auto;
+}
+
+/* Bet controls */
+.bet-controls {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  background: linear-gradient(0deg, rgba(10,10,15,0.95) 0%, rgba(10,10,15,0.7) 80%, transparent 100%);
+  padding-top: 30px;
+}
+
+.chip-btn {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 3px solid var(--gold);
+  background: radial-gradient(circle at 30% 30%, #2a2a3a, #1a1a2e);
+  color: var(--gold-light);
+  font-family: 'Crimson Pro', serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px var(--shadow-dark), inset 0 1px 0 rgba(255,255,255,0.1);
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.chip-btn:active {
+  transform: scale(0.92);
+  box-shadow: 0 1px 4px var(--shadow-dark);
+}
+
+.chip-btn.selected {
+  border-color: var(--gold-light);
+  box-shadow: 0 0 12px var(--shadow-gold), 0 2px 8px var(--shadow-dark);
+  transform: scale(1.08);
+}
+
+/* Action buttons */
+.action-btn {
+  padding: 12px 28px;
+  border-radius: 25px;
+  border: 2px solid var(--gold);
+  background: linear-gradient(135deg, rgba(201,168,76,0.2), rgba(201,168,76,0.05));
+  color: var(--gold-light);
+  font-family: 'Playfair Display', serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.action-btn:active {
+  background: linear-gradient(135deg, rgba(201,168,76,0.4), rgba(201,168,76,0.1));
+  transform: scale(0.96);
+}
+
+.action-btn.primary {
+  background: linear-gradient(135deg, var(--gold), #a88a3c);
+  color: #0a0a0f;
+  border-color: var(--gold-light);
+}
+
+.action-btn:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* Score display */
+.score-display {
+  text-align: center;
+  padding: 8px;
+  font-size: 18px;
+  color: var(--text-primary);
+}
+
+/* Result popup */
+.result-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  background: radial-gradient(ellipse at center, #1a1a2e, #0a0a0f);
+  border: 2px solid var(--gold);
+  border-radius: 16px;
+  padding: 30px 40px;
+  text-align: center;
+  z-index: 2000;
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.result-popup.show {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+}
+
+.result-popup h2 {
+  font-size: 28px;
+  color: var(--gold-light);
+  margin-bottom: 8px;
+}
+
+.result-popup p {
+  font-size: 18px;
+  color: var(--text-muted);
+}
+
+.result-popup .win {
+  color: var(--gold-light);
+}
+
+.result-popup .lose {
+  color: var(--red-dragon);
+}
+
+/* Canvas container */
+.canvas-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+.canvas-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Road history (baccarat) */
+.road-grid {
+  display: grid;
+  grid-template-columns: repeat(20, 16px);
+  grid-auto-rows: 16px;
+  gap: 2px;
+  padding: 8px;
+  overflow-x: auto;
+}
+
+.road-cell {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+.road-cell.player { background: #2980b9; }
+.road-cell.banker { background: var(--red-dragon); }
+.road-cell.tie { background: #27ae60; }
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 5px var(--shadow-gold); }
+  50% { box-shadow: 0 0 20px var(--shadow-gold), 0 0 40px rgba(201,168,76,0.1); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out both;
+}
