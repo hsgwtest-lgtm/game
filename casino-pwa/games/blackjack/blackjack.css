@@ -1,0 +1,28 @@
+.scores {
+  display: flex;
+  justify-content: space-around;
+  padding: 8px 20px;
+}
+
+.score-box {
+  font-family: 'Playfair Display', serif;
+  font-size: 16px;
+  padding: 6px 16px;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.6);
+}
+
+.dealer-score { color: var(--red-dragon); }
+.player-score { color: #2ecc71; }
+
+.action-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 16px;
+}
+
+.bet-phase {
+  background: linear-gradient(0deg, rgba(10,10,15,0.95) 0%, rgba(10,10,15,0.7) 80%, transparent 100%);
+  padding-top: 20px;
+}
