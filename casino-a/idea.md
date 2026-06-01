@@ -2,7 +2,7 @@
 
 ## プロジェクト概要
 
-**プロジェクト名**: Cebu Casino PWA  
+**プロジェクト名**: Casino PWA  
 **対象**: iOS Safari PWA（GitHub Pages ホスティング）  
 **技術スタック**: Vanilla JS (ES Modules), HTML5 Canvas 2D, CSS3 Animation  
 **構成**: マルチファイル（単一HTMLは不要）  
@@ -13,7 +13,7 @@
 ## ディレクトリ構成
 
 ```
-casino-pwa/
+casino-a/
 ├── index.html               # ロビー画面（メインエントリ）
 ├── manifest.json            # PWAマニフェスト
 ├── sw.js                    # Service Worker（オフライン対応）
@@ -82,7 +82,7 @@ casino-pwa/
 
 ```json
 {
-  "name": "Cebu Casino",
+  "name": "Casino",
   "short_name": "Casino",
   "display": "standalone",
   "orientation": "portrait",
