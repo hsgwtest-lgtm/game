@@ -1,0 +1,215 @@
+.blackjack-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top, rgba(201, 168, 76, 0.16), transparent 28%),
+    linear-gradient(180deg, #11111a 0%, var(--bg-deep) 50%, #060609 100%);
+}
+
+.blackjack-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 14px 28px;
+}
+
+.table-shell,
+.hud-grid,
+.controls-panel {
+  background: linear-gradient(180deg, rgba(18, 18, 28, 0.92), rgba(8, 8, 12, 0.94));
+  border: 1px solid rgba(201, 168, 76, 0.22);
+  border-radius: 18px;
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(240, 208, 128, 0.08);
+}
+
+.table-shell {
+  padding: 10px;
+  overflow: hidden;
+}
+
+#tableCanvas {
+  width: 100%;
+  height: min(56vh, 520px);
+  min-height: 360px;
+  border-radius: 14px;
+  background: radial-gradient(circle at center, rgba(17, 73, 42, 0.9), rgba(8, 33, 19, 0.98));
+}
+
+.hud-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px;
+}
+
+.score-card,
+.status-card,
+.bet-panel {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(201, 168, 76, 0.12);
+  border-radius: 14px;
+}
+
+.score-card,
+.status-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 68px;
+  padding: 10px 12px;
+}
+
+.label {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.score-card strong,
+.status-card strong,
+.bet-header strong {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.05rem;
+  color: var(--text-primary);
+}
+
+.status-card strong {
+  line-height: 1.2;
+}
+
+.controls-panel {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.action-btn {
+  min-height: 48px;
+  padding: 12px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(201, 168, 76, 0.18);
+  background: linear-gradient(180deg, rgba(36, 36, 48, 0.96), rgba(18, 18, 24, 0.96));
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.action-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.action-btn:not(:disabled) {
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.24);
+}
+
+.action-btn:disabled {
+  opacity: 0.38;
+}
+
+.action-btn.is-available {
+  border-color: rgba(240, 208, 128, 0.66);
+  box-shadow: 0 0 0 1px rgba(240, 208, 128, 0.2), 0 10px 20px rgba(201, 168, 76, 0.14);
+}
+
+.action-btn.danger {
+  color: #ffd0ca;
+  border-color: rgba(192, 57, 43, 0.35);
+}
+
+.action-btn.gold-accent {
+  color: #231708;
+  background: linear-gradient(135deg, var(--gold), var(--gold-light));
+}
+
+.insurance-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(240, 208, 128, 0.28);
+  background: linear-gradient(180deg, rgba(31, 24, 9, 0.92), rgba(18, 14, 8, 0.94));
+  animation: fadeIn 0.25s ease;
+}
+
+.insurance-copy {
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.insurance-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.hidden {
+  display: none;
+}
+
+.bet-panel {
+  padding: 14px;
+}
+
+.bet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.bet-selector {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.bet-selector .chip-btn {
+  min-height: 42px;
+}
+
+.deal-btn {
+  width: 100%;
+  margin-top: 14px;
+  min-height: 52px;
+}
+
+@media (min-width: 768px) {
+  .blackjack-layout {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 18px 18px 36px;
+  }
+
+  #tableCanvas {
+    height: min(58vh, 600px);
+  }
+
+  .action-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .hud-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .status-card {
+    order: -1;
+  }
+
+  .bet-selector {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

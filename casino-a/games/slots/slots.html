@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Slots">
+  <meta name="theme-color" content="#0a0a0f">
+  <title>Slots</title>
+  <link rel="stylesheet" href="../../style/global.css">
+  <link rel="stylesheet" href="./slots.css">
+</head>
+<body>
+  <div class="slots-page">
+    <header class="top-bar">
+      <a class="back-btn" href="../../index.html" aria-label="Back to casino lobby">←</a>
+      <div class="title">SLOTS</div>
+      <div class="balance" id="balance">¥0</div>
+    </header>
+
+    <main class="slots-layout">
+      <section class="machine-panel">
+        <div class="machine-header">
+          <div>
+            <p class="eyebrow">Dark luxury reels</p>
+            <h1>Center Payline</h1>
+          </div>
+          <div class="win-display">
+            <span>Last Win</span>
+            <strong id="win-amount">¥0</strong>
+          </div>
+        </div>
+
+        <div class="canvas-shell">
+          <canvas id="slots-canvas" class="game-canvas" aria-label="Slot machine reels"></canvas>
+          <div class="payline-flash" id="payline-flash" aria-hidden="true"></div>
+        </div>
+
+        <div class="controls">
+          <button id="spin-button" class="btn-gold spin-button" type="button">Spin</button>
+
+          <div class="bet-panel">
+            <span class="bet-label">Bet</span>
+            <div class="bet-chips" role="group" aria-label="Bet selector">
+              <button class="chip-btn bet-chip active" type="button" data-bet="10">10</button>
+              <button class="chip-btn bet-chip" type="button" data-bet="50">50</button>
+              <button class="chip-btn bet-chip" type="button" data-bet="100">100</button>
+              <button class="chip-btn bet-chip" type="button" data-bet="500">500</button>
+            </div>
+          </div>
+        </div>
+
+        <p id="status-text" class="status-text">Line up the center row for premium payouts.</p>
+      </section>
+
+      <aside class="payout-panel">
+        <h2>Payouts</h2>
+        <ul class="payout-list">
+          <li><span>💎 💎 💎</span><strong>50x</strong></li>
+          <li><span>7️⃣ 7️⃣ 7️⃣</span><strong>20x</strong></li>
+          <li><span>🔔 🔔 🔔</span><strong>10x</strong></li>
+          <li><span>⭐ ⭐ ⭐</span><strong>5x</strong></li>
+          <li><span>🃏 🃏 🃏</span><strong>5x</strong></li>
+          <li><span>🍇 🍇 🍇</span><strong>4x</strong></li>
+          <li><span>🍋 🍋 🍋</span><strong>3x</strong></li>
+          <li><span>🍒 🍒 🍒</span><strong>3x</strong></li>
+          <li><span>🍒 🍒 _</span><strong>1x</strong></li>
+          <li><span>🍒 _ _</span><strong>0.5x</strong></li>
+        </ul>
+        <p class="payout-note">Only the center row pays. Bigger hits trigger premium win audio.</p>
+      </aside>
+    </main>
+  </div>
+
+  <script type="module" src="./slots.js"></script>
+</body>
+</html>

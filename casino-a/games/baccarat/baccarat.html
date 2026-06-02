@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a0a0f">
+  <link rel="apple-touch-icon" href="../../assets/icons/icon-192.png">
+  <title>Baccarat VIP</title>
+  <link rel="stylesheet" href="../../style/global.css">
+  <link rel="stylesheet" href="./baccarat.css">
+</head>
+<body>
+  <header class="top-bar">
+    <a class="back-btn" href="../../index.html" aria-label="Back to casino">‹</a>
+    <div class="title">BACCARAT</div>
+    <div class="balance">Balance: <span id="balance">0</span></div>
+  </header>
+
+  <main class="game-shell">
+    <section class="table-frame">
+      <canvas id="gameCanvas" class="game-canvas" width="1200" height="720" aria-label="Baccarat table"></canvas>
+      <div id="messageOverlay" class="message-overlay" aria-live="polite">
+        <h2 id="messageTitle">Place your wagers</h2>
+        <p id="messageText">Tap a chip, place bets on the board, then deal the coup.</p>
+      </div>
+    </section>
+
+    <section class="score-strip" aria-label="Scores">
+      <div class="score-card player-side">
+        <span class="score-label">Player</span>
+        <strong id="playerScore">--</strong>
+      </div>
+      <div class="score-card banker-side">
+        <span class="score-label">Banker</span>
+        <strong id="bankerScore">--</strong>
+      </div>
+    </section>
+
+    <section class="bet-panel">
+      <div class="panel-heading">
+        <h2>Betting Board</h2>
+        <p>Player 1:1 · Banker 0.95:1 · Tie 8:1 · Pairs 11:1</p>
+      </div>
+      <div class="bet-grid" id="betGrid">
+        <button class="bet-btn player" data-bet="player">
+          <span class="bet-name">PLAYER</span>
+          <span class="bet-odds">1:1</span>
+          <span class="bet-amount" id="bet-player">0</span>
+        </button>
+        <button class="bet-btn banker" data-bet="banker">
+          <span class="bet-name">BANKER</span>
+          <span class="bet-odds">0.95:1</span>
+          <span class="bet-amount" id="bet-banker">0</span>
+        </button>
+        <button class="bet-btn tie" data-bet="tie">
+          <span class="bet-name">TIE</span>
+          <span class="bet-odds">8:1</span>
+          <span class="bet-amount" id="bet-tie">0</span>
+        </button>
+        <button class="bet-btn pair player-pair" data-bet="playerPair">
+          <span class="bet-name">PLAYER PAIR</span>
+          <span class="bet-odds">11:1</span>
+          <span class="bet-amount" id="bet-playerPair">0</span>
+        </button>
+        <button class="bet-btn pair banker-pair" data-bet="bankerPair">
+          <span class="bet-name">BANKER PAIR</span>
+          <span class="bet-odds">11:1</span>
+          <span class="bet-amount" id="bet-bankerPair">0</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="control-row">
+      <div class="chip-panel">
+        <div class="panel-heading compact">
+          <h2>Chips</h2>
+          <p>Selected wager per tap</p>
+        </div>
+        <div class="chip-row" id="chipRow">
+          <button class="chip-btn active" data-value="100">100</button>
+          <button class="chip-btn" data-value="500">500</button>
+          <button class="chip-btn" data-value="1000">1,000</button>
+          <button class="chip-btn" data-value="5000">5,000</button>
+        </div>
+      </div>
+
+      <div class="action-panel">
+        <div class="total-bet">Total Bet: <span id="totalBet">0</span></div>
+        <button id="dealBtn" class="btn-gold">Deal</button>
+      </div>
+    </section>
+
+    <section class="history-panel">
+      <div class="panel-heading compact">
+        <h2>Bead Road</h2>
+        <p>Recent coups fill downward, then move right</p>
+      </div>
+      <div id="beadRoad" class="bead-road" aria-label="Baccarat history"></div>
+    </section>
+  </main>
+
+  <script type="module" src="./baccarat.js"></script>
+</body>
+</html>
