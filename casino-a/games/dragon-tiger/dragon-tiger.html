@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a0a0f">
+  <link rel="stylesheet" href="../../style/global.css">
+  <link rel="stylesheet" href="./dragon-tiger.css">
+  <title>Dragon Tiger</title>
+</head>
+<body>
+  <main class="dragon-tiger-page">
+    <header class="top-bar dragon-tiger-topbar">
+      <a href="../../index.html" class="back-btn" aria-label="Back to lobby">←</a>
+      <div class="title-wrap">
+        <div class="title">DRAGON TIGER</div>
+        <div class="subtitle">Macau VIP Salon</div>
+      </div>
+      <div class="balance" aria-live="polite">💰 <span id="balance">¥10,000</span></div>
+    </header>
+
+    <section class="table-shell" aria-label="Dragon Tiger table">
+      <div class="table-panels" aria-hidden="true">
+        <div class="panel dragon-panel" id="dragonPanel">
+          <span class="panel-label">DRAGON</span>
+        </div>
+        <div class="panel tiger-panel" id="tigerPanel">
+          <span class="panel-label">TIGER</span>
+        </div>
+      </div>
+
+      <div class="table-info">
+        <div class="shoe-status">8 Deck Shoe · <span id="cardsRemaining">416</span> cards left</div>
+        <div class="payouts">Dragon / Tiger 1:1 · Tie 8:1 · Suited Tie 50:1</div>
+      </div>
+
+      <div class="canvas-frame">
+        <canvas id="gameCanvas" class="game-canvas" width="1200" height="700" aria-label="Dragon Tiger cards"></canvas>
+        <div class="canvas-overlay">
+          <div class="seat dragon-seat">
+            <span class="seat-name">Dragon</span>
+            <span class="seat-card" id="dragonCardLabel">Awaiting deal</span>
+          </div>
+          <div class="seat tiger-seat">
+            <span class="seat-name">Tiger</span>
+            <span class="seat-card" id="tigerCardLabel">Awaiting deal</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="control-panel">
+      <div class="betting-area" aria-label="Betting options">
+        <button class="bet-btn dragon" type="button" data-bet-type="dragon">
+          <span class="bet-name">Dragon</span>
+          <span class="bet-odds">1:1</span>
+          <span class="bet-value" data-bet-display="dragon">¥0</span>
+        </button>
+        <button class="bet-btn tiger" type="button" data-bet-type="tiger">
+          <span class="bet-name">Tiger</span>
+          <span class="bet-odds">1:1</span>
+          <span class="bet-value" data-bet-display="tiger">¥0</span>
+        </button>
+        <button class="bet-btn tie" type="button" data-bet-type="tie">
+          <span class="bet-name">Tie</span>
+          <span class="bet-odds">8:1</span>
+          <span class="bet-value" data-bet-display="tie">¥0</span>
+        </button>
+        <button class="bet-btn suited-tie" type="button" data-bet-type="suitedTie">
+          <span class="bet-name">Suited Tie</span>
+          <span class="bet-odds">50:1</span>
+          <span class="bet-value" data-bet-display="suitedTie">¥0</span>
+        </button>
+      </div>
+
+      <div class="bet-actions">
+        <div class="chip-selector" aria-label="Chip values">
+          <button class="chip-btn active" type="button" data-chip="100">¥100</button>
+          <button class="chip-btn" type="button" data-chip="500">¥500</button>
+          <button class="chip-btn" type="button" data-chip="1000">¥1K</button>
+          <button class="chip-btn" type="button" data-chip="5000">¥5K</button>
+        </div>
+
+        <div class="action-row">
+          <button class="secondary-btn" type="button" id="clearBetsBtn">Clear Bets</button>
+          <button class="btn-gold deal-btn" type="button" id="dealBtn">Deal</button>
+        </div>
+      </div>
+
+      <div class="result-message" id="resultMessage" aria-live="polite">
+        Select a chip, tap a betting spot, then deal the hand.
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./dragon-tiger.js"></script>
+</body>
+</html>

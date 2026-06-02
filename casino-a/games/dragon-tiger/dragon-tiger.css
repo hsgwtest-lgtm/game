@@ -1,0 +1,348 @@
+:root {
+  --table-green-glow: rgba(54, 137, 86, 0.55);
+}
+
+body {
+  background:
+    radial-gradient(circle at top, rgba(201, 168, 76, 0.08), transparent 35%),
+    linear-gradient(180deg, #120f15 0%, var(--bg-deep) 30%, #050608 100%);
+}
+
+.dragon-tiger-page {
+  min-height: 100vh;
+  padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+}
+
+.dragon-tiger-topbar {
+  gap: 10px;
+}
+
+.title-wrap {
+  text-align: center;
+  flex: 1;
+}
+
+.subtitle {
+  font-size: 0.72rem;
+  letter-spacing: 0.28rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.table-shell {
+  margin: 14px 14px 0;
+  padding: 14px;
+  border-radius: 24px;
+  border: 1px solid rgba(201, 168, 76, 0.3);
+  background:
+    linear-gradient(180deg, rgba(16, 17, 20, 0.9), rgba(8, 8, 12, 0.96)),
+    var(--bg-deep);
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.35),
+    inset 0 0 0 1px rgba(240, 208, 128, 0.05);
+}
+
+.table-panels {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.panel {
+  min-height: 84px;
+  border-radius: 18px;
+  border: 1px solid rgba(201, 168, 76, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+}
+
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 55%);
+}
+
+.dragon-panel {
+  background: linear-gradient(135deg, rgba(192, 57, 43, 0.72), rgba(40, 8, 8, 0.95));
+}
+
+.tiger-panel {
+  background: linear-gradient(135deg, rgba(26, 74, 138, 0.72), rgba(7, 17, 36, 0.95));
+}
+
+.panel-label {
+  position: relative;
+  font-family: 'Playfair Display', serif;
+  font-size: 1.35rem;
+  letter-spacing: 0.16rem;
+  color: var(--gold-light);
+  text-shadow: 0 0 18px rgba(0, 0, 0, 0.45);
+}
+
+.panel.winner {
+  border-color: rgba(240, 208, 128, 0.85);
+  box-shadow: 0 0 0 1px rgba(240, 208, 128, 0.25), 0 0 28px rgba(201, 168, 76, 0.45);
+  animation: goldGlow 1.15s ease-in-out infinite;
+}
+
+.panel.tie {
+  border-color: rgba(102, 211, 123, 0.8);
+  box-shadow: 0 0 0 1px rgba(102, 211, 123, 0.2), 0 0 24px var(--table-green-glow);
+}
+
+.table-info {
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+.shoe-status {
+  color: var(--gold-light);
+  font-size: 0.95rem;
+}
+
+.payouts {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.canvas-frame {
+  position: relative;
+  min-height: 310px;
+  border-radius: 24px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at center, rgba(28, 84, 53, 0.35), rgba(13, 40, 24, 0.96) 58%, rgba(7, 13, 9, 1) 100%);
+  border: 1px solid rgba(201, 168, 76, 0.28);
+  box-shadow:
+    inset 0 0 40px rgba(0, 0, 0, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+}
+
+.canvas-frame::before,
+.canvas-frame::after {
+  content: '';
+  position: absolute;
+  top: 16px;
+  bottom: 16px;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(240, 208, 128, 0.3), transparent);
+}
+
+.canvas-frame::before {
+  left: 50%;
+}
+
+.canvas-frame::after {
+  left: calc(50% - 1px);
+}
+
+#gameCanvas {
+  height: 310px;
+}
+
+.canvas-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  padding: 18px;
+}
+
+.seat {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.seat-name {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.25rem;
+  letter-spacing: 0.12rem;
+  text-transform: uppercase;
+}
+
+.seat-card {
+  font-size: 0.82rem;
+  letter-spacing: 0.08rem;
+  color: var(--gold-light);
+  text-transform: uppercase;
+}
+
+.dragon-seat {
+  align-items: flex-start;
+}
+
+.dragon-seat .seat-name {
+  color: #f1b4ab;
+}
+
+.tiger-seat {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.tiger-seat .seat-name {
+  color: #b4d0ff;
+}
+
+.control-panel {
+  margin: 16px 14px 0;
+  padding: 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(201, 168, 76, 0.24);
+  background: linear-gradient(180deg, rgba(20, 16, 12, 0.96), rgba(10, 10, 14, 0.98));
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+}
+
+.betting-area {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.bet-btn {
+  min-height: 90px;
+  border-radius: 18px;
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: center;
+  align-items: center;
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.02);
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.bet-btn.dragon {
+  background: linear-gradient(135deg, rgba(192, 57, 43, 0.28), rgba(40, 8, 8, 0.9));
+}
+
+.bet-btn.tiger {
+  background: linear-gradient(135deg, rgba(26, 74, 138, 0.28), rgba(6, 12, 26, 0.92));
+}
+
+.bet-btn.tie,
+.bet-btn.suited-tie {
+  background: linear-gradient(135deg, rgba(201, 168, 76, 0.16), rgba(25, 18, 8, 0.92));
+}
+
+.bet-btn.active,
+.bet-btn:active {
+  transform: translateY(-1px) scale(0.99);
+  border-color: rgba(240, 208, 128, 0.85);
+  box-shadow: 0 0 18px rgba(201, 168, 76, 0.22);
+}
+
+.bet-btn:disabled {
+  opacity: 0.55;
+  transform: none;
+  box-shadow: none;
+}
+
+.bet-name {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.05rem;
+}
+
+.bet-odds {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.08rem;
+  text-transform: uppercase;
+}
+
+.bet-value {
+  color: var(--gold-light);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.bet-actions {
+  margin-top: 14px;
+  display: grid;
+  gap: 14px;
+}
+
+.chip-selector {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.action-row {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 10px;
+}
+
+.secondary-btn {
+  min-height: 48px;
+  border-radius: 12px;
+  border: 1px solid rgba(201, 168, 76, 0.28);
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.95rem;
+}
+
+.deal-btn {
+  min-height: 48px;
+}
+
+.result-message {
+  margin-top: 14px;
+  min-height: 56px;
+  border-radius: 16px;
+  border: 1px solid rgba(201, 168, 76, 0.18);
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+  line-height: 1.35;
+  text-align: center;
+}
+
+.result-message.win {
+  color: var(--gold-light);
+  border-color: rgba(240, 208, 128, 0.6);
+}
+
+.result-message.loss {
+  color: #f0c4bc;
+  border-color: rgba(192, 57, 43, 0.45);
+}
+
+.result-message.tie-state {
+  color: #b5edc5;
+  border-color: rgba(102, 211, 123, 0.45);
+}
+
+@media (min-width: 768px) {
+  .dragon-tiger-page {
+    max-width: 980px;
+    margin: 0 auto;
+  }
+
+  .table-shell,
+  .control-panel {
+    margin-left: 24px;
+    margin-right: 24px;
+  }
+
+  #gameCanvas {
+    height: 360px;
+  }
+
+  .panel {
+    min-height: 104px;
+  }
+}

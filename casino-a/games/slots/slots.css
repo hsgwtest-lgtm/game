@@ -1,0 +1,245 @@
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top, rgba(201, 168, 76, 0.18), transparent 28%),
+    linear-gradient(180deg, #111118 0%, var(--bg-deep) 30%, #050507 100%);
+}
+
+.slots-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.slots-layout {
+  width: min(100%, 1100px);
+  margin: 0 auto;
+  padding: 20px 16px 32px;
+  display: grid;
+  gap: 20px;
+}
+
+.machine-panel,
+.payout-panel {
+  background: linear-gradient(180deg, rgba(18, 22, 14, 0.92), rgba(8, 8, 12, 0.96));
+  border: 1px solid rgba(201, 168, 76, 0.24);
+  border-radius: 20px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(240, 208, 128, 0.08);
+}
+
+.machine-panel {
+  padding: 20px;
+}
+
+.machine-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.eyebrow {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.78rem;
+  margin-bottom: 6px;
+}
+
+.machine-header h1,
+.payout-panel h2 {
+  color: var(--gold-light);
+  font-size: clamp(1.5rem, 4vw, 2.2rem);
+}
+
+.win-display {
+  min-width: 120px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(201, 168, 76, 0.22);
+  background: rgba(10, 10, 15, 0.7);
+  text-align: right;
+}
+
+.win-display span,
+.bet-label,
+.status-text,
+.payout-note {
+  color: var(--text-muted);
+}
+
+.win-display span,
+.bet-label {
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.76rem;
+}
+
+.win-display strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 1.5rem;
+  color: var(--gold-light);
+}
+
+.canvas-shell {
+  position: relative;
+  padding: 18px;
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(35, 44, 29, 0.9), rgba(9, 11, 14, 0.95)),
+    radial-gradient(circle at center, rgba(240, 208, 128, 0.12), transparent 60%);
+  border: 1px solid rgba(201, 168, 76, 0.28);
+  overflow: hidden;
+}
+
+#slots-canvas {
+  width: 100%;
+  height: min(78vw, 420px);
+  max-height: 420px;
+  min-height: 260px;
+  border-radius: 18px;
+  display: block;
+}
+
+.payline-flash {
+  position: absolute;
+  left: 22px;
+  right: 22px;
+  top: 50%;
+  height: 18px;
+  border-radius: 999px;
+  transform: translateY(-50%);
+  background: linear-gradient(90deg, transparent, rgba(240, 208, 128, 0.95), transparent);
+  opacity: 0;
+  pointer-events: none;
+  filter: blur(1px);
+}
+
+.payline-flash.active {
+  animation: paylinePulse 0.45s ease-in-out 4;
+}
+
+.controls {
+  display: grid;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.spin-button {
+  width: 100%;
+  padding: 18px 28px;
+  font-size: 1.35rem;
+  letter-spacing: 0.22em;
+}
+
+.bet-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bet-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.bet-chip {
+  min-width: 70px;
+  padding: 10px 18px;
+  border-width: 1px;
+  background: radial-gradient(circle at 30% 30%, rgba(240, 208, 128, 0.1), rgba(10, 10, 15, 0.9));
+  color: var(--gold-light);
+}
+
+.bet-chip.active {
+  box-shadow: 0 0 18px rgba(201, 168, 76, 0.35);
+}
+
+.status-text {
+  margin-top: 14px;
+  font-size: 1.02rem;
+  min-height: 1.4em;
+}
+
+.payout-panel {
+  padding: 20px;
+}
+
+.payout-list {
+  list-style: none;
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 14px;
+}
+
+.payout-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(10, 10, 15, 0.55);
+  border: 1px solid rgba(201, 168, 76, 0.12);
+}
+
+.payout-list span {
+  letter-spacing: 0.04em;
+}
+
+.payout-list strong {
+  color: var(--gold-light);
+}
+
+@keyframes paylinePulse {
+  0%,
+  100% {
+    opacity: 0;
+    box-shadow: 0 0 0 rgba(240, 208, 128, 0);
+  }
+
+  50% {
+    opacity: 0.95;
+    box-shadow: 0 0 28px rgba(240, 208, 128, 0.65);
+  }
+}
+
+@media (min-width: 900px) {
+  .slots-layout {
+    grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.8fr);
+    align-items: start;
+  }
+
+  .controls {
+    grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1fr);
+    align-items: end;
+  }
+
+  .spin-button {
+    height: 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  .machine-panel,
+  .payout-panel {
+    padding: 16px;
+  }
+
+  .machine-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .win-display {
+    text-align: left;
+  }
+
+  .bet-chip {
+    flex: 1 1 calc(50% - 5px);
+  }
+}
