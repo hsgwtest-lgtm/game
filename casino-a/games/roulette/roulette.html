@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="../../assets/icons/icon-192.png">
+  <link rel="manifest" href="../../manifest.json">
+  <link rel="stylesheet" href="../../style/global.css">
+  <link rel="stylesheet" href="./roulette.css">
+  <title>Roulette</title>
+</head>
+<body>
+  <div class="roulette-page">
+    <header class="top-bar">
+      <a class="back-btn" href="../../index.html" aria-label="Back to lobby">←</a>
+      <div class="title">ROULETTE</div>
+      <div class="balance" id="balance">¥10,000</div>
+    </header>
+
+    <main class="roulette-layout">
+      <section class="wheel-panel" aria-label="Roulette wheel">
+        <canvas id="wheelCanvas" class="game-canvas" aria-label="Roulette wheel canvas"></canvas>
+        <div class="wheel-overlay" aria-hidden="true"></div>
+        <div class="result-card" aria-live="polite">
+          <span class="result-label">Result</span>
+          <strong id="resultValue" class="result-value">—</strong>
+          <span id="resultDetail" class="result-detail">Place your bets. No more bets after the spin begins.</span>
+        </div>
+      </section>
+
+      <section class="controls-panel" aria-label="Roulette controls">
+        <div class="chip-row" role="group" aria-label="Bet chip selector">
+          <button class="chip-btn active" data-chip="100">100</button>
+          <button class="chip-btn" data-chip="500">500</button>
+          <button class="chip-btn" data-chip="1000">1000</button>
+          <button class="chip-btn" data-chip="5000">5000</button>
+        </div>
+
+        <div class="action-row">
+          <div class="bet-summary-card">
+            <span class="summary-label">Total Bet</span>
+            <strong id="totalBet">¥0</strong>
+          </div>
+          <button id="clearBtn" class="action-btn">CLEAR</button>
+          <button id="spinBtn" class="btn-gold spin-btn">SPIN</button>
+        </div>
+
+        <div id="bettingTable" class="betting-table" aria-label="Roulette betting table"></div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="./roulette.js"></script>
+</body>
+</html>
