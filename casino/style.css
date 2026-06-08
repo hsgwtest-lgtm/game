@@ -457,6 +457,17 @@ button { touch-action: manipulation; cursor: pointer; }
 }
 .res-next:active { transform: scale(0.94); }
 
+/* 結果画面のスコア内訳 */
+.res-score {
+  display: block;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(240,220,180,0.6);
+  letter-spacing: 0.4px;
+  margin-top: 2px;
+}
+
 /* ======================================================
    ベーシックストラテジー表エリア
    ====================================================== */
