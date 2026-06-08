@@ -292,13 +292,19 @@ function endGame(results) {
   gs = GS.RESULT;
   let ret = 0;
 
+  // ディーラーの最終スコアを取得
+  const ds = calcScore(dHand);
+
   const msgs = results.map((r, i) => {
-    const b = hBets[i] !== undefined ? hBets[i] : hBets[0];
+    const b  = hBets[i] !== undefined ? hBets[i] : hBets[0];
+    const ps = calcScore(pHands[i] || pHands[0]);
+    // 手札スコア情報（全結果に共通表示）
+    const scoreInfo = `<span class="res-score">あなた: ${ps}　ディーラー: ${ds}</span>`;
     switch (r) {
-      case 'bj':   ret += Math.floor(b * 2.5); return '🎉 Blackjack!';
-      case 'win':  ret += b * 2;               return '✅ 勝ち';
-      case 'push': ret += b;                   return '🤝 引き分け';
-      default:                                 return '❌ 負け';
+      case 'bj':   ret += Math.floor(b * 2.5); return `🎉 Blackjack!<br>${scoreInfo}`;
+      case 'win':  ret += b * 2;               return `✅ 勝ち<br>${scoreInfo}`;
+      case 'push': ret += b;                   return `🤝 引き分け<br>${scoreInfo}`;
+      default:                                 return `❌ 負け<br>${scoreInfo}`;
     }
   });
 
