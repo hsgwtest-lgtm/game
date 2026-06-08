@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <meta name="theme-color" content="#0e3d14" />
+  <title>BJ Practice — ベーシックストラテジー</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Barlow+Condensed:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ==================== ゲームエリア ==================== -->
+  <div id="game">
+
+    <!-- ステータスバー: チップ / 状況 / 正解率 -->
+    <div id="topbar">
+      <span id="chips">💰 1,000</span>
+      <span id="sit">ベットを置いてディールしてください</span>
+      <span id="stat">正解率: —</span>
+    </div>
+
+    <!-- フィードバックメッセージ (正解/不正解) -->
+    <div id="fb" class="fb" role="alert" aria-live="polite"></div>
+
+    <!-- ディーラーエリア -->
+    <div id="dealer">
+      <span class="area-lbl">DEALER <span id="d-score"></span></span>
+      <div id="d-cards" class="cards"></div>
+    </div>
+
+    <div class="vs" aria-hidden="true">— VS —</div>
+
+    <!-- プレイヤーエリア (スプリット対応で複数ハンド) -->
+    <div id="player">
+      <span class="area-lbl">PLAYER</span>
+      <div id="p-hands"></div>
+    </div>
+
+    <!-- コントロール: ベッティング / アクション切替 -->
+    <div id="ctrl">
+
+      <!-- ベッティング -->
+      <div id="bet-ctrl">
+        <button class="chip c25"  onclick="addBet(25)"  aria-label="25チップ追加">25</button>
+        <button class="chip c100" onclick="addBet(100)" aria-label="100チップ追加">100</button>
+        <button class="chip c500" onclick="addBet(500)" aria-label="500チップ追加">500</button>
+        <button class="chip clr"  onclick="clearBet()"  aria-label="ベットクリア">CL</button>
+        <span id="bet-disp" aria-live="polite">BET: 0</span>
+        <button id="bDeal" onclick="deal()" aria-label="ディール">DEAL</button>
+      </div>
+
+      <!-- アクションボタン (プレイヤーターン時) -->
+      <div id="act-ctrl" style="display:none" role="group" aria-label="プレイヤーアクション">
+        <button id="bHit"   onclick="playerHit()"    class="ab h">Hit</button>
+        <button id="bStand" onclick="playerStand()"  class="ab s">Stand</button>
+        <button id="bDbl"   onclick="playerDouble()" class="ab d">Double</button>
+        <button id="bSpl"   onclick="playerSplit()"  class="ab p">Split</button>
+      </div>
+
+    </div>
+
+    <!-- リザルトオーバーレイ -->
+    <div id="overlay" style="display:none" role="dialog" aria-modal="true">
+      <div class="res-box">
+        <div id="res-txt"></div>
+        <div id="res-chips"></div>
+        <button class="res-next" onclick="newRound()">次のラウンド</button>
+      </div>
+    </div>
+
+  </div><!-- #game -->
+
+
+  <!-- ==================== ベーシックストラテジー表 ==================== -->
+  <div id="strat" role="region" aria-label="ベーシックストラテジー表">
+
+    <div id="strat-head">
+      <span class="strat-title">📊 Basic Strategy</span>
+      <div id="tabs" role="tablist">
+        <button class="tab-btn on" data-tab="hard"  onclick="switchTab('hard')"  role="tab" aria-selected="true">Hard</button>
+        <button class="tab-btn"    data-tab="soft"  onclick="switchTab('soft')"  role="tab" aria-selected="false">Soft</button>
+        <button class="tab-btn"    data-tab="pairs" onclick="switchTab('pairs')" role="tab" aria-selected="false">Pairs</button>
+      </div>
+    </div>
+
+    <!-- チャート表示エリア -->
+    <div id="chart-wrap">
+      <div id="chart-hard"  class="chart-pane on" role="tabpanel"></div>
+      <div id="chart-soft"  class="chart-pane"    role="tabpanel"></div>
+      <div id="chart-pairs" class="chart-pane"    role="tabpanel"></div>
+    </div>
+
+    <!-- カラー凡例 -->
+    <div id="legend" aria-label="凡例">
+      <span class="leg" style="background:#9b2335">H: Hit</span>
+      <span class="leg" style="background:#1e6b3c">S: Stand</span>
+      <span class="leg" style="background:#1a4a8a">D: Double</span>
+      <span class="leg" style="background:#b5800a">P: Split</span>
+    </div>
+
+  </div><!-- #strat -->
+
+</div><!-- #app -->
+
+<script src="strategy.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

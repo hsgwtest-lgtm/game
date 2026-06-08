@@ -1,0 +1,658 @@
+/* ================================================
+   style.css — BJ Practice
+   Aesthetic: High-Roller Casino / Luxury Green Felt
+   ================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Barlow+Condensed:wght@400;500;600;700&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root {
+  /* フェルトテーブル */
+  --felt:     #0e3d14;
+  --felt-hi:  #165e1f;
+  --felt-dk:  #071c0a;
+
+  /* UI背景 */
+  --navy:     #0d1520;
+  --navy-2:   #111d2c;
+
+  /* ゴールドアクセント */
+  --gold:     #c9a84c;
+  --gold-lt:  #e8cc82;
+  --gold-dk:  #8a6e28;
+
+  /* テキスト */
+  --cream:    #f5efe0;
+  --dim:      #7a7a8a;
+
+  /* カード */
+  --card-bg:  #fdfaf5;
+
+  /* アクションカラー */
+  --col-h:    #9b2335;   /* Hit  — 深紅 */
+  --col-s:    #1e6b3c;   /* Stand — 深緑 */
+  --col-d:    #1a4a8a;   /* Double — 深青 */
+  --col-p:    #b5800a;   /* Split  — 琥珀 */
+
+  /* ハイライト */
+  --hi-ring:  #f0d060;
+
+  --rad: 8px;
+}
+
+/* ===== ベース ===== */
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--navy);
+  color: var(--cream);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+button { touch-action: manipulation; cursor: pointer; }
+
+/* ===== アプリレイアウト ===== */
+#app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ======================================================
+   ゲームエリア
+   ====================================================== */
+#game {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(ellipse at 50% 25%, var(--felt-hi) 0%, var(--felt) 58%, var(--felt-dk) 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* フェルトの織り目テクスチャ風オーバーレイ */
+#game::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(0deg,   transparent, transparent 3px, rgba(0,0,0,0.03) 3px, rgba(0,0,0,0.03) 4px),
+    repeating-linear-gradient(90deg,  transparent, transparent 3px, rgba(0,0,0,0.03) 3px, rgba(0,0,0,0.03) 4px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+#game > * { position: relative; z-index: 1; }
+
+/* ===== トップバー ===== */
+#topbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: rgba(0,0,0,0.5);
+  border-bottom: 1px solid rgba(201,168,76,0.25);
+  flex-shrink: 0;
+}
+
+#chips {
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gold);
+  white-space: nowrap;
+  min-width: 82px;
+}
+
+#sit {
+  flex: 1;
+  text-align: center;
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gold-lt);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 4px;
+}
+
+#stat {
+  font-size: 11px;
+  color: var(--dim);
+  white-space: nowrap;
+  min-width: 82px;
+  text-align: right;
+}
+
+/* ===== フィードバック ===== */
+#fb {
+  height: 0;
+  overflow: hidden;
+  text-align: center;
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 28px;
+  letter-spacing: 0.4px;
+  opacity: 0;
+  flex-shrink: 0;
+  transition: height 0.15s ease, opacity 0.15s ease;
+}
+#fb.vis { height: 28px; opacity: 1; }
+#fb.ok   { color: #4cd97b; text-shadow: 0 0 12px rgba(76,217,123,0.5); }
+#fb.ng   { color: #ff6b6b; text-shadow: 0 0 12px rgba(255,107,107,0.5); }
+#fb.info { color: #74b9ff; }
+
+/* ===== ディーラー / プレイヤーエリア ===== */
+#dealer, #player {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  overflow: hidden;
+}
+
+.area-lbl {
+  font-family: 'Cinzel', serif;
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  color: rgba(255,255,255,0.35);
+  text-transform: uppercase;
+  margin-bottom: 7px;
+}
+
+#d-score {
+  font-size: 10px;
+  color: var(--dim);
+  margin-left: 4px;
+}
+
+/* VS 区切り */
+.vs {
+  text-align: center;
+  font-family: 'Cinzel', serif;
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: rgba(201,168,76,0.28);
+  padding: 2px 0;
+  border-top:    1px solid rgba(201,168,76,0.1);
+  border-bottom: 1px solid rgba(201,168,76,0.1);
+  flex-shrink: 0;
+}
+
+/* ===== プレイヤーハンドコンテナ ===== */
+#p-hands {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+.hand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 6px;
+  border-radius: var(--rad);
+  border: 1.5px solid transparent;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+/* 現在プレイ中のハンド強調 */
+.hand.cur {
+  border-color: var(--hi-ring);
+  background: rgba(240,208,96,0.06);
+  box-shadow: 0 0 16px rgba(240,208,96,0.12);
+}
+
+.hbet {
+  font-size: 10px;
+  color: var(--gold);
+}
+
+.hscore {
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gold-lt);
+  min-height: 18px;
+  line-height: 1;
+}
+.hscore.bust { color: #ff6060; }
+
+/* カード行 */
+.cards {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ===== プレイングカード ===== */
+.card {
+  width: 46px;
+  height: 64px;
+  border-radius: 5px;
+  background: var(--card-bg);
+  border: 1px solid #c0b090;
+  box-shadow:
+    2px 3px 7px rgba(0,0,0,0.5),
+    inset 0 0 0 1px rgba(255,255,255,0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 3px;
+  flex-shrink: 0;
+}
+
+.card.red { color: #c1121f; }
+.card.blk { color: #1a1a1a; }
+
+/* ランク (上/下) */
+.cr {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  display: block;
+  width: 100%;
+}
+.ct { text-align: left; }
+.cb { text-align: right; transform: rotate(180deg); }
+
+/* スート */
+.cs { font-size: 22px; line-height: 1; display: block; }
+
+/* 裏面カード */
+.card.back {
+  background:
+    repeating-linear-gradient(
+      45deg,
+      #1a2a50 0px, #1a2a50 4px,
+      #0d1a38 4px, #0d1a38 8px
+    );
+  border-color: #3a5490;
+  box-shadow: 2px 3px 7px rgba(0,0,0,0.55);
+  align-items: center;
+  justify-content: center;
+}
+.card.back span {
+  font-size: 26px;
+  color: rgba(180,150,80,0.35);
+}
+
+/* ===== コントロールエリア ===== */
+#ctrl {
+  flex-shrink: 0;
+  background: rgba(0,0,0,0.42);
+  border-top: 1px solid rgba(201,168,76,0.18);
+  padding: 8px 10px;
+}
+
+/* ベッティングコントロール */
+#bet-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: nowrap;
+}
+
+/* チップボタン (コイン風) */
+.chip {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border-width: 2.5px;
+  border-style: dashed;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.45);
+  transition: transform 0.1s, box-shadow 0.1s;
+  flex-shrink: 0;
+}
+.chip:active {
+  transform: scale(0.88);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+
+.c25  { background: radial-gradient(circle at 40% 35%, #e74c3c, #7b241c); border-color: #f1948a; color: #fff; }
+.c100 { background: radial-gradient(circle at 40% 35%, #e0b840, #8a6e28); border-color: #e8cc82; color: #1a1a1a; }
+.c500 { background: radial-gradient(circle at 40% 35%, #2c7be5, #1a3a8a); border-color: #74b9ff; color: #fff; }
+.clr  { background: radial-gradient(circle at 40% 35%, #555, #333); border-color: #888; color: #ccc; font-size: 10px; }
+
+#bet-disp {
+  font-family: 'Cinzel', serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gold);
+  min-width: 70px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+#bDeal {
+  background: linear-gradient(145deg, #2ecc71, #1a7a30);
+  border: none;
+  border-radius: var(--rad);
+  color: #fff;
+  font-family: 'Cinzel', serif;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 10px 16px;
+  letter-spacing: 1px;
+  box-shadow: 0 3px 12px rgba(40,167,69,0.4);
+  transition: transform 0.1s;
+  flex-shrink: 0;
+}
+#bDeal:active { transform: scale(0.93); }
+
+/* アクションボタン */
+#act-ctrl {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.ab {
+  flex: 1;
+  max-width: 82px;
+  height: 44px;
+  border: none;
+  border-radius: var(--rad);
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.95);
+  letter-spacing: 0.5px;
+  transition: transform 0.1s, opacity 0.15s;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+}
+.ab:disabled { opacity: 0.22; cursor: not-allowed; }
+.ab:not(:disabled):active { transform: scale(0.91); }
+
+.ab.h { background: linear-gradient(155deg, var(--col-h), #7a1a28); }
+.ab.s { background: linear-gradient(155deg, var(--col-s), #145530); }
+.ab.d { background: linear-gradient(155deg, var(--col-d), #0f3070); }
+.ab.p { background: linear-gradient(155deg, var(--col-p), #8a5c06); }
+
+/* ===== リザルトオーバーレイ ===== */
+#overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.72);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.res-box {
+  background: linear-gradient(160deg, var(--navy-2), #0a0f1e);
+  border: 1.5px solid var(--gold);
+  border-radius: 14px;
+  padding: 26px 36px;
+  text-align: center;
+  box-shadow:
+    0 10px 50px rgba(0,0,0,0.8),
+    0 0 0 1px rgba(201,168,76,0.08),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+  min-width: 210px;
+  max-width: 300px;
+}
+
+#res-txt {
+  font-family: 'Cinzel', serif;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+#res-chips {
+  font-size: 13px;
+  color: var(--gold);
+  font-family: 'Cinzel', serif;
+  margin-bottom: 20px;
+}
+
+.res-next {
+  background: linear-gradient(135deg, var(--gold-lt), var(--gold-dk));
+  border: none;
+  border-radius: var(--rad);
+  color: #1a1a1a;
+  font-family: 'Cinzel', serif;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 11px 28px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 16px rgba(201,168,76,0.4);
+  transition: transform 0.1s;
+}
+.res-next:active { transform: scale(0.94); }
+
+/* ======================================================
+   ベーシックストラテジー表エリア
+   ====================================================== */
+#strat {
+  flex: 0 0 42vh;
+  min-height: 190px;
+  display: flex;
+  flex-direction: column;
+  background: var(--navy-2);
+  border-top: 2px solid rgba(201,168,76,0.18);
+  overflow: hidden;
+}
+
+/* ヘッダー (タイトル + タブ) */
+#strat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 10px;
+  background: rgba(0,0,0,0.38);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+
+.strat-title {
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+
+/* タブボタン */
+#tabs { display: flex; gap: 4px; }
+
+.tab-btn {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 5px;
+  color: var(--dim);
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  letter-spacing: 0.5px;
+  transition: background 0.18s, color 0.18s, border-color 0.18s;
+}
+.tab-btn.on {
+  background: var(--gold);
+  color: #1a1a1a;
+  border-color: var(--gold);
+}
+
+/* チャートペイン */
+#chart-wrap {
+  flex: 1 1 0;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.chart-pane {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  display: none;
+  padding: 3px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(201,168,76,0.3) transparent;
+}
+.chart-pane.on { display: block; }
+.chart-pane::-webkit-scrollbar { width: 4px; height: 4px; }
+.chart-pane::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.3); border-radius: 2px; }
+
+/* テーブルラッパー (横スクロール対応) */
+.tbl-wrap { min-width: max-content; }
+
+/* 戦略テーブル */
+.s-tbl {
+  border-collapse: collapse;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+}
+
+.s-tbl thead th {
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.5);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 0;
+  min-width: 26px;
+  text-align: center;
+}
+
+/* 左上コーナー */
+.th-corner {
+  min-width: 46px !important;
+  font-size: 8px !important;
+  color: rgba(255,255,255,0.28) !important;
+}
+
+/* 行ヘッダー (手の種類) */
+.th-row {
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.65);
+  font-size: 9px;
+  font-weight: 700;
+  text-align: center;
+  padding: 0 5px;
+  white-space: nowrap;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+/* 戦略セル */
+.s-cell {
+  width: 26px;
+  height: 21px;
+  min-width: 26px;
+  text-align: center;
+  vertical-align: middle;
+  color: rgba(255,255,255,0.88);
+  font-weight: 800;
+  font-size: 10px;
+  cursor: default;
+  outline: 2px solid transparent;
+  outline-offset: -1px;
+  transition: outline-color 0.12s, box-shadow 0.12s;
+}
+
+/* 現在の手に対応するセルをハイライト */
+.s-cell.active-cell {
+  outline: 2.5px solid var(--hi-ring) !important;
+  box-shadow: 0 0 10px var(--hi-ring), inset 0 0 5px rgba(240,208,96,0.25);
+  z-index: 2;
+  position: relative;
+  animation: cell-pulse 0.55s ease;
+}
+
+@keyframes cell-pulse {
+  0%   { box-shadow: 0 0 0   rgba(240,208,96,0); }
+  50%  { box-shadow: 0 0 18px rgba(240,208,96,0.8); }
+  100% { box-shadow: 0 0 10px rgba(240,208,96,0.5); }
+}
+
+/* 凡例 */
+#legend {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+  align-items: center;
+  padding: 4px 8px;
+  background: rgba(0,0,0,0.32);
+  border-top: 1px solid rgba(255,255,255,0.05);
+  flex-shrink: 0;
+}
+
+.leg {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.88);
+  padding: 2px 7px;
+  border-radius: 3px;
+  letter-spacing: 0.3px;
+}
+
+/* ======================================================
+   レスポンシブ
+   ====================================================== */
+@media (max-width: 360px) {
+  .card      { width: 40px; height: 58px; }
+  .cs        { font-size: 18px; }
+  .cr        { font-size: 10px; }
+  .ab        { font-size: 11px; max-width: 70px; height: 40px; }
+  .chip      { width: 36px; height: 36px; font-size: 10px; }
+  #bDeal     { padding: 9px 12px; font-size: 12px; }
+  #sit       { font-size: 9px; }
+  #strat     { flex: 0 0 40vh; }
+}
+
+@media (min-height: 740px) {
+  #strat     { flex: 0 0 44vh; }
+  .card      { width: 50px; height: 70px; }
+  .cs        { font-size: 24px; }
+  .cr        { font-size: 12px; }
+  .s-cell    { height: 23px; width: 28px; min-width: 28px; }
+  .s-tbl thead th { min-width: 28px; }
+}
+
+@media (min-height: 900px) {
+  .card  { width: 54px; height: 76px; }
+  .cs    { font-size: 26px; }
+  #bDeal { padding: 12px 20px; }
+  .ab    { height: 48px; }
+}
