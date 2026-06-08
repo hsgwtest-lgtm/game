@@ -85,7 +85,10 @@ const PAIRS_STRATEGY = {
  * @returns {'H'|'S'|'D'|'P'}
  */
 function getOptimalMove(playerScore, isSoft, isPair, dealerUpCard, pairRank) {
-  const dIdx = DEALER_CARDS.indexOf(String(dealerUpCard));
+  // J / Q / K はすべて '10' として扱う
+  let upNorm = String(dealerUpCard);
+  if (['J','Q','K'].includes(upNorm)) upNorm = '10';
+  const dIdx = DEALER_CARDS.indexOf(upNorm);
   if (dIdx === -1) return 'H';
 
   // ペア判定 (J/Q/K はすべて '10' として扱う)
@@ -177,6 +180,10 @@ function _buildTable(containerId, type, rowLabels, rowKeys, strategy) {
  * 現在のプレイヤー状況に対応するセルをハイライトし、タブを切り替える
  */
 function highlightStrategyCell(playerScore, isSoft, isPair, dealerUpCard, pairRank) {
+  // J / Q / K はすべて '10' として扱う（セルIDはディーラー列2〜A のみ存在）
+  let upNorm = String(dealerUpCard);
+  if (['J','Q','K'].includes(upNorm)) upNorm = '10';
+
   // 既存ハイライトをリセット
   document.querySelectorAll('.s-cell.active-cell').forEach(c => c.classList.remove('active-cell'));
 
@@ -201,8 +208,8 @@ function highlightStrategyCell(playerScore, isSoft, isPair, dealerUpCard, pairRa
   // 対応するタブに自動切り替え
   switchTab(type);
 
-  // セルをハイライト & スクロール
-  const cellId = `cell-${type}-${rowKey}-${dealerUpCard}`;
+  // セルをハイライト & スクロール（正規化済みのupNormを使用）
+  const cellId = `cell-${type}-${rowKey}-${upNorm}`;
   const cell   = document.getElementById(cellId);
   if (cell) {
     cell.classList.add('active-cell');
