@@ -26,7 +26,6 @@ let dHand    = [];         // ディーラーハンド
 let chips    = 1000;       // 所持チップ
 let bet      = 0;          // 現在のベット額
 let hBets    = [];         // ハンドごとのベット (スプリット後に複数)
-let firstAct = true;       // Double/Split が可能な最初のアクションか
 let stats    = { n: 0, ok: 0 }; // 正解率カウンター
 let fbTimer  = null;       // フィードバック消去タイマー
 
@@ -134,7 +133,6 @@ function deal() {
   pHands   = [[pop(), pop()]];
   dHand    = [pop(), pop(/* hidden = */true)];
   hIdx     = 0;
-  firstAct = true;
   gs       = GS.PLAYER;
 
   rAll();
@@ -161,7 +159,6 @@ function playerHit() {
   _chkFb('H'); // フィードバック評価
 
   pHands[hIdx].push(pop());
-  firstAct = false;
 
   const s = calcScore(pHands[hIdx]);
   rAll();
@@ -175,21 +172,22 @@ function playerHit() {
 function playerStand() {
   if (gs !== GS.PLAYER) return;
   _chkFb('S');
-  firstAct = false;
   rAll();
   _next();
 }
 
 /** Double Down — ベット2倍, カード1枚, 強制スタンド */
 function playerDouble() {
-  if (gs !== GS.PLAYER || !firstAct) return;
+  if (gs !== GS.PLAYER) return;
+  const curHand = pHands[hIdx];
+  // 手牌が正確に2枚のときのみダブル可能（firstActフラグ不要）
+  if (!curHand || curHand.length !== 2) return;
   if (chips < hBets[hIdx]) { toast('チップが足りません'); return; }
 
   _chkFb('D');
   chips -= hBets[hIdx];
   hBets[hIdx] *= 2;
   pHands[hIdx].push(pop());
-  firstAct = false;
 
   rAll();
   setTimeout(_next, 600);
@@ -197,36 +195,38 @@ function playerDouble() {
 
 /** Split — ペアを2つのハンドに分割 */
 function playerSplit() {
-  if (gs !== GS.PLAYER || !firstAct)  return;
-  if (!isPair(pHands[hIdx]))          return;
-  if (chips < hBets[hIdx])            { toast('チップが足りません'); return; }
+  if (gs !== GS.PLAYER) return;
+  const sHand = pHands[hIdx];
+  // 手牌が正確に2枚 & ペアのときのみスプリット可能
+  if (!sHand || sHand.length !== 2 || !isPair(sHand)) return;
+  if (chips < hBets[hIdx]) { toast('チップが足りません'); return; }
 
   _chkFb('P');
   chips -= hBets[hIdx];
 
-  const [c1, c2] = pHands[hIdx];
+  const [c1, c2] = sHand;
   const b = hBets[hIdx];
   // 元のハンドを2つに分割し, それぞれ新しいカードを1枚追加
   pHands.splice(hIdx, 1, [c1, pop()], [c2, pop()]);
   hBets.splice(hIdx, 1, b, b);
-  firstAct = true;
 
-  rAll();
-
-  // エーススプリット: 各ハンド1枚のみでそのままディーラーターンへ
+  // エーススプリット: gsを即座にDEALERへ変えてプレイヤー操作を完全ロック
   if (c1.r === 'A') {
-    setTimeout(dealerTurn, 600);
+    gs = GS.DEALER;
+    _reveal();
+    rAll();              // ボタンが非表示の状態でレンダリング
+    setTimeout(_dStep, 900);
     return;
   }
 
-  _hlCell();
+  rAll();    // 通常スプリット: 新しいハンドを表示 (hand.length===2 → Double/Split有効)
+  _hlCell(); // 戦略表を更新
 }
 
 /** 次のハンドへ進む, なければディーラーターンへ */
 function _next() {
   hIdx++;
   if (hIdx < pHands.length) {
-    firstAct = true;
     rAll();
     _hlCell();
   } else {
@@ -327,7 +327,7 @@ function _chkFb(act) {
 
   const ps     = calcScore(hand);
   const sf     = isSoft(hand);
-  const pr     = isPair(hand) && firstAct;
+  const pr     = isPair(hand) && hand.length === 2;
   const pRank  = pr ? hand[0].r : undefined;
   const upCard = dHand.find(c => !c.hidden);
   if (!upCard) return;
@@ -466,7 +466,7 @@ function rStatus() {
 
   const ps   = calcScore(hand);
   const sf   = isSoft(hand);
-  const pr   = isPair(hand) && firstAct && gs === GS.PLAYER;
+  const pr   = isPair(hand) && hand.length === 2 && gs === GS.PLAYER;
   const type = pr ? 'Pair' : sf ? 'Soft' : 'Hard';
 
   el.textContent = `プレイヤー: ${ps} (${type})  vs  ディーラー: ${upCard.r}`;
@@ -489,10 +489,10 @@ function rCtrl() {
     aEl.style.display = 'flex';
     const hand  = pHands[hIdx];
     const cBet  = hBets[hIdx] || 0;
-    // Double: 最初の2枚かつチップ十分
-    document.getElementById('bDbl').disabled = !(firstAct && hand?.length === 2 && chips >= cBet);
-    // Split: 最初の2枚かつペアかつチップ十分
-    document.getElementById('bSpl').disabled = !(firstAct && hand && isPair(hand) && chips >= cBet);
+    // 手牌が正確に2枚 = 最初のアクション。firstActフラグ不要でバグ根絶
+    const isFirst = hand?.length === 2;
+    document.getElementById('bDbl').disabled = !(isFirst && chips >= cBet);
+    document.getElementById('bSpl').disabled = !(isFirst && hand && isPair(hand) && chips >= cBet);
     return;
   }
 
@@ -530,7 +530,7 @@ function _hlCell() {
 
   const ps     = calcScore(hand);
   const sf     = isSoft(hand);
-  const pr     = isPair(hand) && firstAct;
+  const pr     = isPair(hand) && hand.length === 2;
   const upCard = dHand.find(c => !c.hidden);
   if (!upCard) return;
 
@@ -564,7 +564,6 @@ function newRound() {
   dHand    = [];
   bet      = 0;
   hBets    = [];
-  firstAct = true;
 
   // カード表示をクリア
   document.getElementById('d-cards').innerHTML = '';
