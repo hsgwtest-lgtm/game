@@ -1,0 +1,674 @@
+/* ================================================
+   style.css — Texas Hold'em Practice
+   Aesthetic: Monte Carlo Navy / Luxury Casino
+   ================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Barlow+Condensed:wght@400;500;600;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --felt:     #0d1a35;
+  --felt-hi:  #122247;
+  --felt-dk:  #070f1f;
+  --navy:     #0a1220;
+  --navy-2:   #0e1828;
+  --gold:     #c8a85a;
+  --gold-lt:  #e8cc84;
+  --gold-dk:  #8a6e28;
+  --cream:    #f0ece4;
+  --dim:      #6070a0;
+  --card-bg:  #fefdf8;
+  --col-raise:#1a5c34;
+  --col-fold: #3d0f18;
+  --hi-ring:  #f0d060;
+  --rad:      8px;
+}
+
+html, body { height: 100%; overflow: hidden; background: var(--navy); color: var(--cream); font-family: 'Barlow Condensed', sans-serif; font-size: 15px; user-select: none; -webkit-user-select: none; }
+button { touch-action: manipulation; cursor: pointer; }
+
+/* ===== アプリ全体 ===== */
+#app { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ===== ゲームエリア (フェルトテーブル) ===== */
+#game {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(ellipse at 50% 20%, var(--felt-hi) 0%, var(--felt) 55%, var(--felt-dk) 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* フェルト織り目 */
+#game::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(0deg,   transparent, transparent 3px, rgba(0,0,0,0.025) 3px, rgba(0,0,0,0.025) 4px),
+    repeating-linear-gradient(90deg,  transparent, transparent 3px, rgba(0,0,0,0.025) 3px, rgba(0,0,0,0.025) 4px);
+  pointer-events: none;
+  z-index: 0;
+}
+#game > * { position: relative; z-index: 1; }
+
+/* ===== トップバー ===== */
+#topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 6px 10px;
+  background: rgba(0,0,0,0.5);
+  border-bottom: 1px solid rgba(200,168,90,0.25);
+  flex-shrink: 0;
+}
+
+#chips {
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gold);
+  white-space: nowrap;
+  min-width: 88px;
+}
+
+#sit {
+  flex: 1;
+  text-align: center;
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gold-lt);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 4px;
+}
+
+#sc-total-wrap {
+  font-size: 11px;
+  color: var(--dim);
+  white-space: nowrap;
+  min-width: 88px;
+  text-align: right;
+}
+
+/* ===== フィードバック ===== */
+#fb {
+  height: 0;
+  overflow: hidden;
+  text-align: center;
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 28px;
+  letter-spacing: 0.4px;
+  opacity: 0;
+  flex-shrink: 0;
+  transition: height 0.15s ease, opacity 0.15s ease;
+}
+#fb.vis { height: 28px; opacity: 1; }
+#fb.ok   { color: #4cd97b; text-shadow: 0 0 12px rgba(76,217,123,0.5); }
+#fb.ng   { color: #ff6b6b; text-shadow: 0 0 12px rgba(255,107,107,0.5); }
+#fb.info { color: #74b9ff; }
+
+/* ===== ポット表示 ===== */
+#pot-bar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 3px 0;
+  flex-shrink: 0;
+}
+
+#pot-disp {
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gold-lt);
+  letter-spacing: 1px;
+  padding: 2px 14px;
+  border-radius: 20px;
+  background: rgba(200,168,90,0.12);
+  border: 1px solid rgba(200,168,90,0.2);
+  min-width: 80px;
+  text-align: center;
+  min-height: 22px;
+}
+
+/* ===== コミュニティカード ===== */
+#community {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 8px 2px;
+  flex-shrink: 0;
+}
+
+#community-cards {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+
+/* ===== ディーラー / プレイヤーエリア ===== */
+#dealer-area, #player-area {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  overflow: hidden;
+}
+
+/* VS 区切り */
+.vs {
+  text-align: center;
+  font-family: 'Cinzel', serif;
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: rgba(200,168,90,0.25);
+  padding: 2px 0;
+  border-top:    1px solid rgba(200,168,90,0.08);
+  border-bottom: 1px solid rgba(200,168,90,0.08);
+  flex-shrink: 0;
+}
+
+.area-lbl {
+  font-family: 'Cinzel', serif;
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  color: rgba(255,255,255,0.32);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+#player-hand-name, #dealer-hand-name {
+  font-size: 11px;
+  color: var(--gold);
+  margin-left: 4px;
+  font-family: 'Barlow Condensed', sans-serif;
+}
+
+.cards-row {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+}
+
+/* ===== ハンド強度パネル ===== */
+#analysis-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  padding: 0 6px;
+}
+
+.tier-chip {
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  padding: 2px 9px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.hand-detail {
+  font-size: 12px;
+  color: var(--cream);
+  white-space: nowrap;
+}
+
+.equity-label {
+  font-size: 11px;
+  color: var(--gold-lt);
+  white-space: nowrap;
+}
+
+/* ===== ポットオッズ表示 ===== */
+#pot-odds-disp {
+  text-align: center;
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  color: var(--gold-lt);
+  letter-spacing: 0.4px;
+  padding-bottom: 6px;
+}
+
+/* ===== プレイングカード ===== */
+.card {
+  width: 46px;
+  height: 64px;
+  border-radius: 5px;
+  background: var(--card-bg);
+  border: 1px solid #c0b090;
+  box-shadow: 2px 3px 7px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,255,255,0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 3px;
+  flex-shrink: 0;
+}
+.card.red { color: #c1121f; }
+.card.blk { color: #1a1a1a; }
+
+.cr { font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 900; line-height: 1; display: block; width: 100%; }
+.ct { text-align: left; }
+.cb { text-align: right; transform: rotate(180deg); }
+.cs { font-size: 22px; line-height: 1; display: block; }
+
+.card.back {
+  background: repeating-linear-gradient(45deg, #1a2a50 0,#1a2a50 4px, #0d1a38 4px,#0d1a38 8px);
+  border-color: #3a5490;
+  box-shadow: 2px 3px 7px rgba(0,0,0,0.55);
+  align-items: center;
+  justify-content: center;
+}
+.card.back span { font-size: 24px; color: rgba(180,150,80,0.35); }
+
+/* カードスロット (未配布) */
+.card-slot {
+  width: 46px;
+  height: 64px;
+  border-radius: 5px;
+  border: 1.5px dashed rgba(255,255,255,0.1);
+  background: rgba(0,0,0,0.15);
+  flex-shrink: 0;
+}
+
+/* ===== コントロールエリア ===== */
+#ctrl {
+  flex-shrink: 0;
+  background: rgba(0,0,0,0.42);
+  border-top: 1px solid rgba(200,168,90,0.18);
+  padding: 8px 10px;
+}
+
+/* ─── IDLE (DEAL ボタン) ─── */
+#idle-ctrl { display: flex; justify-content: center; }
+
+#deal-btn {
+  background: linear-gradient(145deg, #2ecc71, #1a7a30);
+  border: none;
+  border-radius: var(--rad);
+  color: #fff;
+  font-family: 'Cinzel', serif;
+  font-size: 16px;
+  font-weight: 700;
+  padding: 12px 40px;
+  letter-spacing: 2px;
+  box-shadow: 0 4px 16px rgba(46,204,113,0.4);
+  transition: transform 0.1s;
+}
+#deal-btn:active { transform: scale(0.93); }
+
+/* ─── PREFLOP アクション ─── */
+#preflop-ctrl { display: flex; gap: 6px; justify-content: center; }
+
+/* ─── POSTFLOP アクション ─── */
+#postflop-ctrl { display: flex; gap: 6px; justify-content: center; }
+
+/* 共通アクションボタン */
+.ab {
+  flex: 1;
+  max-width: 110px;
+  height: 44px;
+  border: none;
+  border-radius: var(--rad);
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.5px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+  transition: transform 0.1s, opacity 0.15s;
+}
+.ab:disabled { opacity: 0.25; cursor: not-allowed; }
+.ab:not(:disabled):active { transform: scale(0.91); }
+
+.fold-btn  { background: linear-gradient(155deg, #922b21, #6e1a14); }
+.call-btn  { background: linear-gradient(155deg, #1a5276, #0f3050); }
+.check-btn { background: linear-gradient(155deg, #1e6b3c, #145530); }
+.raise-btn { background: linear-gradient(155deg, #d4ac0d, #9a7d0a); color: #1a1a1a; }
+
+/* ===== リザルトオーバーレイ ===== */
+#overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.72);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.res-box {
+  background: linear-gradient(160deg, var(--navy-2), #070f1e);
+  border: 1.5px solid var(--gold);
+  border-radius: 14px;
+  padding: 26px 32px;
+  text-align: center;
+  box-shadow: 0 12px 50px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.06);
+  min-width: 220px;
+  max-width: 300px;
+}
+
+#res-txt {
+  font-family: 'Cinzel', serif;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+.res-score {
+  display: block;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(240,220,180,0.65);
+  margin-top: 3px;
+}
+
+#res-chips {
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  color: var(--gold);
+  margin-bottom: 18px;
+}
+
+.res-next {
+  background: linear-gradient(135deg, var(--gold-lt), var(--gold-dk));
+  border: none;
+  border-radius: var(--rad);
+  color: #1a1a1a;
+  font-family: 'Cinzel', serif;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 11px 28px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 16px rgba(200,168,90,0.4);
+  transition: transform 0.1s;
+}
+.res-next:active { transform: scale(0.94); }
+
+/* ===== 正解率バー ===== */
+#stat-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(0,0,0,0.38);
+  border-top: 1px solid rgba(200,168,90,0.1);
+}
+
+.sc {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+}
+.sc-lbl { color: var(--dim); font-family: 'Cinzel', serif; font-size: 10px; letter-spacing: 0.5px; }
+.sc b   { color: var(--gold-lt); font-weight: 700; font-size: 12px; min-width: 30px; text-align: right; }
+
+/* ======================================================
+   スタートハンドマトリクス
+   ====================================================== */
+#strat {
+  flex: 0 0 42vh;
+  min-height: 190px;
+  display: flex;
+  flex-direction: column;
+  background: var(--navy-2);
+  border-top: 2px solid rgba(200,168,90,0.18);
+  overflow: hidden;
+}
+
+#strat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 10px;
+  background: rgba(0,0,0,0.38);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+
+.strat-title {
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+
+/* ポジションタブ */
+#tabs { display: flex; gap: 4px; }
+
+.tab-btn {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 5px;
+  color: var(--dim);
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  letter-spacing: 0.5px;
+  transition: background 0.18s, color 0.18s, border-color 0.18s;
+}
+.tab-btn.on {
+  background: var(--gold);
+  color: #1a1a1a;
+  border-color: var(--gold);
+}
+
+/* チャートペイン */
+#chart-wrap {
+  flex: 1 1 0;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.chart-pane {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  display: none;
+  padding: 3px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(200,168,90,0.3) transparent;
+}
+.chart-pane.on { display: block; }
+.chart-pane::-webkit-scrollbar { width: 4px; height: 4px; }
+.chart-pane::-webkit-scrollbar-thumb { background: rgba(200,168,90,0.3); border-radius: 2px; }
+
+.tbl-wrap { min-width: max-content; }
+
+/* マトリクステーブル */
+.s-tbl { border-collapse: collapse; font-family: 'Barlow Condensed', sans-serif; font-size: 10px; }
+
+.s-tbl thead th {
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.5);
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 0;
+  min-width: 24px;
+  text-align: center;
+}
+
+.th-corner { min-width: 22px !important; color: rgba(255,255,255,0.25) !important; }
+
+.th-row {
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.6);
+  font-size: 9px;
+  font-weight: 700;
+  text-align: center;
+  padding: 0 4px;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 22px;
+}
+
+/* ハンドセル */
+.s-cell {
+  width: 24px;
+  height: 20px;
+  min-width: 24px;
+  text-align: center;
+  vertical-align: middle;
+  color: rgba(255,255,255,0.7);
+  font-weight: 800;
+  font-size: 8px;
+  cursor: default;
+  outline: 2px solid transparent;
+  outline-offset: -1px;
+  transition: outline-color 0.12s, box-shadow 0.12s;
+}
+
+/* レンジ内のセルを少し明るく */
+.s-cell.in-range { color: rgba(255,255,255,0.85); }
+
+/* ハイライト (現在のハンド) */
+.s-cell.active-cell {
+  outline: 2.5px solid var(--hi-ring) !important;
+  box-shadow: 0 0 10px var(--hi-ring), inset 0 0 5px rgba(240,208,96,0.2);
+  z-index: 2;
+  position: relative;
+  animation: cell-pulse 0.55s ease;
+}
+
+@keyframes cell-pulse {
+  0%   { box-shadow: 0 0 0   rgba(240,208,96,0); }
+  50%  { box-shadow: 0 0 18px rgba(240,208,96,0.8); }
+  100% { box-shadow: 0 0 10px rgba(240,208,96,0.5); }
+}
+
+/* 凡例 */
+#legend {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  padding: 4px 8px;
+  background: rgba(0,0,0,0.32);
+  border-top: 1px solid rgba(255,255,255,0.05);
+  flex-shrink: 0;
+}
+.leg {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.88);
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+
+/* ===== ポストフロップ戦略ガイド ===== */
+.guide-wrap {
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(240,236,228,0.9);
+}
+
+.guide-wrap h4 {
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin: 12px 0 6px;
+}
+.guide-wrap h4:first-child { margin-top: 0; }
+
+.guide-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.guide-tbl th, .guide-tbl td {
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 4px 6px;
+  text-align: left;
+  vertical-align: middle;
+}
+.guide-tbl th {
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.55);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.tier-chip-sm {
+  display: inline-block;
+  font-family: 'Cinzel', serif;
+  font-size: 9px;
+  font-weight: 700;
+  color: #fff;
+  padding: 1px 7px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.guide-formula {
+  background: rgba(255,255,255,0.04);
+  border-left: 3px solid var(--gold);
+  border-radius: 0 4px 4px 0;
+  padding: 6px 10px;
+  margin: 6px 0;
+  font-size: 11px;
+}
+.guide-formula b { color: var(--gold-lt); }
+
+/* ===== レスポンシブ ===== */
+@media (max-width: 360px) {
+  .card     { width: 40px; height: 58px; }
+  .cs       { font-size: 18px; }
+  .cr       { font-size: 10px; }
+  .card-slot{ width: 40px; height: 58px; }
+  .ab       { font-size: 11px; max-width: 90px; height: 40px; }
+  .s-cell   { width: 20px; min-width: 20px; }
+}
+
+@media (min-height: 750px) {
+  #strat  { flex: 0 0 44vh; }
+  .card   { width: 50px; height: 70px; }
+  .cs     { font-size: 24px; }
+  .card-slot { width: 50px; height: 70px; }
+  .s-cell { height: 22px; width: 26px; min-width: 26px; }
+}
+
+@media (min-height: 900px) {
+  .card      { width: 54px; height: 76px; }
+  .card-slot { width: 54px; height: 76px; }
+  .cs        { font-size: 26px; }
+}
