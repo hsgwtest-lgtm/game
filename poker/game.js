@@ -188,15 +188,16 @@ function _dealerActs() {
   if (Math.random() < 0.48) {
     // チェック
     currentBet = 0;
+    renderAll();
     _renderPostflopCtrl('check');
   } else {
     // ベット (ハーフポット)
     const betAmt = Math.max(BB, Math.floor(pot * 0.5));
     pot       += betAmt; // ディーラーのベットをポットへ
     currentBet = betAmt;
+    renderAll();
     _renderPostflopCtrl('bet');
   }
-  renderAll();
 }
 
 /** ストリート進行 */
@@ -240,6 +241,7 @@ function nextHand() {
   if (playerStack <= 0) { playerStack = 1000; fb('チップをリセットしました', 'info'); }
   playerHand = []; dealerHand = []; community = [];
   pot = 0; playerBet = 0; currentBet = 0;
+  handKey = '';
   document.querySelectorAll('.s-cell.active-cell').forEach(c => c.classList.remove('active-cell'));
   renderAll();
 }
@@ -346,17 +348,16 @@ function renderAll() {
 
 function _renderTopbar() {
   const sitEl = document.getElementById('sit');
-  if (!sitEl) return;
+  const potEl = document.getElementById('pot-disp');
 
   if (gs === GS.IDLE) {
-    sitEl.textContent = 'DEAL を押してください';
+    if (sitEl) sitEl.textContent = 'DEAL を押してください';
+    if (potEl) potEl.textContent = '';
     return;
   }
 
   const streetNames = { [GS.PREFLOP]: 'Preflop', [GS.FLOP]: 'Flop', [GS.TURN]: 'Turn', [GS.RIVER]: 'River', [GS.SHOWDOWN]: 'Showdown' };
-  sitEl.textContent = `${position} — ${POS_FULL[position]}　|　${streetNames[gs] || ''}`;
-
-  const potEl = document.getElementById('pot-disp');
+  if (sitEl) sitEl.textContent = `${position} — ${POS_FULL[position]}　|　${streetNames[gs] || ''}`;
   if (potEl) potEl.textContent = `POT: ${pot}`;
 }
 
@@ -397,10 +398,10 @@ function _renderCards() {
     }
   }
 
-  // ディーラーのハンド名 (ショーダウン後)
+  // ディーラーのハンド名 (ホールカード公開後)
   const dnEl = document.getElementById('dealer-hand-name');
   if (dnEl) {
-    if (gs === GS.IDLE && dealerHand.length && !dealerHand[0].hidden && community.length >= 3) {
+    if (dealerHand.length && !dealerHand[0].hidden && community.length >= 3) {
       const best = bestHand([...dealerHand, ...community]);
       dnEl.textContent = best ? `[${best.name}]` : '';
     } else {
@@ -476,11 +477,14 @@ function _renderChips() {
 }
 
 function _renderStats() {
-  const el = document.getElementById('sc-total');
-  if (!el) return;
-  if (stats.n === 0) { el.textContent = '—'; return; }
-  const pct = Math.round(stats.ok / stats.n * 100);
-  el.textContent = `${stats.ok}/${stats.n} (${pct}%)`;
+  const text = stats.n === 0
+    ? '—'
+    : `${stats.ok}/${stats.n} (${Math.round(stats.ok / stats.n * 100)}%)`;
+
+  const elTop = document.getElementById('sc-total-top');
+  const elBar = document.getElementById('sc-total');
+  if (elTop) elTop.textContent = text;
+  if (elBar) elBar.textContent = text;
 }
 
 // ============================================================
