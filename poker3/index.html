@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <meta name="theme-color" content="#0d1a35" />
+  <title>Texas Hold'em Practice</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Barlow+Condensed:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== ゲームエリア (フェルトテーブル) ===== -->
+  <div id="game">
+
+    <!-- トップバー: チップ / ポジション+ストリート / 正解率 -->
+    <div id="topbar">
+      <span id="chips">💰 1,000</span>
+      <span id="sit">DEAL を押してください</span>
+      <span id="sc-total-wrap">正解率: <b id="sc-total-top">—</b></span>
+    </div>
+
+    <!-- フィードバック (正解/不正解) -->
+    <div id="fb" class="fb" role="alert" aria-live="polite"></div>
+
+    <!-- ポット表示 -->
+    <div id="pot-bar">
+      <div id="pot-disp"></div>
+    </div>
+
+    <!-- コミュニティカード (フロップ/ターン/リバー) -->
+    <div id="community">
+      <span class="area-lbl">COMMUNITY</span>
+      <div id="community-cards" class="cards-row"></div>
+    </div>
+
+    <div class="vs" aria-hidden="true">— VS —</div>
+
+    <!-- ディーラーエリア -->
+    <div id="dealer-area">
+      <span class="area-lbl">DEALER <span id="dealer-hand-name"></span></span>
+      <div id="dealer-cards" class="cards-row"></div>
+    </div>
+
+    <div class="vs" aria-hidden="true">— VS —</div>
+
+    <!-- プレイヤーエリア -->
+    <div id="player-area">
+      <span class="area-lbl">YOUR HAND <span id="player-hand-name"></span></span>
+      <div id="player-cards" class="cards-row"></div>
+      <!-- ハンド強度パネル (フロップ以降) -->
+      <div id="analysis-bar" style="display:none" aria-live="polite"></div>
+    </div>
+
+    <!-- コントロール -->
+    <div id="ctrl">
+
+      <!-- ポットオッズ表示 (ベットに直面している場合のみ) -->
+      <div id="pot-odds-disp" style="display:none"></div>
+
+      <!-- IDLE: DEAL ボタン -->
+      <div id="idle-ctrl">
+        <button id="deal-btn" onclick="startHand()">DEAL</button>
+      </div>
+
+      <!-- PREFLOP: Fold / Call / Raise -->
+      <div id="preflop-ctrl" style="display:none" role="group" aria-label="プリフロップ アクション">
+        <button onclick="pFold()"  class="ab fold-btn">Fold</button>
+        <button id="call-btn" onclick="pCall()"  class="ab call-btn">Call 10</button>
+        <button onclick="pRaise()" class="ab raise-btn">Raise 60</button>
+      </div>
+
+      <!-- POSTFLOP: JS で動的生成 -->
+      <div id="postflop-ctrl" style="display:none" role="group" aria-label="ポストフロップ アクション"></div>
+
+    </div>
+
+    <!-- リザルトオーバーレイ -->
+    <div id="overlay" style="display:none" role="dialog" aria-modal="true">
+      <div class="res-box">
+        <div id="res-txt"></div>
+        <div id="res-chips"></div>
+        <button class="res-next" onclick="nextHand()">次のハンド</button>
+      </div>
+    </div>
+
+  </div><!-- #game -->
+
+  <!-- ===== 正解率バー ===== -->
+  <div id="stat-bar" aria-label="正解率">
+    <div class="sc">
+      <span class="sc-lbl">Preflop</span>
+      <b id="sc-preflop">—</b>
+    </div>
+    <div class="sc">
+      <span class="sc-lbl">Postflop</span>
+      <b id="sc-postflop">—</b>
+    </div>
+    <div class="sc hi">
+      <span class="sc-lbl">Total</span>
+      <b id="sc-total">—</b>
+    </div>
+  </div>
+
+  <!-- ===== スタートハンドマトリクス ===== -->
+  <div id="strat" role="region" aria-label="スタートハンドチャート">
+
+    <div id="strat-head">
+      <span class="strat-title">📊 Starting Hand Chart</span>
+      <div id="tabs" role="tablist">
+        <button class="tab-btn on" data-tab="btn" onclick="switchTab('btn')" role="tab" aria-selected="true">BTN</button>
+        <button class="tab-btn"    data-tab="co"  onclick="switchTab('co')"  role="tab" aria-selected="false">CO</button>
+        <button class="tab-btn"    data-tab="mp"  onclick="switchTab('mp')"  role="tab" aria-selected="false">MP</button>
+        <button class="tab-btn"    data-tab="ep"  onclick="switchTab('ep')"  role="tab" aria-selected="false">EP</button>
+        <button class="tab-btn"    data-tab="guide" onclick="switchTab('guide')" role="tab" aria-selected="false">Guide</button>
+      </div>
+    </div>
+
+    <div id="chart-wrap">
+      <div id="matrix-btn"   class="chart-pane on" role="tabpanel"></div>
+      <div id="matrix-co"    class="chart-pane"    role="tabpanel"></div>
+      <div id="matrix-mp"    class="chart-pane"    role="tabpanel"></div>
+      <div id="matrix-ep"    class="chart-pane"    role="tabpanel"></div>
+      <div id="matrix-guide" class="chart-pane"    role="tabpanel"></div>
+    </div>
+
+    <div id="legend">
+      <span class="leg" style="background:#1a5c34">■ Open Raise</span>
+      <span class="leg" style="background:#3d0f18">■ Fold</span>
+    </div>
+
+  </div><!-- #strat -->
+
+</div><!-- #app -->
+
+<script src="strategy.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
