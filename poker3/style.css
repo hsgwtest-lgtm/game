@@ -209,28 +209,25 @@ button { touch-action: manipulation; cursor: pointer; }
 /* ===== ハンド強度パネル ===== */
 #analysis-bar {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  margin-top: 6px;
-  padding: 0 6px;
-}
-
-.ana-row1 {
-  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 5px;
+  row-gap: 1px;
   flex-wrap: wrap;
+  margin-top: 4px;
+  padding: 0 6px;
+  max-width: 100%;
 }
 
 .equity-num {
   font-family: 'Cinzel', serif;
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--gold-lt);
-  letter-spacing: 0.5px;
-  text-shadow: 0 0 10px rgba(232,204,132,0.35);
+  letter-spacing: 0.4px;
+  text-shadow: 0 0 8px rgba(232,204,132,0.3);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .tier-chip {
@@ -238,21 +235,23 @@ button { touch-action: manipulation; cursor: pointer; }
   font-size: 10px;
   font-weight: 700;
   color: #fff;
-  padding: 2px 9px;
+  padding: 2px 8px;
   border-radius: 4px;
   letter-spacing: 0.5px;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
-.ana-row2 {
+.hand-detail {
   font-size: 11px;
-  color: rgba(240,236,228,0.7);
-  text-align: center;
+  color: rgba(240,236,228,0.75);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
+}
+
+.equity-label {
+  font-size: 10px;
+  color: var(--gold-lt);
+  white-space: nowrap;
 }
 
 /* ===== ポットオッズ表示 ===== */
@@ -293,12 +292,10 @@ button { touch-action: manipulation; cursor: pointer; }
 .card.red { color: #c1121f; }
 .card.blk { color: #1a1a1a; }
 
-/* 現在の役を構成するカード (金色グロー + 浮き上がり) */
+/* 現在の役を構成するカード (金色の枠線 + グロー) */
 .card.card-highlight {
   border: 2px solid var(--gold);
-  box-shadow: 0 0 12px rgba(200,168,90,0.75), 2px 5px 9px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.7);
-  transform: translateY(-4px);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 0 12px rgba(200,168,90,0.75), 2px 3px 7px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.7);
 }
 
 .cr { font-family: 'Barlow Condensed', sans-serif; font-size: 12px; font-weight: 900; line-height: 1; display: block; width: 100%; }
