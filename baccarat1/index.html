@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#082A22">
+  <title>バカラ練習 — Punto Banco Trainer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand__mark">P&nbsp;•&nbsp;B</span>
+        <div class="brand__text">
+          <h1>バカラ練習</h1>
+          <p>Punto Banco Trainer</p>
+        </div>
+      </div>
+      <div class="hud">
+        <div class="hud__item">
+          <span class="hud__label">残高</span>
+          <span class="hud__value" id="bankroll">¥0</span>
+        </div>
+        <div class="hud__item hud__item--shoe">
+          <span class="hud__label">シュー残数</span>
+          <span class="hud__value" id="shoe-count">— / —</span>
+          <span class="hud__bar"><span class="hud__bar-fill" id="shoe-bar"></span></span>
+        </div>
+      </div>
+    </header>
+
+    <main class="table-area">
+      <div class="felt">
+        <div class="felt__pattern" aria-hidden="true"></div>
+
+        <section class="zone zone--player" data-zone="player" role="button" tabindex="0"
+                  aria-label="プレイヤーに賭ける">
+          <header class="zone__label">
+            <span class="zone__name">PLAYER</span>
+            <span class="zone__odds">1 : 1</span>
+          </header>
+          <div class="hand" id="player-hand"></div>
+          <div class="zone__total" id="player-total">--</div>
+          <div class="zone__bet"><span id="player-bet">¥0</span></div>
+        </section>
+
+        <section class="zone zone--tie" data-zone="tie" role="button" tabindex="0"
+                  aria-label="タイに賭ける">
+          <header class="zone__label">
+            <span class="zone__name">TIE</span>
+            <span class="zone__odds">8 : 1</span>
+          </header>
+          <div class="zone__total zone__total--tie" aria-hidden="true">&nbsp;</div>
+          <div class="zone__bet"><span id="tie-bet">¥0</span></div>
+        </section>
+
+        <section class="zone zone--banker" data-zone="banker" role="button" tabindex="0"
+                  aria-label="バンカーに賭ける">
+          <header class="zone__label">
+            <span class="zone__name">BANKER</span>
+            <span class="zone__odds">1 : 1<small>(−5%)</small></span>
+          </header>
+          <div class="hand" id="banker-hand"></div>
+          <div class="zone__total" id="banker-total">--</div>
+          <div class="zone__bet"><span id="banker-bet">¥0</span></div>
+        </section>
+
+        <div class="result-banner" id="result-banner" aria-live="polite"></div>
+      </div>
+
+      <section class="dealer-call" aria-live="polite">
+        <div class="dealer-call__plate">
+          <span class="dealer-call__rivet" aria-hidden="true"></span>
+          <span class="dealer-call__rivet" aria-hidden="true"></span>
+          <span class="dealer-call__rivet" aria-hidden="true"></span>
+          <span class="dealer-call__rivet" aria-hidden="true"></span>
+          <div class="dealer-call__title">ディーラーコール</div>
+          <div class="dealer-call__body" id="dealer-call-body">チップを選んで、ゾーンをタップして賭けてください。</div>
+        </div>
+      </section>
+
+      <section class="road" aria-label="ビーズプレート（勝敗の履歴）">
+        <div class="road__title">
+          ロード
+          <span class="road__legend">
+            <span class="road__legend-item"><span class="road__dot road__dot--player"></span>プレイヤー</span>
+            <span class="road__legend-item"><span class="road__dot road__dot--banker"></span>バンカー</span>
+            <span class="road__legend-item"><span class="road__dot road__dot--tie"></span>タイ</span>
+          </span>
+        </div>
+        <div class="road__grid" id="road-grid"></div>
+      </section>
+    </main>
+
+    <footer class="controls">
+      <div class="chip-tray" id="chip-tray" aria-label="チップを選択"></div>
+      <div class="action-row">
+        <button class="btn btn--ghost" id="btn-undo" type="button">1つ戻す</button>
+        <button class="btn btn--ghost" id="btn-clear" type="button">クリア</button>
+        <button class="btn btn--primary" id="btn-deal" type="button">ディール</button>
+      </div>
+    </footer>
+
+    <button class="stats-toggle" id="stats-toggle" type="button" aria-expanded="false" aria-controls="stats-panel">
+      統計
+    </button>
+
+    <aside class="stats-panel" id="stats-panel" hidden>
+      <div class="stats-panel__inner" id="stats-panel-body"></div>
+    </aside>
+
+    <div class="scrim" id="scrim" hidden></div>
+  </div>
+
+  <script src="game.js"></script>
+  <script src="ui.js"></script>
+</body>
+</html>
