@@ -334,7 +334,7 @@ function bestHand(cards) {
     const h = _eval5(combo);
     if (!best || h.score > best.score) best = h;
   }
-  return best || { score: 0, name: 'High Card', cards: [] };
+  return best || { score: 0, name: 'High Card', cards: [], highlightCards: [] };
 }
 
 /** 配列から5枚の組み合わせを全列挙 */
@@ -390,7 +390,19 @@ function _eval5(hand) {
   let score = rank * 1e10;
   tv.slice(0, 5).forEach((v, i) => { score += v * Math.pow(100, 4 - i); });
 
-  return { rank, name: HAND_NAMES[rank], score, cards: sorted };
+  // ハイライト対象: 役を構成する「核」となるカードのみ (キッカーは含めない)
+  let highlightCards;
+  switch (rank) {
+    case 0: highlightCards = []; break;                                              // ハイカード: 強調なし
+    case 1: highlightCards = sorted.filter(c => c.numVal === gv[0]); break;          // ワンペア (2枚)
+    case 2: highlightCards = sorted.filter(c => c.numVal === gv[0] || c.numVal === gv[1]); break; // ツーペア (4枚)
+    case 3: highlightCards = sorted.filter(c => c.numVal === gv[0]); break;          // スリーカード (3枚)
+    case 6: highlightCards = sorted.filter(c => c.numVal === gv[0] || c.numVal === gv[1]); break; // フルハウス (5枚)
+    case 7: highlightCards = sorted.filter(c => c.numVal === gv[0]); break;          // フォーカード (4枚)
+    default: highlightCards = sorted; break;                                         // ストレート/フラッシュ/SF/RF (5枚)
+  }
+
+  return { rank, name: HAND_NAMES[rank], score, cards: sorted, highlightCards };
 }
 
 // ============================================================
@@ -447,18 +459,13 @@ function _renderAnalysis() {
   // モンテカルロ法で「ランダムな相手」に対する推定勝率を計算
   lastEquity = estimateEquity(playerHand, community, 200);
 
-  // 1行目: 勝率を大きく表示
-  let html = `<div class="ana-row1">`;
-  html += `<span class="equity-num">勝率 約${lastEquity}%</span>`;
+  // 勝率・強さ・役名を1行 (折り返し可) で表示
+  let html = `<span class="equity-num">勝率 約${lastEquity}%</span>`;
   html += `<span class="tier-chip" style="background:${info.color}">${info.label}</span>`;
-  html += `</div>`;
-
-  // 2行目: 役の名前 (+ ドローならアウツ情報)
-  html += `<div class="ana-row2">${analysis.label}`;
+  html += `<span class="hand-detail">${analysis.label}</span>`;
   if (analysis.outs) {
-    html += `　/　アウツ${analysis.outs}枚 (4-2ルール概算 約${analysis.equity}%)`;
+    html += `<span class="equity-label">アウツ${analysis.outs}枚 (4-2ルール約${analysis.equity}%)</span>`;
   }
-  html += `</div>`;
 
   bar.innerHTML = html;
   bar.style.display = 'flex';
@@ -487,7 +494,7 @@ function _renderCards() {
   if (community.length >= 3 && playerHand.length === 2) {
     pBest = bestHand([...playerHand, ...community]);
   }
-  const pCards = pBest ? pBest.cards : [];
+  const pCards = pBest ? pBest.highlightCards : [];
 
   // コミュニティカード (5スロット)
   const commEl = document.getElementById('community-cards');
