@@ -1,0 +1,899 @@
+/* =========================================================================
+ * バカラ練習アプリ — スタイルシート
+ *
+ * デザインコンセプト: 「サロン・プリヴェ」— 深いエメラルドのフェルトと
+ * 真鍮(brass)の装飾でまとめた、落ち着いたVIPルーム風のテーブル。
+ * 署名要素: 真鍮プレート風の「ディーラーコール」— ルールの判定理由を
+ * その場で実況することで、練習用アプリとしての価値を可視化する。
+ * ========================================================================= */
+
+/* ---- デザイントークン --------------------------------------------------- */
+:root {
+  /* カラー */
+  --felt: #0E4438;
+  --felt-deep: #071F19;
+  --felt-light: #1C6E58;
+  --brass: #C9A865;
+  --brass-bright: #F2DCA0;
+  --brass-dim: #7E6B41;
+  --cream: #F4ECDA;
+  --ink: #19140F;
+  --ruby: #C25A62;
+  --cobalt: #5C90C4;
+  --jade: #63B392;
+
+  /* フォント */
+  --font-display: 'Shippori Mincho', serif;
+  --font-body: 'Zen Kaku Gothic New', sans-serif;
+  --font-mono: 'Roboto Mono', monospace;
+
+  /* レイアウト */
+  --radius-lg: 16px;
+  --radius-md: 10px;
+  --radius-sm: 6px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --road-cell: 18px;
+}
+
+/* ---- リセット & 基本 ------------------------------------------------------ */
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  height: 100%;
+}
+body {
+  min-height: 100dvh;
+  background: radial-gradient(120% 80% at 50% -10%, var(--felt-light) 0%, var(--felt) 45%, var(--felt-deep) 100%);
+  color: var(--cream);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+h1, h2 { margin: 0; font-family: var(--font-display); }
+button {
+  font: inherit;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+:focus-visible {
+  outline: 2px solid var(--brass-bright);
+  outline-offset: 2px;
+}
+
+/* ---- アプリ全体レイアウト -------------------------------------------------- */
+.app {
+  position: relative;
+  max-width: 520px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+}
+
+/* ---- ヘッダー ------------------------------------------------------------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--brass) 35%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--felt-deep) 85%, black) 0%, transparent 100%);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.brand__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--brass);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--brass-bright);
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--brass) 25%, transparent), transparent 70%);
+  flex-shrink: 0;
+}
+.brand__text h1 {
+  font-size: clamp(1.05rem, 4.5vw, 1.3rem);
+  font-weight: 600;
+  color: var(--brass-bright);
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+}
+.brand__text p {
+  margin: 2px 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brass-dim);
+}
+.hud {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  text-align: right;
+}
+.hud__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.15;
+}
+.hud__label {
+  font-size: 0.6rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--brass-dim);
+}
+.hud__value {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--brass-bright);
+}
+.hud__item--shoe .hud__value {
+  font-size: 0.85rem;
+  color: var(--cream);
+}
+.hud__bar {
+  display: block;
+  width: 84px;
+  height: 4px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brass-dim) 45%, transparent);
+  overflow: hidden;
+}
+.hud__bar-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: var(--brass);
+  transform-origin: right center;
+  transition: transform 0.4s ease;
+}
+
+/* ---- テーブル領域 ---------------------------------------------------------- */
+.table-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 14px 18px;
+}
+
+/* ---- フェルト & ベットゾーン ----------------------------------------------- */
+.felt {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 0.62fr 1fr;
+  gap: 10px;
+  padding: 18px 12px;
+  border: 1px solid color-mix(in srgb, var(--brass) 45%, transparent);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(120% 100% at 50% 0%, color-mix(in srgb, var(--felt-light) 55%, transparent), transparent 60%),
+    var(--felt);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+.felt__pattern {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.06;
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--brass-bright) 0px,
+    var(--brass-bright) 1px,
+    transparent 1px,
+    transparent 18px
+  );
+}
+
+.zone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 6px 12px;
+  border: 1px dashed color-mix(in srgb, var(--brass) 55%, transparent);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.16);
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+  z-index: 1;
+}
+.zone:hover,
+.zone:focus-visible {
+  border-color: var(--brass-bright);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brass-bright) 35%, transparent), 0 4px 18px rgba(0, 0, 0, 0.25);
+}
+.zone:active {
+  transform: scale(0.98);
+}
+.zone.is-disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.zone--tie {
+  padding-top: 10px;
+  justify-content: flex-start;
+}
+
+.zone__label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--font-body);
+}
+.zone__name {
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: var(--brass-bright);
+}
+.zone__odds {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--brass-dim);
+}
+.zone__odds small {
+  font-size: 0.85em;
+}
+
+.hand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 78px;
+  flex-wrap: nowrap;
+}
+
+.zone__total {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 1.4rem;
+  color: var(--cream);
+  min-height: 1.6rem;
+  line-height: 1;
+}
+.zone__total--tie {
+  visibility: hidden;
+}
+
+.zone__bet {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--brass);
+  border: 1px solid var(--brass-bright);
+  border-radius: 999px;
+  padding: 3px 12px;
+  min-width: 64px;
+  text-align: center;
+}
+
+/* ---- カード(フリップ) ------------------------------------------------------ */
+.card-flip {
+  width: clamp(40px, 12vw, 52px);
+  height: clamp(58px, 17.4vw, 76px);
+  flex-shrink: 0;
+  perspective: 600px;
+  opacity: 0;
+  transform: translateY(8px) scale(0.85);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.card-flip.is-entered {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+.card-flip__inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.4, 0.2, 0.2, 1);
+}
+.card-flip.is-revealed .card-flip__inner {
+  transform: rotateY(180deg);
+}
+.card-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  border-radius: var(--radius-sm);
+  backface-visibility: hidden;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+.card-face--back {
+  background:
+    repeating-linear-gradient(135deg, color-mix(in srgb, var(--brass) 35%, transparent) 0 6px, transparent 6px 12px),
+    var(--felt-deep);
+  border: 1px solid var(--brass-dim);
+  align-items: center;
+  justify-content: center;
+}
+.card-face__mark {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--brass-bright);
+}
+.card-face--front {
+  transform: rotateY(180deg);
+  background: var(--cream);
+  border: 1px solid color-mix(in srgb, var(--ink) 15%, transparent);
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 4px 5px;
+  font-family: var(--font-body);
+}
+.card-face--front.is-red { color: var(--ruby); }
+.card-face--front.is-black { color: var(--ink); }
+.card-face__corner {
+  font-size: clamp(0.62rem, 2vw, 0.78rem);
+  font-weight: 700;
+  line-height: 1.05;
+  text-align: left;
+}
+.card-face__corner--br {
+  align-self: flex-end;
+  text-align: right;
+  transform: rotate(180deg);
+}
+.card-face__pip {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(1.1rem, 4.2vw, 1.6rem);
+}
+
+/* ---- 結果バナー ------------------------------------------------------------ */
+.result-banner {
+  position: absolute;
+  inset: 0;
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 12px;
+  font-family: var(--font-display);
+  font-size: clamp(1.3rem, 7vw, 2rem);
+  font-weight: 800;
+  color: var(--brass-bright);
+  background: rgba(7, 31, 25, 0.55);
+  opacity: 0;
+  transform: scale(0.92);
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  z-index: 2;
+}
+.result-banner.is-visible {
+  opacity: 1;
+  transform: scale(1);
+}
+.result-banner__sub {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--cream);
+}
+.result-banner--player { color: var(--cobalt); }
+.result-banner--banker { color: var(--ruby); }
+.result-banner--tie { color: var(--jade); }
+
+/* ---- ディーラーコール(真鍮プレート) ---------------------------------------- */
+.dealer-call__plate {
+  position: relative;
+  padding: 14px 22px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--brass);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--felt-deep) 92%, black) 0%, var(--felt-deep) 100%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--brass-bright) 25%, transparent),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+    0 4px 14px rgba(0, 0, 0, 0.3);
+}
+.dealer-call__rivet {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--brass-bright), var(--brass-dim) 75%);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
+}
+.dealer-call__rivet:nth-child(1) { top: 7px; left: 7px; }
+.dealer-call__rivet:nth-child(2) { top: 7px; right: 7px; }
+.dealer-call__rivet:nth-child(3) { bottom: 7px; left: 7px; }
+.dealer-call__rivet:nth-child(4) { bottom: 7px; right: 7px; }
+.dealer-call__title {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--brass-dim);
+  margin-bottom: 6px;
+}
+.dealer-call__body {
+  font-family: var(--font-display);
+  font-size: clamp(0.92rem, 3.6vw, 1.05rem);
+  font-weight: 600;
+  color: var(--cream);
+  min-height: 2.6em;
+  line-height: 1.4;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6), 0 -1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* ---- ロード(ビーズプレート) ------------------------------------------------ */
+.road {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.road__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--brass-dim);
+}
+.road__legend {
+  display: flex;
+  gap: 10px;
+  font-family: var(--font-mono);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.62rem;
+  color: var(--cream);
+}
+.road__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.road__dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.road__dot--player,
+.road-cell--player::after { background: var(--cobalt); }
+.road__dot--banker,
+.road-cell--banker::after { background: var(--ruby); }
+.road__dot--tie,
+.road-cell--tie::after { background: var(--jade); }
+
+.road__grid {
+  display: grid;
+  grid-template-rows: repeat(6, var(--road-cell));
+  grid-auto-flow: column;
+  grid-auto-columns: var(--road-cell);
+  gap: 3px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--brass) 30%, transparent);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.18);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.road-cell {
+  position: relative;
+  width: var(--road-cell);
+  height: var(--road-cell);
+}
+.road-cell::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+/* ---- フッター(チップ & 操作) ------------------------------------------------ */
+.controls {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px calc(12px + var(--safe-bottom));
+  border-top: 1px solid color-mix(in srgb, var(--brass) 35%, transparent);
+  background: linear-gradient(0deg, color-mix(in srgb, var(--felt-deep) 92%, black) 0%, var(--felt-deep) 70%);
+}
+.chip-tray {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+.chip {
+  position: relative;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--cream);
+  background:
+    radial-gradient(circle at 50% 50%, var(--chip-color) 0%, color-mix(in srgb, var(--chip-color) 70%, black) 100%);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--cream) 75%, transparent),
+    0 0 0 4px var(--chip-color),
+    repeating-conic-gradient(transparent 0deg 22.5deg, rgba(255, 255, 255, 0.18) 22.5deg 45deg) 0 0 / 100% 100%,
+    0 3px 6px rgba(0, 0, 0, 0.4);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.chip[data-value="100"]    { --chip-color: #6b6b6b; }
+.chip[data-value="500"]    { --chip-color: var(--ruby); }
+.chip[data-value="1000"]   { --chip-color: var(--cobalt); }
+.chip[data-value="5000"]   { --chip-color: var(--jade); }
+.chip[data-value="10000"]  { --chip-color: var(--ink); color: var(--brass-bright); }
+.chip.is-selected {
+  transform: translateY(-6px);
+  box-shadow:
+    0 0 0 2px var(--brass-bright),
+    0 0 0 4px var(--chip-color),
+    0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+.action-row {
+  display: flex;
+  gap: 8px;
+}
+.btn {
+  flex: 1;
+  padding: 12px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--brass);
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+.btn:active {
+  transform: scale(0.97);
+}
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.btn--ghost {
+  background: transparent;
+  color: var(--brass-bright);
+}
+.btn--ghost:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--brass) 16%, transparent);
+}
+.btn--primary {
+  flex: 1.4;
+  background: linear-gradient(180deg, var(--brass-bright) 0%, var(--brass) 100%);
+  color: var(--ink);
+  border-color: var(--brass-bright);
+}
+
+/* ---- フローティングボタン群 ------------------------------------------------- */
+.float-btns {
+  position: fixed;
+  right: max(14px, calc((100% - 520px) / 2 + 14px));
+  bottom: calc(132px + var(--safe-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 45;
+}
+.float-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1px solid var(--brass);
+  background: var(--felt-deep);
+  color: var(--brass-bright);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  transition: background 0.15s;
+}
+.float-btn:hover {
+  background: color-mix(in srgb, var(--felt-deep) 80%, var(--brass-dim));
+}
+
+/* ---- ルールパネル ---------------------------------------------------------- */
+.rules-panel {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  width: min(100%, 520px);
+  max-height: 82vh;
+  overflow-y: auto;
+  transform: translateX(-50%);
+  border: 1px solid var(--brass);
+  border-bottom: none;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--felt-deep);
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.55);
+  z-index: 49;
+}
+.rules-panel__inner {
+  padding: 20px 18px calc(22px + var(--safe-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* 見出し */
+.rules-h2 {
+  font-size: 1.1rem;
+  color: var(--brass-bright);
+  margin: 0 0 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--brass) 35%, transparent);
+}
+.rules-section {
+  margin-bottom: 22px;
+}
+.rules-h3 {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--brass-bright);
+  margin: 0 0 10px;
+  letter-spacing: 0.05em;
+}
+.rules-desc {
+  font-size: 0.82rem;
+  color: var(--cream);
+  opacity: 0.88;
+  margin: 0 0 8px;
+  line-height: 1.55;
+}
+.rules-note {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  color: var(--cream);
+  opacity: 0.7;
+  line-height: 1.5;
+}
+
+/* ステップリスト */
+.rules-steps {
+  margin: 0;
+  padding: 0 0 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rules-steps li {
+  font-size: 0.82rem;
+  color: var(--cream);
+  line-height: 1.5;
+}
+
+/* コールアウト（ナチュラル強調） */
+.rules-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+}
+.rules-callout--natural {
+  background: color-mix(in srgb, var(--brass) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brass) 55%, transparent);
+}
+.rules-callout__icon {
+  font-size: 1.1rem;
+  color: var(--brass-bright);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.rules-callout p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--cream);
+  line-height: 1.55;
+}
+.rules-callout strong {
+  color: var(--brass-bright);
+}
+
+/* 共通テーブル */
+.rules-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  color: var(--cream);
+}
+.rules-table th {
+  background: color-mix(in srgb, var(--brass-dim) 30%, transparent);
+  color: var(--brass-bright);
+  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 0.76rem;
+  padding: 7px 8px;
+  text-align: left;
+  border-bottom: 1px solid color-mix(in srgb, var(--brass) 40%, transparent);
+}
+.rules-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--cream) 10%, transparent);
+  line-height: 1.4;
+}
+.rules-table tr:last-child td {
+  border-bottom: none;
+}
+.rules-draw td { color: color-mix(in srgb, var(--cobalt) 90%, white); }
+.rules-stand td { color: color-mix(in srgb, var(--jade) 90%, white); }
+
+/* バンカードロー表 */
+.banker-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.banker-draw-table {
+  min-width: 360px;
+  font-size: 0.75rem;
+}
+.banker-draw-table th {
+  text-align: center;
+  padding: 5px 4px;
+}
+.banker-draw-header2 th {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--cream);
+  background: color-mix(in srgb, var(--brass-dim) 18%, transparent);
+  padding: 4px 3px;
+}
+.banker-draw-table td {
+  text-align: center;
+  padding: 5px 3px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.banker-total {
+  font-weight: 700;
+  color: var(--brass-bright) !important;
+  background: color-mix(in srgb, var(--brass-dim) 22%, transparent);
+  text-align: center !important;
+}
+td.d {
+  color: #7ec8e3;
+  background: color-mix(in srgb, var(--cobalt) 18%, transparent);
+}
+td.s {
+  color: #78c9a1;
+  background: color-mix(in srgb, var(--jade) 14%, transparent);
+}
+.banker-table-note {
+  margin-top: 8px !important;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.tag-draw, .tag-stand {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.tag-draw { background: color-mix(in srgb, var(--cobalt) 25%, transparent); color: #7ec8e3; }
+.tag-stand { background: color-mix(in srgb, var(--jade) 20%, transparent); color: #78c9a1; }
+
+.rules-panel__close {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+}
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 14, 11, 0.6);
+  z-index: 48;
+}
+.stats-panel {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  width: min(100%, 520px);
+  max-height: 78vh;
+  overflow-y: auto;
+  transform: translateX(-50%);
+  border: 1px solid var(--brass);
+  border-bottom: none;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--felt-deep);
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.5);
+  z-index: 49;
+  padding: 18px 18px calc(18px + var(--safe-bottom));
+}
+.stats-panel__inner h2 {
+  font-size: 1.1rem;
+  color: var(--brass-bright);
+  margin-bottom: 12px;
+}
+.stats-panel dl {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+.stats-panel dl > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--brass) 18%, transparent);
+}
+.stats-panel dt {
+  font-size: 0.82rem;
+  color: var(--cream);
+  opacity: 0.85;
+}
+.stats-panel dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-align: right;
+  color: var(--brass-bright);
+}
+.stats-panel dd.is-positive { color: var(--jade); }
+.stats-panel dd.is-negative { color: var(--ruby); }
+.stats-panel__close {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* ---- アクセシビリティ -------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* ---- レイアウト微調整(小型画面) ---------------------------------------------- */
+@media (max-width: 360px) {
+  .zone__name { font-size: 0.7rem; letter-spacing: 0.08em; }
+  .zone__odds { font-size: 0.6rem; }
+  .chip { width: 44px; height: 44px; font-size: 0.7rem; }
+}
