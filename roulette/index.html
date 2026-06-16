@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ルーレット">
+  <meta name="theme-color" content="#030b04">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <title>ルーレット練習</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ヘッダー -->
+  <header>
+    <div class="header-title">
+      <div class="game-name">ROULETTE</div>
+      <div class="game-sub">EUROPEAN · PRACTICE</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-ghost btn-sm" id="btnStats">統計</button>
+      <button class="btn-gold  btn-sm" id="btnRules">ルール説明</button>
+    </div>
+  </header>
+
+  <!-- 残高バー -->
+  <div class="balance-bar">
+    <div>
+      <div class="label">残高</div>
+      <div class="balance-value" id="balanceDisplay">¥10,000</div>
+    </div>
+    <div class="balance-right">
+      <div id="resultBox" class="result-box hidden">
+        <div class="label">直前の結果</div>
+        <div class="result-number" id="resultNumber">0</div>
+      </div>
+      <button class="btn-gold btn-sm hidden" id="btnReset">リセット</button>
+    </div>
+  </div>
+
+  <!-- ホイール -->
+  <div class="wheel-wrapper">
+    <canvas id="wheelCanvas"></canvas>
+  </div>
+
+  <!-- チップ選択 -->
+  <div class="section">
+    <div class="label mb4">チップを選ぶ</div>
+    <div class="chip-row" id="chipRow"></div>
+  </div>
+
+  <!-- ベッティングボード -->
+  <div class="section">
+    <div class="board-label">
+      <span class="label">ベッティングボード</span>
+      <span class="total-bet" id="totalBetDisplay"></span>
+    </div>
+    <div class="number-grid" id="numberGrid"></div>
+    <div class="dozen-row"   id="dozenRow"></div>
+    <div class="outside-row" id="outsideRow"></div>
+  </div>
+
+  <!-- コントロール -->
+  <div class="section controls">
+    <div class="ctrl-row-1">
+      <button class="btn-clear"  id="btnClear">クリア</button>
+      <button class="btn-double" id="btnDouble">× 2 倍</button>
+    </div>
+    <div class="ctrl-row-2">
+      <button class="btn-rebet" id="btnRebet">リベット</button>
+      <button class="btn-spin"  id="btnSpin">▶ SPIN</button>
+      <div class="net-display"  id="netDisplay">—</div>
+    </div>
+  </div>
+
+  <!-- 履歴 -->
+  <div class="section hidden" id="historySection">
+    <div class="label mb4">直近の結果（新しい順）</div>
+    <div class="history-dots" id="historyDots"></div>
+  </div>
+
+</div><!-- /#app -->
+
+<!-- トースト通知 -->
+<div class="toast hidden" id="toast"></div>
+
+<!-- 統計モーダル -->
+<div class="modal-overlay hidden" id="statsModal">
+  <div class="modal-box" id="statsContent"></div>
+</div>
+
+<!-- ルール説明モーダル -->
+<div class="modal-overlay hidden" id="rulesModal">
+  <div class="modal-box" id="rulesContent"></div>
+</div>
+
+<script src="game.js"></script>
+<script src="ui.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>

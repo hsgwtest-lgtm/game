@@ -1,0 +1,325 @@
+/* ============================================================
+   style.css  ── ルーレット練習アプリ スタイル
+   ラグジュアリーカジノテーマ（ダークグリーン × ゴールド）
+   ============================================================ */
+
+/* ── リセット & ベース ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #030b04;
+  color: #F0EBE3;
+  font-family: Georgia, serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  overflow-x: hidden;
+}
+button { cursor: pointer; font-family: inherit; border: none; background: none; }
+
+/* ── アプリ本体 ────────────────────────────────────────────── */
+#app {
+  width: 100%;
+  max-width: 420px;
+  padding-bottom: 44px;
+}
+
+/* ── ヘッダー ──────────────────────────────────────────────── */
+header {
+  width: 100%;
+  background: linear-gradient(180deg, #1a0800, #081a0c);
+  border-bottom: 2px solid #C9A84C;
+  padding: 9px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.game-name {
+  font-size: 20px;
+  font-weight: bold;
+  letter-spacing: 4px;
+  color: #C9A84C;
+}
+.game-sub {
+  font-size: 9px;
+  color: #555;
+  letter-spacing: 2px;
+}
+.header-actions { display: flex; gap: 6px; }
+
+/* ── ボタン基本クラス ──────────────────────────────────────── */
+.btn-gold {
+  background: transparent;
+  border: 1px solid #C9A84C;
+  color: #C9A84C;
+  border-radius: 4px;
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+.btn-ghost {
+  background: transparent;
+  border: 1px solid #555;
+  color: #888;
+  border-radius: 4px;
+  font-size: 11px;
+}
+.btn-sm { padding: 5px 10px; }
+.btn-sm:active { opacity: 0.7; }
+
+/* ── 残高バー ──────────────────────────────────────────────── */
+.balance-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(0,0,0,0.45);
+  border: 1px solid #1a3a1a;
+  border-radius: 8px;
+  margin: 10px 12px 0;
+  padding: 9px 14px;
+}
+.label {
+  font-size: 9px;
+  color: #555;
+  letter-spacing: 1px;
+}
+.mb4 { margin-bottom: 4px; }
+.balance-value {
+  font-size: 22px;
+  font-weight: bold;
+  color: #C9A84C;
+}
+.balance-right { display: flex; align-items: center; gap: 10px; }
+.result-box    { text-align: center; }
+.result-number {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  border: 2px solid #C9A84C;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: bold; color: #FFF;
+  margin-top: 2px;
+}
+
+/* ── ホイール ──────────────────────────────────────────────── */
+.wheel-wrapper {
+  display: flex;
+  justify-content: center;
+  margin: 10px 12px 0;
+}
+#wheelCanvas {
+  border-radius: 50%;
+  box-shadow: 0 0 44px rgba(201,168,76,0.2), 0 0 80px rgba(0,0,0,0.65);
+  width:  min(268px, 84vw);
+  height: min(268px, 84vw);
+}
+
+/* ── セクション共通 ────────────────────────────────────────── */
+.section { margin: 9px 12px 0; }
+
+/* ── チップ選択 ────────────────────────────────────────────── */
+.chip-row { display: flex; gap: 6px; }
+.chip-btn {
+  flex: 1;
+  padding: 7px 0;
+  font-size: 11px; font-weight: bold;
+  border-radius: 5px;
+  border: 2px solid #252525;
+  background: rgba(0,0,0,0.4);
+  color: #555;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.chip-btn.active {
+  border-color: #FFD700;
+  background: rgba(201,168,76,0.18);
+  color: #FFD700;
+}
+.chip-btn:active { opacity: 0.7; }
+
+/* ── ベッティングボード ────────────────────────────────────── */
+.board-label {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 4px;
+}
+.total-bet { font-size: 11px; color: #C9A84C; }
+
+/* 数字グリッド */
+.number-grid {
+  display: grid;
+  grid-template-columns: 24px repeat(12, 1fr) 24px;
+  grid-template-rows: repeat(3, 28px);
+  gap: 1.5px;
+  margin-bottom: 1.5px;
+}
+/* ダズン行 */
+.dozen-row {
+  display: grid;
+  grid-template-columns: 24px repeat(12, 1fr) 24px;
+  gap: 1.5px;
+  height: 28px;
+  margin-bottom: 1.5px;
+}
+/* アウトサイド行 */
+.outside-row {
+  display: grid;
+  grid-template-columns: 24px repeat(6, 1fr) 24px;
+  gap: 1.5px;
+  height: 28px;
+}
+
+/* ベットセル共通 */
+.bet-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(201,168,76,0.25);
+  font-size: 10px; font-weight: bold; color: #FFF;
+  position: relative;
+  cursor: pointer;
+  transition: filter .08s;
+}
+.bet-cell:active { filter: brightness(1.5); }
+.bet-cell .pay   { font-size: 7px; color: #C9A84C; }
+.badge {
+  position: absolute; top: 1px; right: 1px;
+  background: #FFD700; color: #000;
+  border-radius: 50%;
+  width: 13px; height: 13px;
+  font-size: 7px; font-weight: bold;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1; line-height: 1;
+}
+
+/* ── コントロール ──────────────────────────────────────────── */
+.controls { display: flex; flex-direction: column; gap: 6px; }
+.ctrl-row-1 { display: grid; grid-template-columns: 1fr 1fr;       gap: 6px; }
+.ctrl-row-2 { display: grid; grid-template-columns: 1fr 1.6fr 1fr; gap: 6px; }
+
+.btn-clear {
+  padding: 9px 0;
+  background: rgba(70,0,0,0.4); border: 1px solid #3a0000;
+  border-radius: 6px; color: #FF6666;
+  font-size: 12px; font-weight: bold;
+}
+.btn-double {
+  padding: 9px 0;
+  background: rgba(0,50,0,0.4); border: 1px solid #003800;
+  border-radius: 6px; color: #66FF88;
+  font-size: 12px; font-weight: bold;
+}
+.btn-rebet {
+  padding: 11px 0;
+  background: rgba(30,30,80,0.5); border: 1px solid #334;
+  border-radius: 6px; color: #AAAAFF;
+  font-size: 12px; font-weight: bold;
+}
+.btn-spin {
+  padding: 11px 0;
+  font-size: 16px; font-weight: bold;
+  border-radius: 6px;
+  border: 2px solid #C9A84C;
+  background: linear-gradient(135deg, #C9A84C, #8B6914);
+  color: #000;
+}
+/* スピン中スタイル */
+.btn-spin.spinning {
+  border-color: #444;
+  background: #1a1a1a;
+  color: #555;
+  animation: none;
+}
+/* アイドル時の脈動グロー */
+.btn-spin:not(.spinning):not(:disabled) {
+  animation: spinGlow 2s ease-in-out infinite;
+}
+@keyframes spinGlow {
+  0%, 100% { box-shadow: 0 0 14px rgba(201,168,76,0.35); }
+  50%       { box-shadow: 0 0 32px rgba(201,168,76,0.7), 0 0 55px rgba(201,168,76,0.25); }
+}
+
+/* 純損益表示 */
+.net-display {
+  padding: 11px 4px;
+  background: rgba(20,40,20,0.3); border: 1px solid #1a3a1a;
+  border-radius: 6px;
+  font-size: 11px; font-weight: bold; text-align: center;
+  display: flex; align-items: center; justify-content: center;
+  color: #2a4a2a;
+}
+.net-display.win  { color: #66FF88; }
+.net-display.lose { color: #FF6666; }
+
+/* 無効状態・タップフィードバック共通 */
+button:disabled         { opacity: 0.35 !important; cursor: not-allowed; }
+button:not(:disabled):active { opacity: 0.75; }
+
+/* ── 履歴 ──────────────────────────────────────────────────── */
+.history-dots { display: flex; flex-wrap: wrap; gap: 4px; }
+.hist-dot {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 8px; font-weight: bold; color: #FFF;
+}
+
+/* ── トースト通知 ───────────────────────────────────────────── */
+.toast {
+  position: fixed; top: 65px;
+  left: 50%; transform: translateX(-50%);
+  padding: 9px 18px; border-radius: 8px;
+  font-size: 13px; font-weight: bold;
+  z-index: 100; text-align: center;
+  max-width: 88vw; white-space: nowrap;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.75);
+  pointer-events: none;
+}
+.toast.win  { background: rgba(0,68,20,0.97);   border: 1px solid #00AA44; color: #FFF; }
+.toast.lose { background: rgba(68,0,0,0.97);    border: 1px solid #AA0000; color: #FFF; }
+.toast.err  { background: rgba(12,12,12,0.95);  border: 1px solid #444;    color: #FFF; }
+
+/* ── モーダル共通 ───────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.9);
+  z-index: 200;
+  display: flex; align-items: flex-start; justify-content: center;
+  overflow-y: auto;
+  padding: 16px 12px;
+}
+.modal-box {
+  background: #060f08;
+  border: 2px solid #C9A84C;
+  border-radius: 12px;
+  padding: 18px;
+  max-width: 420px; width: 100%;
+  color: #CCC; font-size: 13px; line-height: 1.75;
+}
+.modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 14px;
+}
+.modal-title       { margin: 0; color: #C9A84C; font-size: 17px; }
+.modal-close       { background: none; border: none; color: #666; font-size: 24px; line-height: 1; padding: 0; cursor: pointer; }
+.modal-section-title { color: #C9A84C; font-size: 13px; margin: 0 0 6px; }
+.info-box          { background: rgba(0,0,0,0.3); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+.info-box-title    { color: #FFD700; font-weight: bold; font-size: 12px; margin-bottom: 6px; }
+.payout-grid       { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; row-gap: 4px; font-size: 12px; }
+.payout-val        { color: #C9A84C; font-weight: bold; text-align: right; }
+.modal-note        { padding: 9px 12px; background: rgba(201,168,76,0.07); border: 1px solid rgba(201,168,76,0.2); border-radius: 8px; font-size: 11px; color: #555; line-height: 1.6; margin-bottom: 14px; }
+.btn-modal-close   { width: 100%; padding: 12px; background: linear-gradient(135deg,#C9A84C,#8B6914); border: none; border-radius: 6px; color: #000; font-weight: bold; font-size: 14px; cursor: pointer; }
+
+/* ── 統計モーダル専用 ───────────────────────────────────────── */
+.stats-grid  { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.stat-label  { font-size: 9px; color: #555; letter-spacing: 1px; margin-bottom: 3px; }
+.stat-val    { font-size: 18px; font-weight: bold; }
+.color-bar   { display: flex; gap: 4px; align-items: center; margin-bottom: 6px; }
+.color-bar div { height: 18px; border-radius: 3px; min-width: 4px; }
+.color-legend  { display: flex; gap: 12px; font-size: 11px; color: #888; }
+.hot-numbers   { display: flex; gap: 6px; flex-wrap: wrap; }
+.hot-num       { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.hot-dot       { width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #C9A84C; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; color: #FFF; }
+.hot-cnt       { font-size: 9px; color: #C9A84C; }
+
+/* ── ユーティリティ ─────────────────────────────────────────── */
+.hidden { display: none !important; }
