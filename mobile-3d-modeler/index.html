@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="3D Modeler">
+  <meta name="theme-color" content="#0d1117">
+  <title>Mobile 3D Modeler</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Header -->
+  <header id="header">
+    <button id="btn-menu" class="header-btn" aria-label="メニュー">☰</button>
+    <h1>Mobile 3D Modeler</h1>
+    <button id="btn-export" class="header-btn" aria-label="STL出力">STL</button>
+  </header>
+
+  <!-- 3D Viewport -->
+  <div id="viewport-container">
+    <canvas id="viewport"></canvas>
+    <div id="viewport-controls">
+      <button id="btn-view-reset" class="view-btn" title="視点リセット">⟳</button>
+      <button id="btn-view-top" class="view-btn" title="真上">▽</button>
+      <button id="btn-view-front" class="view-btn" title="正面">□</button>
+      <button id="btn-view-right" class="view-btn" title="右側面">▷</button>
+    </div>
+  </div>
+
+  <!-- Transform Panel -->
+  <div id="transform-panel">
+    <div id="selected-name">オブジェクト未選択</div>
+    <div id="transform-inputs">
+      <div class="axis-group">
+        <label>X</label>
+        <button class="step-btn minus" data-axis="x" data-delta="-5">-5</button>
+        <button class="step-btn minus" data-axis="x" data-delta="-1">-1</button>
+        <input type="number" id="pos-x" value="0" step="1">
+        <button class="step-btn plus" data-axis="x" data-delta="1">+1</button>
+        <button class="step-btn plus" data-axis="x" data-delta="5">+5</button>
+        <span class="unit">mm</span>
+      </div>
+      <div class="axis-group">
+        <label>Y</label>
+        <button class="step-btn minus" data-axis="y" data-delta="-5">-5</button>
+        <button class="step-btn minus" data-axis="y" data-delta="-1">-1</button>
+        <input type="number" id="pos-y" value="0" step="1">
+        <button class="step-btn plus" data-axis="y" data-delta="1">+1</button>
+        <button class="step-btn plus" data-axis="y" data-delta="5">+5</button>
+        <span class="unit">mm</span>
+      </div>
+      <div class="axis-group">
+        <label>Z</label>
+        <button class="step-btn minus" data-axis="z" data-delta="-5">-5</button>
+        <button class="step-btn minus" data-axis="z" data-delta="-1">-1</button>
+        <input type="number" id="pos-z" value="0" step="1">
+        <button class="step-btn plus" data-axis="z" data-delta="1">+1</button>
+        <button class="step-btn plus" data-axis="z" data-delta="5">+5</button>
+        <span class="unit">mm</span>
+      </div>
+    </div>
+    <div id="scale-rotation-row">
+      <div class="compact-group">
+        <label>拡大</label>
+        <input type="range" id="scale-slider" min="0.1" max="5" step="0.1" value="1">
+        <span id="scale-value">1.0</span>
+      </div>
+      <div class="compact-group">
+        <label>回転Y</label>
+        <input type="range" id="rotation-slider" min="0" max="360" step="5" value="0">
+        <span id="rotation-value">0°</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div id="toolbar">
+    <div class="tool-section">
+      <div class="tool-label">プリミティブ</div>
+      <div class="tool-buttons">
+        <button class="tool-btn" data-shape="cube" title="立方体">⬜</button>
+        <button class="tool-btn" data-shape="cylinder" title="円柱">⬡</button>
+        <button class="tool-btn" data-shape="sphere" title="球">⚪</button>
+        <button class="tool-btn" data-shape="cone" title="円錐">△</button>
+        <button class="tool-btn" data-shape="torus" title="トーラス">◎</button>
+      </div>
+    </div>
+    <div class="tool-section">
+      <div class="tool-label">変形</div>
+      <div class="tool-buttons">
+        <button class="tool-btn" id="btn-move" title="移動" data-mode="translate">✥</button>
+        <button class="tool-btn" id="btn-rotate" title="回転" data-mode="rotate">↻</button>
+        <button class="tool-btn" id="btn-scale" title="拡大" data-mode="scale">⤢</button>
+      </div>
+    </div>
+    <div class="tool-section">
+      <div class="tool-label">CSG</div>
+      <div class="tool-buttons">
+        <button class="tool-btn" id="btn-union" title="結合">∪</button>
+        <button class="tool-btn" id="btn-subtract" title="切削">−</button>
+        <button class="tool-btn" id="btn-intersect" title="交差">∩</button>
+      </div>
+    </div>
+    <div class="tool-section">
+      <div class="tool-label">操作</div>
+      <div class="tool-buttons">
+        <button class="tool-btn" id="btn-delete" title="削除">🗑</button>
+        <button class="tool-btn" id="btn-undo" title="元に戻す">↶</button>
+        <button class="tool-btn" id="btn-redo" title="やり直し">↷</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Side Menu (Projects) -->
+  <div id="menu-overlay" class="hidden"></div>
+  <div id="side-menu" class="hidden">
+    <div class="menu-header">
+      <h2>プロジェクト</h2>
+      <button id="btn-menu-close" class="header-btn">✕</button>
+    </div>
+    <button id="btn-new-project" class="menu-action-btn">＋ 新規プロジェクト</button>
+    <div id="project-list"></div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="hidden"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"
+          integrity="sha384-bMFMgCdOHkSbZprfSFM4fTcOaRFBBh3R9SkMEhJrmbO2pSeamOPWSP3ixjmSOD1P"
+          crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"
+          crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"
+          crossorigin="anonymous"></script>
+  <script src="js/csg.js"></script>
+  <script src="js/exporter.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
