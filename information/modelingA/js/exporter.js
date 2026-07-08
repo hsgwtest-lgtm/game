@@ -7,52 +7,55 @@
 
   function exportSTL(meshes) {
     // Merge all meshes and calculate total triangles
-    let totalTriangles = 0;
-    const meshDataList = [];
+    var totalTriangles = 0;
+    var meshDataList = [];
 
-    for (const mesh of meshes) {
+    for (var mi = 0; mi < meshes.length; mi++) {
+      var mesh = meshes[mi];
       mesh.updateMatrixWorld();
-      let geom = mesh.geometry;
+      var geom = mesh.geometry;
       if (geom.index) {
         geom = geom.toNonIndexed();
       }
       if (!geom.getAttribute('normal')) {
         geom.computeVertexNormals();
       }
-      const posAttr = geom.getAttribute('position');
-      const count = posAttr.count / 3;
+      var posAttr = geom.getAttribute('position');
+      var count = posAttr.count / 3;
       totalTriangles += count;
-      meshDataList.push({ geom, matrix: mesh.matrixWorld });
+      meshDataList.push({ geom: geom, matrix: mesh.matrixWorld });
     }
 
     // Binary STL format:
     // 80 bytes header + 4 bytes triangle count + 50 bytes per triangle
-    const bufferSize = 80 + 4 + totalTriangles * 50;
-    const buffer = new ArrayBuffer(bufferSize);
-    const view = new DataView(buffer);
+    var bufferSize = 80 + 4 + totalTriangles * 50;
+    var buffer = new ArrayBuffer(bufferSize);
+    var view = new DataView(buffer);
 
     // Header (80 bytes) - write app identifier
-    const header = 'Mobile 3D Modeler - Binary STL';
-    for (let i = 0; i < 80; i++) {
+    var header = 'Mobile 3D Modeler - Binary STL';
+    for (var i = 0; i < 80; i++) {
       view.setUint8(i, i < header.length ? header.charCodeAt(i) : 0);
     }
 
     // Triangle count
     view.setUint32(80, totalTriangles, true);
 
-    let offset = 84;
-    const tempVert = new THREE.Vector3();
-    const tempNorm = new THREE.Vector3();
-    const normalMatrix = new THREE.Matrix3();
+    var offset = 84;
+    var tempVert = new THREE.Vector3();
+    var tempNorm = new THREE.Vector3();
+    var normalMatrix = new THREE.Matrix3();
 
-    for (const { geom, matrix } of meshDataList) {
-      const posAttr = geom.getAttribute('position');
-      const normAttr = geom.getAttribute('normal');
-      normalMatrix.getNormalMatrix(matrix);
+    for (var di = 0; di < meshDataList.length; di++) {
+      var dGeom = meshDataList[di].geom;
+      var dMatrix = meshDataList[di].matrix;
+      var dPosAttr = dGeom.getAttribute('position');
+      var dNormAttr = dGeom.getAttribute('normal');
+      normalMatrix.getNormalMatrix(dMatrix);
 
-      for (let i = 0; i < posAttr.count; i += 3) {
+      for (var fi = 0; fi < dPosAttr.count; fi += 3) {
         // Compute face normal from first vertex normal
-        tempNorm.set(normAttr.getX(i), normAttr.getY(i), normAttr.getZ(i));
+        tempNorm.set(dNormAttr.getX(fi), dNormAttr.getY(fi), dNormAttr.getZ(fi));
         tempNorm.applyMatrix3(normalMatrix).normalize();
 
         // Normal vector
@@ -61,10 +64,10 @@
         view.setFloat32(offset, tempNorm.z, true); offset += 4;
 
         // Three vertices
-        for (let j = 0; j < 3; j++) {
-          const k = i + j;
-          tempVert.set(posAttr.getX(k), posAttr.getY(k), posAttr.getZ(k));
-          tempVert.applyMatrix4(matrix);
+        for (var j = 0; j < 3; j++) {
+          var k = fi + j;
+          tempVert.set(dPosAttr.getX(k), dPosAttr.getY(k), dPosAttr.getZ(k));
+          tempVert.applyMatrix4(dMatrix);
 
           view.setFloat32(offset, tempVert.x, true); offset += 4;
           view.setFloat32(offset, tempVert.y, true); offset += 4;
