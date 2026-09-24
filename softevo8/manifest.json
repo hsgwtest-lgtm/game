@@ -1,0 +1,15 @@
+{
+  "name": "SoftEvo 8 — 進化観察ラボ",
+  "short_name": "SoftEvo 8",
+  "description": "自分で設計した軟体生物が、ニューラルネットワークの脳を進化させて歩き出すまでを観察するシミュレータ",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#070b16",
+  "theme_color": "#070b16",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

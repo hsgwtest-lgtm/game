@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#070b16">
+<meta name="description" content="自分で設計した軟体生物が、ニューラルネットワークの脳を進化させて歩き出すまでを観察するシミュレータ">
+<title>SoftEvo 8 — 進化観察ラボ</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-screen="home">
+
+<!-- ═══════════════ ホーム ═══════════════ -->
+<div id="screen-home" class="screen active">
+  <header class="hero">
+    <div class="logo">SoftEvo<span>8</span></div>
+    <p class="tagline">あなたが設計した生き物が、<b>脳を育てて</b>歩き出すまでを観察する。</p>
+    <div class="hero-actions">
+      <button id="btn-new" class="btn primary big">＋ 新しい生物をつくる</button>
+      <button id="btn-quick" class="btn ghost">🐕 おまかせで始める</button>
+      <button id="btn-import" class="btn ghost">📂 読み込み</button>
+      <button id="btn-help" class="btn ghost">？ 遊び方</button>
+    </div>
+  </header>
+  <section class="home-list">
+    <h2>マイ生物</h2>
+    <p id="home-empty" class="empty">まだ生物がいません。最初の1体をつくってみよう。</p>
+    <div id="run-list" class="run-grid"></div>
+  </section>
+</div>
+
+<!-- ═══════════════ 設計 ═══════════════ -->
+<div id="screen-build" class="screen">
+  <header class="build-top">
+    <button id="build-home" class="icon-btn" title="ホームへ">←</button>
+    <input id="creature-name" maxlength="16" placeholder="名前" aria-label="生物の名前">
+    <div class="tool-group" id="tools">
+      <button data-tool="node" class="tool active" title="ノード (1)"><i class="ti ti-node"></i>ノード</button>
+      <button data-tool="bone" class="tool" title="骨 (2)"><i class="ti ti-bone"></i>骨</button>
+      <button data-tool="muscle" class="tool" title="筋肉 (3)"><i class="ti ti-muscle"></i>筋肉</button>
+      <button data-tool="erase" class="tool" title="消す (4)"><i class="ti">✕</i>消す</button>
+    </div>
+    <div class="tool-group">
+      <button id="btn-mirror" class="tool toggle active" title="左右対称">⇋<span class="lbl"> 対称</span></button>
+      <button id="btn-undo" class="tool" title="元に戻す">↶</button>
+      <button id="btn-redo" class="tool" title="やり直し">↷</button>
+      <button id="btn-fit" class="tool" title="全体表示">⤢</button>
+      <button id="btn-clear" class="tool" title="全消去">🗑</button>
+    </div>
+  </header>
+  <main class="build-main">
+    <canvas id="build-canvas"></canvas>
+    <div id="presets" class="presets"><span class="presets-label">プリセット</span></div>
+    <div id="build-hint" class="hint"></div>
+  </main>
+  <footer class="build-bottom">
+    <div class="build-left">
+      <div id="build-stats" class="build-stats"></div>
+      <div id="build-error" class="build-error"></div>
+    </div>
+    <details id="build-settings">
+      <summary>⚙ 進化の設定</summary>
+      <div id="build-settings-body" class="settings-body"></div>
+    </details>
+    <button id="btn-preview" class="btn ghost">🫨 試運転</button>
+    <button id="btn-evolve" class="btn primary big">▶ 進化スタート</button>
+  </footer>
+</div>
+
+<!-- ═══════════════ 進化ラボ ═══════════════ -->
+<div id="screen-lab" class="screen">
+  <header class="lab-top">
+    <button id="lab-home" class="icon-btn" title="保存してホームへ">🏠</button>
+    <div class="lab-title"><span id="lab-name"></span><small id="lab-sub"></small></div>
+    <div class="lab-stats">
+      <div class="stat"><b id="st-gen">0</b><small>世代</small></div>
+      <div class="stat gold"><b id="st-best">—</b><small>最高記録</small></div>
+      <div class="stat"><b id="st-rate">—</b><small>世代/分</small></div>
+    </div>
+    <div class="seg" id="evo-mode" role="group" aria-label="進化の速さ">
+      <button data-mode="pause" title="一時停止 (Space)"><svg width="12" height="12" viewBox="0 0 12 12" aria-label="一時停止"><rect x="2" y="1" width="3" height="10" rx="1" fill="currentColor"/><rect x="7" y="1" width="3" height="10" rx="1" fill="currentColor"/></svg></button>
+      <button data-mode="watch" title="1世代ずつ再生と同期">▶<span class="lbl"> 観察</span></button>
+      <button data-mode="fast" class="active" title="裏で全力で進化">⏩<span class="lbl"> 高速</span></button>
+    </div>
+    <button id="lab-save" class="icon-btn" title="保存">💾</button>
+    <div class="menu-wrap">
+      <button id="lab-menu" class="icon-btn" title="メニュー">⋯</button>
+      <div id="lab-menu-pop" class="menu hidden">
+        <button id="m-rename">✎ 名前を変更</button>
+        <button id="m-edit">🔧 この体を改造して新しい実験</button>
+        <button id="m-export">⤓ ファイルに書き出し</button>
+        <button id="m-help">？ 遊び方</button>
+      </div>
+    </div>
+  </header>
+  <div id="evo-state" class="evo-state"></div>
+
+  <main class="lab-grid">
+    <section class="panel theater-panel">
+      <div class="th-stage">
+        <canvas id="theater"></canvas>
+        <div class="th-caption">
+          <div><span id="th-title">進化の準備中…</span> <span id="th-chip" class="chip hidden"></span></div>
+          <small id="th-sub"></small>
+          <button id="th-latest" class="latest-btn hidden"></button>
+        </div>
+        <div id="event-feed" class="event-feed"></div>
+        <div id="th-result" class="th-result"></div>
+        <div id="knock-badge" class="knock-badge hidden"><span></span><button>元に戻す</button></div>
+        <div class="th-progress"><div id="th-bar"></div></div>
+      </div>
+      <div class="th-controls">
+        <div class="seg small" id="view-mode">
+          <button data-view="live" class="active" title="常に最新のチャンピオン">最新</button>
+          <button data-view="pinned" title="推移グラフや物語で選んだ世代をくり返す">選択</button>
+          <button data-view="parade" title="節目の世代を並べて同時に走らせる">パレード</button>
+        </div>
+        <div class="seg small" id="play-speed">
+          <button data-speed="0.25" title="スロー">¼×</button>
+          <button data-speed="1" class="active">1×</button>
+          <button data-speed="2">2×</button>
+          <button data-speed="4">4×</button>
+        </div>
+        <button id="btn-ghosts" class="tool small toggle active" title="同世代のライバルを表示">👻</button>
+        <button id="btn-replay" class="tool small" title="最初から再生">↺</button>
+      </div>
+    </section>
+
+    <section class="panel brain-panel">
+      <div class="panel-head">
+        <h3>🧠 脳</h3>
+        <small id="brain-sub"></small>
+        <div class="seg small" id="brain-mode">
+          <button data-bm="activity" class="active">活動</button>
+          <button data-bm="weights">重み</button>
+          <button data-bm="mutation">変異</button>
+        </div>
+        <button id="brain-expand" class="tool small" title="拡大">⤢</button>
+      </div>
+      <div class="brain-wrap">
+        <canvas id="brain"></canvas>
+        <div id="neuron-card" class="neuron-card hidden">
+          <div class="nc-head"><b id="nc-title"></b><span id="nc-val" class="nc-val"></span><button id="nc-close" class="x">✕</button></div>
+          <canvas id="nc-spark"></canvas>
+          <p id="nc-desc"></p>
+          <div id="nc-links" class="nc-links"></div>
+          <button id="nc-knock" class="btn small danger-outline">🔪 ノックアウト</button>
+        </div>
+      </div>
+      <div id="brain-note" class="panel-note"></div>
+    </section>
+
+    <section class="panel tabs-panel">
+      <nav class="tabs">
+        <button data-tab="timeline" class="active">📈<span> 推移</span></button>
+        <button data-tab="gait">🎼<span> 歩容</span></button>
+        <button data-tab="clades">🌳<span> 系統</span></button>
+        <button data-tab="journal">📜<span> 物語</span></button>
+        <button data-tab="env">🌍<span> 環境</span></button>
+      </nav>
+      <div class="tab-body">
+        <div data-pane="timeline" class="pane active"><canvas id="timeline"></canvas></div>
+        <div data-pane="gait" class="pane"><canvas id="gait"></canvas></div>
+        <div data-pane="clades" class="pane"><canvas id="clades"></canvas></div>
+        <div data-pane="journal" class="pane scroll"><ol id="journal" class="journal"></ol></div>
+        <div data-pane="env" class="pane scroll" id="env-pane"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="toast" role="status"></div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
