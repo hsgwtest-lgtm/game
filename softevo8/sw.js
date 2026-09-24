@@ -1,5 +1,5 @@
 // SoftEvo 8 — Service Worker (ネットワーク優先 / オフライン時はキャッシュ)
-const CACHE = 'softevo8-v1';
+const CACHE = 'softevo8-v2';
 const ASSETS = [
   './', './index.html', './style.css', './manifest.json',
   './js/app.js', './js/sim.js', './js/evo.js', './js/worker.js', './js/builder.js',
