@@ -1,5 +1,5 @@
 // SoftEvo 8 — Service Worker (ネットワーク優先 / オフライン時はキャッシュ)
-const CACHE = 'softevo8-v2';
+const CACHE = 'softevo8-v3';
 const ASSETS = [
   './', './index.html', './style.css', './manifest.json',
   './js/app.js', './js/sim.js', './js/evo.js', './js/worker.js', './js/builder.js',
@@ -15,7 +15,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
-    fetch(e.request).then(res => {
+    fetch(e.request, { cache: 'no-cache' }).then(res => {
       const copy = res.clone();
       caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
       return res;

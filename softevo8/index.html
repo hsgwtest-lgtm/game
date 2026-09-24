@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#070b16">
 <meta name="description" content="自分で設計した軟体生物が、ニューラルネットワークの脳を進化させて歩き出すまでを観察するシミュレータ">
 <title>SoftEvo 8 — 進化観察ラボ</title>
@@ -84,8 +84,8 @@
     </div>
     <div class="seg" id="evo-mode" role="group" aria-label="進化の速さ">
       <button data-mode="pause" title="一時停止 (Space)"><svg width="12" height="12" viewBox="0 0 12 12" aria-label="一時停止"><rect x="2" y="1" width="3" height="10" rx="1" fill="currentColor"/><rect x="7" y="1" width="3" height="10" rx="1" fill="currentColor"/></svg></button>
-      <button data-mode="watch" title="1世代ずつ再生と同期">▶<span class="lbl"> 観察</span></button>
-      <button data-mode="fast" class="active" title="裏で全力で進化">⏩<span class="lbl"> 高速</span></button>
+      <button data-mode="watch" class="active" title="1世代ずつ再生と同期">▶<span class="lbl"> 観察</span></button>
+      <button data-mode="fast" title="裏で全力で進化">⏩<span class="lbl"> 高速</span></button>
     </div>
     <button id="lab-save" class="icon-btn" title="保存">💾</button>
     <div class="menu-wrap">
