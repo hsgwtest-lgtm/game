@@ -263,7 +263,7 @@ function resumeRun(id) {
 //  進化ラボ
 // ════════════════════════════════════════════════════════════
 const lab = {
-  run: null, worker: null, mode: 'fast', view: 'live',
+  run: null, worker: null, mode: 'watch', lastRunMode: 'watch', view: 'live',
   shown: null, pinned: null, rate: 0, lastSaveGen: 0,
   dirty: { stats: true, timeline: true, clades: true, journal: true },
   tab: 'timeline',
@@ -334,6 +334,7 @@ function startLab(run, resumed = false) {
 
 function setMode(mode) {
   lab.mode = mode;
+  if (mode !== 'pause') lab.lastRunMode = mode;
   $$('#evo-mode button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
   lab.worker && lab.worker.postMessage({ type: 'mode', mode });
   $('#evo-state').textContent = { pause: '一時停止中', watch: '観察モード: 1世代ずつ再生と同期', fast: '高速モード: 裏で全力で進化中' }[mode];
@@ -725,7 +726,7 @@ function initLabUI() {
   document.addEventListener('visibilitychange', () => { if (document.hidden && screen === 'lab') saveCurrent(true); });
   window.addEventListener('keydown', e => {
     if (screen !== 'lab' || e.target.tagName === 'INPUT') return;
-    if (e.key === ' ') { e.preventDefault(); setMode(lab.mode === 'pause' ? 'fast' : 'pause'); }
+    if (e.key === ' ') { e.preventDefault(); setMode(lab.mode === 'pause' ? lab.lastRunMode : 'pause'); }
     if (e.key === 'Escape') { brainView.select(null); document.body.classList.remove('brain-full'); }
   });
 }
