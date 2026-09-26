@@ -253,6 +253,47 @@ body[data-arena="race"] .arena-brains { display: none; }
 .duo-canvas { flex: 1; position: relative; min-height: 0; }
 .duo-canvas canvas { position: absolute; inset: 0; }
 
+.post-box { margin-top: 14px; padding: 10px 12px; border: 1px solid rgba(255, 209, 102, .35); border-radius: 12px; background: rgba(255, 209, 102, .05); }
+.post-box h4 { margin: 0 0 4px; font-size: 14px; }
+.post-box .dim { font-size: 12px; margin: 4px 0 8px; }
+.post-row { display: flex; gap: 6px; }
+.post-row .on-input { flex: 1; min-width: 0; }
+
+/* ─── オンライン道場 ─── */
+.badge { display: inline-block; min-width: 18px; height: 18px; line-height: 18px; padding: 0 5px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 11px; font-weight: 800; font-style: normal; text-align: center; vertical-align: 1px; margin-left: 4px; }
+.online-body { flex: 1; width: 100%; max-width: 1100px; margin: 0 auto; padding: 12px 16px 60px; padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); padding-bottom: max(60px, env(safe-area-inset-bottom)); }
+#online-tabs { background: var(--panel); }
+.on-intro { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 12px; }
+.on-intro p { margin: 0; color: var(--dim); font-size: 13px; line-height: 1.55; flex: 1; min-width: 240px; }
+.on-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+.on-card { position: relative; display: grid; grid-template-columns: 96px minmax(0, 1fr); grid-template-rows: auto auto; gap: 6px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 10px; }
+.on-card.mine { border-color: rgba(61, 224, 176, .45); }
+.on-rank { position: absolute; left: 8px; top: 6px; font-weight: 900; color: var(--gold); font-size: 13px; }
+.on-thumb { width: 96px; height: 64px; grid-row: 1; }
+.on-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.on-info b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.on-info small { color: var(--dim); font-size: 11px; }
+.on-msg { margin: 3px 0 0; font-size: 13px; color: #d7e0f5; line-height: 1.45; word-break: break-word; }
+.on-msg.reply { color: #bff0d8; }
+.on-rec { font-size: 13px; font-weight: 700; color: var(--gold); margin-top: 2px; }
+.on-actions { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.on-actions .on-input { flex: 1; min-width: 140px; }
+.on-input { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 999px; padding: 7px 12px; font-size: 13px; }
+.on-field { display: grid; grid-template-columns: 70px 1fr; align-items: center; gap: 8px; margin: 10px 0; font-size: 13px; }
+.on-field .on-input, .on-field select { width: 100%; }
+.on-bouts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.on-bouts li { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+.on-bouts li.new { border-color: rgba(255, 91, 110, .6); box-shadow: 0 0 0 1px rgba(255, 91, 110, .25); }
+.on-bout-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 13px; }
+.on-bout-head span { color: var(--dim); font-size: 12px; }
+.on-bout-res { font-size: 13px; color: var(--gold); }
+.on-empty { font-size: 13px; }
+.on-error { background: var(--panel); border: 1px solid rgba(255, 91, 110, .4); border-radius: var(--r); padding: 16px; }
+.on-error h3 { margin: 0 0 8px; }
+.on-error p { color: #c4cfe8; line-height: 1.6; font-size: 14px; }
+.on-error pre { background: #050912; border: 1px solid var(--line); border-radius: 8px; padding: 10px; overflow-x: auto; font-size: 12px; color: #bff0d8; }
+.online-top #online-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+
 /* ─── モーダル / トースト ─── */
 .modal-back { position: fixed; inset: 0; background: rgba(3, 6, 14, .7); backdrop-filter: blur(4px); z-index: 100; display: grid; place-items: center; padding: 16px; }
 .modal { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px; width: min(420px, 100%); box-shadow: 0 30px 80px rgba(0, 0, 0, .6); }
@@ -316,3 +357,4 @@ body.brain-full .brain-panel { padding-top: env(safe-area-inset-top); padding-bo
 .modal-back { padding-top: max(16px, env(safe-area-inset-top)); padding-bottom: max(16px, env(safe-area-inset-bottom)); }
 .lab-grid { height: calc(100dvh - var(--top-h) - 22px - env(safe-area-inset-top)); }
 @media (max-width: 900px) { .lab-grid, .arena-grid { height: auto; } }
+@media (max-width: 600px) { .on-grid { grid-template-columns: 1fr; } .online-top .lab-title small { display: none; } }
