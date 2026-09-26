@@ -952,7 +952,7 @@ const lobby = new Lobby({
   onRace: f => { arena.setup({ mode: 'race', racer: f }); show('arena'); },
   onTrain: (f, rival, mode) => startTraining(f, rival, mode),
   onReplay: (b, def) => {
-    arena.setup({ mode: b.mode, west: onlineFighter({ ...b.challenger, id: `ch-${b.id}`, msg: '' }), east: onlineFighter(def), replay: b });
+    arena.setup({ mode: b.mode, west: onlineFighter({ ...b.challenger, mode: b.mode, id: `ch-${b.id}`, msg: '' }), east: onlineFighter(def), replay: b });
     show('arena');
   },
   myCreatures: () => arena.candidates().filter(c => c.kind === 'run'),

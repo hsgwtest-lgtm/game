@@ -57,7 +57,7 @@ export const BATTLES = {
   },
   tug: {
     name: 'つなひき', icon: '🪢', terrain: 'flat',
-    desc: `綱の赤い印を自分の後ろ側へ ${TUG_WIN}cm 引き込めば勝ち。前へ出ると綱がたるんで印が相手側へ流れ、自滅 (勇み足) する。後ずさりと踏ん張りが試される`,
+    desc: `背中合わせに綱で結ばれ、西は西へ・東は東へ引く。赤い印を自分の側へ ${TUG_WIN}cm 引き込めば勝ち。前へ進む力と足の踏ん張りが試される`,
     senses: ['綱の張り', '綱の位置', '相手の勢い'],
   },
 };
@@ -263,7 +263,8 @@ export class Brain {
 export class Creature {
   /**
    * opts.dir   : 1 = 右向き (既定), -1 = 左右反転して左向き。脳には「自分の前方 = +」で世界が見える
-   * opts.front : 最も前にある節点をこの x に置く (対戦の立ち位置)
+   * opts.front : 最も前にある節点をこの x に置く (すもうの立ち位置)
+   * opts.back  : 最も後ろにある節点をこの x に置く (つなひき: 背中に綱を結ぶ)
    */
   constructor(bp, layout, genome, env, opts = null) {
     this.env = env;
@@ -287,8 +288,13 @@ export class Creature {
     let f = 0;
     for (let i = 1; i < n; i++) if (this.x[i] * dir > this.x[f] * dir + 0.5 || (Math.abs(this.x[i] - this.x[f]) <= 0.5 && this.y[i] > this.y[f])) f = i;
     this.front = f;
-    if (opts && opts.front != null) {
-      const sh = opts.front - this.x[f];
+    // 最後尾の節点 (つなひきで綱を結ぶ場所)
+    let r = 0;
+    for (let i = 1; i < n; i++) if (this.x[i] * dir < this.x[r] * dir - 0.5 || (Math.abs(this.x[i] - this.x[r]) <= 0.5 && this.y[i] > this.y[r])) r = i;
+    this.back = r;
+    const place = opts && (opts.front != null ? [opts.front, f] : opts.back != null ? [opts.back, r] : null);
+    if (place) {
+      const sh = place[0] - this.x[place[1]];
       for (let i = 0; i < n; i++) { this.x[i] += sh; this.px[i] = this.x[i]; }
     }
     const c0 = this.centroid();
@@ -474,9 +480,16 @@ export class Match {
   /** a, b: { bp, layout, genome } (layout は対戦種目の脳構造) */
   constructor(mode, a, b, env, opening = OPENINGS[0]) {
     this.mode = mode; this.env = env;
-    const half = mode === 'tug' ? opening.gap / 2 + 40 : opening.gap / 2;
-    this.A = new Creature(a.bp, a.layout, a.genome, env, { dir: 1, front: -half });
-    this.B = new Creature(b.bp, b.layout, b.genome, env, { dir: -1, front: half });
+    if (mode === 'tug') {
+      // つなひき: 背中合わせに立ち、最後尾の節点どうしを綱で結ぶ。前へ進む = 自分の側へ引く
+      const half = opening.gap / 2 + 20;
+      this.A = new Creature(a.bp, a.layout, a.genome, env, { dir: -1, back: -half });
+      this.B = new Creature(b.bp, b.layout, b.genome, env, { dir: 1, back: half });
+    } else {
+      const half = opening.gap / 2;
+      this.A = new Creature(a.bp, a.layout, a.genome, env, { dir: 1, front: -half });
+      this.B = new Creature(b.bp, b.layout, b.genome, env, { dir: -1, front: half });
+    }
     this.C = [this.A, this.B];
     this.T = Math.round(env.evalSeconds * FPS);
     this.t = 0; this.done = false; this.ko = false;
@@ -484,7 +497,7 @@ export class Match {
     this.touching = false; this.lastTouch = -999;
     this.tension = 0; this.lastTaut = -999;
     if (mode === 'tug') {
-      const A = this.A, B = this.B, fa = A.front, fb = B.front;
+      const A = this.A, B = this.B, fa = A.back, fb = B.back;
       this.ropeL = Math.hypot(B.x[fb] - A.x[fa], B.y[fb] - A.y[fa]);
     }
   }
@@ -492,7 +505,7 @@ export class Match {
   /** 綱の中心を自分の側へ引き込んだ量 (cm) */
   pull(s) {
     const A = this.A, B = this.B;
-    const mid = (A.x[A.front] + B.x[B.front]) / 2;
+    const mid = (A.x[A.back] + B.x[B.back]) / 2;
     return s === 0 ? -mid : mid;
   }
 
@@ -536,7 +549,7 @@ export class Match {
 
   /** 綱: 伸びきったら引っぱる (たるむ時は力なし)。両端に等しく反対向き → 運動量を保存 */
   rope() {
-    const A = this.A, B = this.B, a = A.front, b = B.front;
+    const A = this.A, B = this.B, a = A.back, b = B.back;
     const dx = B.x[b] - A.x[a], dy = B.y[b] - A.y[a];
     const d = Math.sqrt(dx * dx + dy * dy) || 1e-6;
     if (d <= this.ropeL) return;
