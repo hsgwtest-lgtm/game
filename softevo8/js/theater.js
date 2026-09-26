@@ -1,15 +1,26 @@
 /* =====================================================================
    SoftEvo 8 — theater.js
    「劇場」: Worker が評価した個体を決定論的に再生する
-   ・チャンピオン + 同世代の上位個体をゴーストで
-   ・パレード: 過去の節目の世代をレーンに並べて同時に走らせる
+   ・single : チャンピオン + 同世代の上位個体をゴーストで
+   ・match  : 対戦 (すもう / つなひき)。2体が同じ世界で押し合い、引き合う
+   ・lanes  : レーンに並べて同時に走らせる (進化のパレード / 闘技場のかけっこ)
    ・脳の手術 (ノックアウト) をリアルタイムに適用
    ===================================================================== */
-import { Creature, FPS, groundY, formatFitness } from './sim.js';
-import { Camera, drawCreature, drawWorld } from './world.js';
+import { Creature, Match, FPS, groundY, formatFitness, RING_R } from './sim.js';
+import { Camera, drawCreature, drawWorld, drawRope } from './world.js';
 import { fitCanvas, clamp } from './ui.js';
 
 const HIST = 240; // 記録するフレーム数 (4秒)
+const POST = 50;  // 決着後の余韻 (フレーム)
+export const WEST = '#5cc8ff', EAST = '#ff7b8a';
+
+function sizeOf(bp) {
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const p of bp.nodes) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); }
+  return Math.max(40, x1 - x0, y1 - y0);
+}
+const mainOf = u => (u instanceof Match ? u.A : u);
+const unitDone = u => (u instanceof Match ? u.done && u.post >= POST : u.t >= u.steps || u.broken);
 
 export class Theater {
   constructor(canvas, hooks = {}) {
@@ -20,12 +31,12 @@ export class Theater {
     this.speed = 1;
     this.acc = 0;
     this.spec = null;
-    this.bodies = [];
+    this.units = [];
+    this.ghosts = [];
     this.main = null;
     this.knock = null;
     this.finished = false;
     this.holdT = 0;
-    this.sel = { edge: -1, node: -1 };
     this.showGhosts = true;
     this.trail = [];
     this.bindInput();
@@ -39,16 +50,20 @@ export class Theater {
     this.gaitTouch = Array.from({ length: bp.nodes.length }, () => new Uint8Array(HIST));
     this.actHist = layout.sizes.map(n => Array.from({ length: n }, () => new Float32Array(HIST)));
     this.head = 0; this.filled = 0;
-    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-    for (const p of bp.nodes) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); }
-    this.size = Math.max(40, x1 - x0, y1 - y0);
+    this.size = sizeOf(bp);
   }
 
   knockCount() { return this.knock ? this.knock.reduce((s, k) => s + k.reduce((a, b) => a + b, 0), 0) : 0; }
 
-  make(genome, env) {
-    const c = new Creature(this.bp, this.layout, genome, env);
-    c.brain.knock = this.knock;
+  makeUnit(l) {
+    const bp = l.bp || this.bp, layout = l.layout || this.layout;
+    if (l.rival) {
+      const m = new Match(l.env.objective, { bp, layout, genome: l.genome }, l.rival, l.env, l.opening);
+      m.lane = l; m.post = 0;
+      return m;
+    }
+    const c = new Creature(bp, layout, l.genome, l.env);
+    c.lane = l; c.steps = Math.round(l.env.evalSeconds * FPS);
     return c;
   }
 
@@ -57,19 +72,27 @@ export class Theater {
     this.finished = false; this.holdT = 0; this.acc = 0;
     this.trail = [];
     this.head = 0; this.filled = 0;
-    if (spec.kind === 'parade') {
-      this.bodies = spec.lanes.map(l => { const c = new Creature(this.bp, this.layout, l.genome, l.env); c.lane = l; return c; });
-      this.main = this.bodies[this.bodies.length - 1];
-      this.main.brain.knock = this.knock;
+    this.ghosts = [];
+    if (spec.kind === 'lanes') {
+      this.units = spec.lanes.map(l => this.makeUnit(l));
+      this.main = mainOf(this.units[spec.main ?? this.units.length - 1]);
     } else {
-      this.main = this.make(spec.genome, spec.env);
-      this.bodies = [this.main];
-      this.ghosts = (spec.ghosts || []).map(g => { const c = new Creature(this.bp, this.layout, g.genome, spec.env); c.hue = g.hue; return c; });
+      this.units = [this.makeUnit(spec)];
+      this.main = mainOf(this.units[0]);
+      if (spec.kind === 'single') this.ghosts = (spec.ghosts || []).map(g => { const c = new Creature(this.bp, this.layout, g.genome, spec.env); c.hue = g.hue; return c; });
     }
+    if (this.main.brain.sizes.length === this.knock.length) this.main.brain.knock = this.knock;
+    let size = 0;
+    for (const u of this.units) {
+      if (u instanceof Match) size = Math.max(size, sizeOf(u.lane.bp || this.bp), sizeOf(u.lane.rival.bp));
+      else size = Math.max(size, sizeOf(u.lane.bp || this.bp));
+    }
+    this.size = size;
     const [cx, cy] = this.main.centroid();
-    this.cam.x = cx; this.cam.y = cy + 20;
-    this.steps = Math.round((spec.kind === 'parade' ? spec.lanes[0].env : spec.env).evalSeconds * FPS);
+    this.cam.x = spec.kind === 'match' ? 0 : cx; this.cam.y = cy + 20;
   }
+
+  get match() { return this.spec && this.spec.kind === 'match' ? this.units[0] : null; }
 
   update(dt) {
     if (!this.main) return;
@@ -81,29 +104,42 @@ export class Theater {
     this.acc += dt * FPS * this.speed;
     let n = Math.min(Math.floor(this.acc), 40);
     this.acc -= Math.floor(this.acc);
-    while (n-- > 0 && this.main.t < this.steps) {
-      for (const b of this.bodies) if (b.t < this.steps) b.step();
-      if (this.spec.kind !== 'parade' && this.showGhosts) for (const g of this.ghosts) if (g.t < this.steps) g.step();
+    const units = this.units;
+    while (n-- > 0 && !units.every(unitDone)) {
+      for (const u of units) {
+        if (unitDone(u)) continue;
+        u.step();
+        if (u instanceof Match && u.done) {
+          if (!u.announced) { u.announced = true; this.hooks.onDecision && this.hooks.onDecision(u); }
+          u.post++;
+        }
+      }
+      if (this.spec.kind === 'single' && this.showGhosts) for (const g of this.ghosts) if (g.t < units[0].steps) g.step();
       this.record();
     }
-    if (this.main.t >= this.steps) this.finished = true;
+    if (units.every(unitDone)) this.finished = true;
   }
 
   record() {
     const m = this.main, h = this.head;
-    for (let j = 0; j < this.M; j++) this.gaitOut[j][h] = m.out[j];
-    for (let i = 0; i < m.n; i++) this.gaitTouch[i][h] = m.contact[i];
+    for (let j = 0; j < this.M && j < m.out.length; j++) this.gaitOut[j][h] = m.out[j];
+    for (let i = 0; i < m.n && i < this.gaitTouch.length; i++) this.gaitTouch[i][h] = m.contact[i];
     const acts = m.brain.acts;
-    for (let l = 0; l < acts.length; l++) for (let i = 0; i < acts[l].length; i++) this.actHist[l][i][h] = acts[l][i];
+    if (acts.length === this.actHist.length) for (let l = 0; l < acts.length; l++) for (let i = 0; i < acts[l].length; i++) this.actHist[l][i][h] = acts[l][i];
     this.head = (h + 1) % HIST; this.filled = Math.min(HIST, this.filled + 1);
     if (m.t % 4 === 0) { const [cx, cy] = m.centroid(); this.trail.push(cx, cy); if (this.trail.length > 600) this.trail.splice(0, 2); }
   }
 
-  progress() { return this.main ? clamp(this.main.t / this.steps, 0, 1) : 0; }
+  progress() {
+    if (!this.main) return 0;
+    let p = 0;
+    for (const u of this.units) p = Math.max(p, u instanceof Match ? (u.done ? 1 : u.t / u.T) : u.t / u.steps);
+    return clamp(p, 0, 1);
+  }
 
   liveScore() {
-    if (!this.main) return '';
-    const env = this.spec.kind === 'parade' ? this.spec.lanes[0].env : this.spec.env;
+    if (!this.main || this.spec.kind !== 'single') return '';
+    const env = this.spec.env;
     return formatFitness(this.main.fitness(env.objective), env.objective);
   }
 
@@ -133,7 +169,7 @@ export class Theater {
   }
 
   tap(e) {
-    if (!this.main || this.spec.kind === 'parade') return;
+    if (!this.main || this.spec.kind === 'lanes' || !this.hooks.onTapBody) return;
     const r = this.canvas.getBoundingClientRect(), w = r.width, h = r.height;
     const px = this.cam.wx(e.clientX - r.left, w), py = this.cam.wy(e.clientY - r.top, h);
     const m = this.main, R = 16 / this.cam.zoom;
@@ -148,20 +184,21 @@ export class Theater {
         if (d < bd) { bd = d; best = { muscle: j }; }
       });
     }
-    this.hooks.onTapBody && this.hooks.onTapBody(best);
+    this.hooks.onTapBody(best);
   }
 
   // ─── 描画 ───
   render() {
     const { ctx, w, h } = fitCanvas(this.canvas);
     if (!this.main) { ctx.fillStyle = '#070b16'; ctx.fillRect(0, 0, w, h); return; }
-    if (this.spec.kind === 'parade') return this.renderParade(ctx, w, h);
+    if (this.spec.kind === 'lanes') return this.renderLanes(ctx, w, h);
+    if (this.spec.kind === 'match') return this.renderMatch(ctx, w, h);
     const env = this.spec.env;
     const [cx, cy] = this.main.centroid();
     const baseZoom = clamp(Math.min(w, h * 1.4) / (this.size * 4.2), 0.35, 4);
     const Z = baseZoom * this.userZoom;
     this.cam.zoom = Z;
-    this.cam.x += (cx + 40 / Z * 0 - this.cam.x) * 0.12;
+    this.cam.x += (cx - this.cam.x) * 0.12;
     const gy = groundY(env.terrain, cx);
     const targetY = env.objective === 'jump' ? Math.max(cy, gy + h * 0.28 / Z) : gy + h * 0.22 / Z;
     this.cam.y += (targetY - this.cam.y) * 0.08;
@@ -177,12 +214,7 @@ export class Theater {
       ctx.stroke(); ctx.setLineDash([]);
     }
     if (this.showGhosts) for (const g of this.ghosts) drawCreature(ctx, g, { ghost: g.hue, alpha: 0.28, eyes: false });
-    const glowNodes = new Set(), glowEdges = new Set();
-    if (this.highlight) {
-      for (const n of this.highlight.nodes) glowNodes.add(n);
-      for (const e of this.highlight.edges) glowEdges.add(e);
-    }
-    drawCreature(ctx, this.main, { glowNodes, glowEdges });
+    drawCreature(ctx, this.main, this.glow());
     ctx.restore();
 
     // 生物の頭上ラベル
@@ -192,32 +224,112 @@ export class Theater {
     ctx.fillText(this.liveScore(), hx, hy - this.size * 0.75 * Z - 12);
   }
 
-  renderParade(ctx, w, h) {
-    const TOP = 46;
+  glow() {
+    const glowNodes = new Set(), glowEdges = new Set();
+    if (this.highlight) {
+      for (const n of this.highlight.nodes) glowNodes.add(n);
+      for (const e of this.highlight.edges) glowEdges.add(e);
+    }
+    return { glowNodes, glowEdges };
+  }
+
+  /** 対戦の1番を大きく */
+  renderMatch(ctx, w, h) {
+    const m = this.units[0], A = m.A, B = m.B, sp = this.spec;
+    const sumo = m.mode === 'sumo';
+    const span = Math.abs(A.cx - B.cx);
+    const viewW = clamp(span + this.size * 2.6, this.size * 3.2, sumo ? 2 * RING_R + 120 : 1e9);
+    const Z = clamp(Math.min(w / viewW, h * 1.25 / (this.size * 3)), 0.2, 4) * this.userZoom;
+    this.cam.zoom = Z;
+    this.cam.x += ((A.cx + B.cx) / 2 - this.cam.x) * 0.12;
+    this.cam.y += (h * 0.27 / Z - this.cam.y) * 0.1;
+
+    drawWorld(ctx, this.cam, w, h, m.env.terrain, { battle: m.mode });
+    ctx.save(); this.cam.apply(ctx, w, h);
+    drawCreature(ctx, B, sp.tintRival === false ? {} : { tint: sp.rival.hue ?? 0 });
+    drawCreature(ctx, A, this.glow());
+    if (m.mode === 'tug') drawRope(ctx, A.x[A.front], A.y[A.front], B.x[B.front], B.y[B.front], m.ropeL);
+    ctx.restore();
+
+    // 名札
+    const tag = (c, name, col) => {
+      let top = -Infinity; for (let i = 0; i < c.n; i++) top = Math.max(top, c.y[i]);
+      const sx = this.cam.sx(c.cx, w), sy = Math.max(16, this.cam.sy(top, h) - 12);
+      ctx.font = '700 12px system-ui'; ctx.textAlign = 'center';
+      const tw = ctx.measureText(name).width + 14;
+      ctx.fillStyle = 'rgba(7,11,22,0.75)'; ctx.fillRect(sx - tw / 2, sy - 13, tw, 18);
+      ctx.fillStyle = col; ctx.fillRect(sx - tw / 2, sy + 3, tw, 2);
+      ctx.fillStyle = '#e8eefc'; ctx.fillText(name, sx, sy);
+    };
+    tag(A, sp.meName || '西', WEST);
+    tag(B, sp.rival.name || '東', EAST);
+
+    // 決着の垂れ幕
+    if (m.done && sp.banner !== false) {
+      const a = clamp(m.post / 12, 0, 1);
+      const winName = m.winner === 0 ? sp.meName || '西' : m.winner === 1 ? sp.rival.name || '東' : null;
+      ctx.save(); ctx.globalAlpha = a;
+      const bw = Math.min(w - 24, 340), bh = 70, bx = (w - bw) / 2, by = h * 0.36 - bh / 2;
+      ctx.fillStyle = 'rgba(7,11,22,0.86)'; ctx.fillRect(bx, by, bw, bh);
+      ctx.fillStyle = m.winner === 0 ? WEST : m.winner === 1 ? EAST : '#ffd166';
+      ctx.fillRect(bx, by, 4, bh); ctx.fillRect(bx + bw - 4, by, 4, bh);
+      ctx.textAlign = 'center'; ctx.fillStyle = '#ffd166'; ctx.font = '900 26px system-ui';
+      ctx.fillText(m.kimarite, w / 2, by + 32);
+      ctx.fillStyle = '#e8eefc'; ctx.font = '700 14px system-ui';
+      ctx.fillText(winName ? `${winName} の勝ち` : '勝負つかず', w / 2, by + 55);
+      ctx.restore();
+    }
+  }
+
+  /** レーン: パレード / かけっこ / 対戦のパレード */
+  renderLanes(ctx, w, h) {
+    const TOP = this.spec.top ?? 46;
     ctx.fillStyle = '#070b16'; ctx.fillRect(0, 0, w, TOP);
     ctx.save(); ctx.translate(0, TOP); h -= TOP;
-    const lanes = this.bodies, L = lanes.length, lh = h / L;
-    const lead = lanes.reduce((a, b) => (b.centroid()[0] > a.centroid()[0] ? b : a));
-    const Z = clamp(Math.min(w / (this.size * 4.5), lh / (this.size * 1.5)), 0.25, 3) * this.userZoom;
-    this.cam.zoom = Z;
-    this.cam.x += (lead.centroid()[0] - w * 0.12 / Z - this.cam.x) * 0.1;
-    lanes.forEach((b, i) => {
+    const units = this.units, L = units.length, lh = h / L;
+    const bodies = units.filter(u => !(u instanceof Match));
+    const cam = this.cam;
+    if (bodies.length) {
+      const lead = bodies.reduce((a, b) => (b.centroid()[0] > a.centroid()[0] ? b : a));
+      const Z = clamp(Math.min(w / (this.size * 4.5), lh / (this.size * 1.5)), 0.25, 3) * this.userZoom;
+      cam.zoom = Z;
+      cam.x += (lead.centroid()[0] - w * 0.12 / Z - cam.x) * 0.1;
+    }
+    units.forEach((u, i) => {
       ctx.save();
       ctx.beginPath(); ctx.rect(0, i * lh, w, lh); ctx.clip();
       ctx.translate(0, i * lh);
-      const cam = this.cam;
-      const savedY = cam.y;
-      cam.y = groundY(b.lane.env.terrain, b.centroid()[0]) + lh * 0.25 / Z;
-      drawWorld(ctx, cam, w, lh, b.lane.env.terrain, { startX: b.startX });
-      ctx.save(); cam.apply(ctx, w, lh);
-      drawCreature(ctx, b, {});
-      ctx.restore();
-      cam.y = savedY;
-      // ラベル
-      ctx.fillStyle = 'rgba(7,11,22,0.7)'; ctx.fillRect(8, 8, 190, 22);
-      ctx.fillStyle = `hsl(${b.lane.hue},80%,70%)`; ctx.fillRect(8, 8, 4, 22);
-      ctx.fillStyle = '#e8eefc'; ctx.font = '700 12px system-ui'; ctx.textAlign = 'left';
-      ctx.fillText(`${b.lane.label}  ${formatFitness(b.fitness(b.lane.env.objective), b.lane.env.objective)}`, 18, 23);
+      const l = u.lane;
+      let label = l.label;
+      if (u instanceof Match) {
+        const lc = new Camera();
+        lc.zoom = clamp(Math.min(w / (u.mode === 'sumo' ? 2 * RING_R + 90 : Math.abs(u.A.cx - u.B.cx) + this.size * 3), lh / (this.size * 1.7)), 0.2, 3);
+        lc.x = u.mode === 'sumo' ? 0 : (u.A.cx + u.B.cx) / 2;
+        lc.y = lh * 0.28 / lc.zoom;
+        drawWorld(ctx, lc, w, lh, u.env.terrain, { battle: u.mode });
+        ctx.save(); lc.apply(ctx, w, lh);
+        drawCreature(ctx, u.B, { tint: l.rival.hue ?? 0 });
+        drawCreature(ctx, u.A, {});
+        if (u.mode === 'tug') drawRope(ctx, u.A.x[u.A.front], u.A.y[u.A.front], u.B.x[u.B.front], u.B.y[u.B.front], u.ropeL);
+        ctx.restore();
+        if (u.done) label += u.winner === 0 ? `  ○ ${u.kimarite}` : u.winner === 1 ? `  ● ${u.kimarite}` : `  △ ${u.kimarite}`;
+      } else {
+        const savedY = cam.y;
+        cam.y = groundY(l.env.terrain, u.centroid()[0]) + lh * 0.25 / cam.zoom;
+        drawWorld(ctx, cam, w, lh, l.env.terrain, { startX: u.startX });
+        ctx.save(); cam.apply(ctx, w, lh);
+        drawCreature(ctx, u, {});
+        ctx.restore();
+        cam.y = savedY;
+        label += `  ${formatFitness(u.fitness(l.env.objective), l.env.objective)}`;
+        if (l.rank) label = `${l.rank} ${label}`;
+      }
+      ctx.font = '700 12px system-ui'; ctx.textAlign = 'left';
+      const tw = Math.min(w - 16, ctx.measureText(label).width + 24);
+      ctx.fillStyle = 'rgba(7,11,22,0.7)'; ctx.fillRect(8, 8, tw, 22);
+      ctx.fillStyle = `hsl(${l.hue ?? 200},80%,70%)`; ctx.fillRect(8, 8, 4, 22);
+      ctx.fillStyle = '#e8eefc';
+      ctx.fillText(label, 18, 23);
       ctx.restore();
       ctx.fillStyle = 'rgba(120,160,255,0.25)'; ctx.fillRect(0, (i + 1) * lh - 1, w, 1);
     });

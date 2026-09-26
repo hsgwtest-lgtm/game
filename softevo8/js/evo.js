@@ -7,15 +7,25 @@
    ・記録を大きく更新した個体は「新しい系統」の祖となる。
      子孫は系統を受け継ぐので、系統の盛衰 (ミュラー図) が観察できる。
    ===================================================================== */
-import { brainLayout, evaluate, randomGenome, makeRng, genomeLength } from './sim.js';
+import { brainLayout, evaluate, evaluateBattle, prepareFighter, adaptGenome, randomGenome, makeRng, genomeLength, BATTLES, OPENINGS } from './sim.js';
 
 const TOP_K = 10;
+export const LADDER_STREAK = 8; // 「全勝 & 半分以上が決着勝ち」がこの世代数つづいたら昇段
 
 export class Evolver {
-  constructor(bp, settings, { seed = (Math.random() * 2 ** 31) | 0, seedGenome = null, startGen = 0, bestEver = null, cladeSeq = 0, clade = null } = {}) {
+  constructor(bp, settings, { seed = (Math.random() * 2 ** 31) | 0, seedGenome = null, seedObjective = null, startGen = 0, bestEver = null, cladeSeq = 0, clade = null, battle = null } = {}) {
     this.bp = bp;
     this.settings = { ...settings };
     this.layout = brainLayout(bp, settings);
+    // 対戦: 相手 (raw) と、この種目の脳に合わせた相手 (rivals)
+    this.battle = BATTLES[settings.objective] && battle ? {
+      raw: battle.rivals, ladder: !!battle.ladder, stage: battle.stage || 0, streak: 0,
+      rivals: battle.rivals.map(r => prepareFighter(r, settings.objective)),
+    } : null;
+    // 歩行で鍛えた脳から始める場合など: 新しい感覚の配線はゼロで移植
+    if (seedGenome && seedObjective && seedObjective !== settings.objective) {
+      seedGenome = adaptGenome(seedGenome, brainLayout(bp, { ...settings, objective: seedObjective }), this.layout);
+    }
     this.rng = makeRng(seed);
     this.nextId = 1;
     this.gen = startGen;
@@ -59,7 +69,14 @@ export class Evolver {
 
   envOf() {
     const s = this.settings;
-    return { terrain: s.terrain, objective: s.objective, gravity: s.gravity, friction: s.friction, evalSeconds: s.evalSeconds };
+    const env = { terrain: s.terrain, objective: s.objective, gravity: s.gravity, friction: s.friction, evalSeconds: s.evalSeconds };
+    if (this.battle) env.stage = this.battle.stage;
+    return env;
+  }
+
+  score(g, env) {
+    if (!this.battle) return evaluate(this.bp, this.layout, g, env).fitness;
+    return evaluateBattle({ bp: this.bp, layout: this.layout, genome: g }, this.battle.rivals, env).fitness;
   }
 
   mutate(g, rate, size) {
@@ -104,7 +121,7 @@ export class Evolver {
     const t0 = performance.now();
 
     for (const ind of this.pop) {
-      if (ind.fit === null || envChanged) ind.fit = evaluate(this.bp, this.layout, ind.g, env).fitness;
+      if (ind.fit === null || envChanged) ind.fit = this.score(ind.g, env);
     }
     this.pop.sort((a, b) => b.fit - a.fit);
     const P = this.pop, n = P.length;
@@ -112,8 +129,15 @@ export class Evolver {
     const q = f => fits[Math.min(n - 1, Math.floor(f * n))];
     const champ = P[0];
 
-    // チャンピオンの詳細 (歩容シグネチャ付き)
-    const detail = evaluate(this.bp, this.layout, champ.g, env, { gait: true });
+    // チャンピオンの詳細 (歩容シグネチャ付き / 対戦なら取組の内訳 + 「目隠し」テスト)
+    let detail, battle = null;
+    if (this.battle) {
+      const me = { bp: this.bp, layout: this.layout, genome: champ.g };
+      const r = evaluateBattle(me, this.battle.rivals, env, OPENINGS, { detail: true });
+      const blind = evaluateBattle(me, this.battle.rivals, env, OPENINGS, { blind: true });
+      battle = { wins: r.wins, losses: r.losses, draws: r.draws, n: r.n, bouts: r.bouts, blind: blind.fitness, blindWins: blind.wins, stage: this.battle.stage };
+      detail = { distance: null, height: null, gait: null };
+    } else detail = evaluate(this.bp, this.layout, champ.g, env, { gait: true });
 
     // 記録と系統
     let newClade = null, record = false;
@@ -147,7 +171,7 @@ export class Evolver {
         id: champ.id, clade: champ.clade, born: champ.born,
         genome: Float32Array.from(champ.g),
         parentGenome: parentInd ? Float32Array.from(parentInd) : null,
-        fitness: champ.fit, distance: detail.distance, height: detail.height, gait: detail.gait,
+        fitness: champ.fit, distance: detail.distance, height: detail.height, gait: detail.gait, battle,
       },
       top: P.slice(1, TOP_K).map(p => ({ genome: Float32Array.from(p.g), clade: p.clade, fitness: p.fit })),
       cladeCounts,
@@ -155,6 +179,28 @@ export class Evolver {
       clades: newClade || this.gen === 0 ? [...this.clades.values()] : null,
       ms: performance.now() - t0,
     };
+
+    // 昇段: 今の相手に全勝し続けたら、自分のチャンピオンが次の相手になる (軍拡競争)
+    if (battle && this.battle.ladder) {
+      const kos = battle.bouts.filter(b => b.winner === 0 && b.kimarite !== '判定').length;
+      this.battle.streak = battle.wins === battle.n && kos * 2 >= battle.n ? this.battle.streak + 1 : 0;
+      if (this.battle.streak >= LADDER_STREAK) {
+        const S = this.settings;
+        const self = {
+          name: `第${this.gen}世代の自分`, bp: this.bp, hidden: S.hidden, hidden2: S.hidden2, obj: S.objective,
+          g: Float32Array.from(champ.g), src: 'self', gen: this.gen, hue: 330,
+        };
+        // 最初の相手は常に残す (自分とだけ戦っていると、元の相手への勝ち方を忘れてしまうため)
+        const beaten = this.battle.raw, origin = beaten[beaten.length - 1];
+        this.battle.raw = [self, origin];
+        this.battle.rivals = this.battle.raw.map(r => prepareFighter(r, S.objective));
+        this.battle.stage++;
+        this.battle.streak = 0;
+        this.bestEver = null; this.stall = 0;
+        summary.promoted = { stage: this.battle.stage, rivals: this.battle.raw.map(r => ({ ...r, g: Float32Array.from(r.g) })), beaten: beaten.map(r => r.name) };
+      }
+      summary.streak = this.battle.streak;
+    }
 
     // 次世代
     const S = this.settings;

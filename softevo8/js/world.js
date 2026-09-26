@@ -2,7 +2,7 @@
    SoftEvo 8 — world.js
    世界と生物の描画 (理論座標: cm, y上向き)
    ===================================================================== */
-import { groundY, NODE_R } from './sim.js';
+import { groundY, NODE_R, RING_R, TUG_WIN } from './sim.js';
 import { muscleHue } from './ui.js';
 
 export class Camera {
@@ -35,21 +35,22 @@ function prep(c) {
   if (c._mOf) return;
   c._mOf = new Int32Array(c.ea.length).fill(-1);
   c.muscleEdge.forEach((e, j) => { c._mOf[e] = j; });
-  // 頭 = 静止形で一番上のノード
-  const ry = c.ry || c.y, rx = c.rx || c.x;
+  // 頭 = 静止形で一番上のノード (同じ高さなら前側)
+  const ry = c.ry || c.y, rx = c.rx || c.x, d = c.dir || 1;
   let h = 0;
-  for (let i = 1; i < c.n; i++) if (ry[i] > ry[h] + 0.5 || (Math.abs(ry[i] - ry[h]) <= 0.5 && rx[i] > rx[h])) h = i;
+  for (let i = 1; i < c.n; i++) if (ry[i] > ry[h] + 0.5 || (Math.abs(ry[i] - ry[h]) <= 0.5 && rx[i] * d > rx[h] * d)) h = i;
   c._head = h;
 }
 
 /**
  * 生物を描く (ctx は Camera.apply 済み)
- * o: { ghost: hue|null, alpha, selEdge, selNode, eyes, glowNodes:Set, glowEdges:Set }
+ * o: { ghost: hue|null, tint: hue|null, alpha, selEdge, selNode, eyes, glowNodes:Set, glowEdges:Set }
+ *   ghost … 半透明の影 (筋肉の動きは描かない) / tint … 対戦相手 (色味を変えるが筋肉の動きも目も描く)
  */
 export function drawCreature(ctx, c, o = {}) {
   prep(c);
   const { x, y, ea, eb, isMuscle, out } = c;
-  const ghost = o.ghost != null;
+  const ghost = o.ghost != null, tint = o.tint;
   ctx.save();
   ctx.globalAlpha = o.alpha ?? 1;
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -65,13 +66,15 @@ export function drawCreature(ctx, c, o = {}) {
       ctx.lineWidth = 7 + 4 * con;
       ctx.beginPath(); ctx.moveTo(x[ea[e]], y[ea[e]]); ctx.lineTo(x[eb[e]], y[eb[e]]); ctx.stroke();
     }
-    ctx.strokeStyle = ghost ? `hsl(${o.ghost},70%,60%)` : `hsl(${muscleHue(j)},${60 + 35 * con}%,${38 + 30 * con - 8 * ext}%)`;
+    ctx.strokeStyle = ghost ? `hsl(${o.ghost},70%,60%)`
+      : tint != null ? `hsl(${tint},${45 + 45 * con}%,${36 + 30 * con - 8 * ext}%)`
+      : `hsl(${muscleHue(j)},${60 + 35 * con}%,${38 + 30 * con - 8 * ext}%)`;
     ctx.lineWidth = 1.6 + 3.6 * con + (1 - ext) * 0.6;
     ctx.beginPath(); ctx.moveTo(x[ea[e]], y[ea[e]]); ctx.lineTo(x[eb[e]], y[eb[e]]); ctx.stroke();
   }
 
   // 骨
-  ctx.strokeStyle = ghost ? `hsl(${o.ghost},40%,75%)` : '#dfe8fb';
+  ctx.strokeStyle = ghost ? `hsl(${o.ghost},40%,75%)` : tint != null ? `hsl(${tint},45%,82%)` : '#dfe8fb';
   ctx.lineWidth = 3.2;
   ctx.beginPath();
   for (let e = 0; e < ea.length; e++) {
@@ -87,8 +90,8 @@ export function drawCreature(ctx, c, o = {}) {
       ctx.fillStyle = 'rgba(255,255,255,0.35)';
       ctx.beginPath(); ctx.arc(x[i], y[i], NODE_R * 2.1, 0, 7); ctx.fill();
     }
-    ctx.fillStyle = ghost ? `hsl(${o.ghost},35%,22%)` : '#172036';
-    ctx.strokeStyle = c.contact[i] ? '#ffd166' : ghost ? `hsl(${o.ghost},50%,70%)` : '#dfe8fb';
+    ctx.fillStyle = ghost ? `hsl(${o.ghost},35%,22%)` : tint != null ? `hsl(${tint},40%,18%)` : '#172036';
+    ctx.strokeStyle = c.contact[i] ? '#ffd166' : ghost ? `hsl(${o.ghost},50%,70%)` : tint != null ? `hsl(${tint},55%,78%)` : '#dfe8fb';
     ctx.lineWidth = c.contact[i] ? 2.4 : 1.6;
     ctx.beginPath(); ctx.arc(x[i], y[i], NODE_R, 0, 7); ctx.fill(); ctx.stroke();
   }
@@ -97,7 +100,7 @@ export function drawCreature(ctx, c, o = {}) {
   if (o.eyes !== false && !ghost) {
     const h = c._head, hx = x[h], hy = y[h];
     const sp = Math.hypot(c.vx, c.vy);
-    const lx = sp > 0.05 ? c.vx / sp : 1, ly = sp > 0.05 ? c.vy / sp : 0;
+    const lx = sp > 0.05 ? c.vx / sp : (c.dir || 1), ly = sp > 0.05 ? c.vy / sp : 0;
     const ca = Math.cos(c.tilt || 0), sa = Math.sin(c.tilt || 0);
     for (const s of [-1, 1]) {
       const ox = s * 3.2, oy = 2.2;
@@ -135,7 +138,7 @@ export function drawWorld(ctx, cam, w, h, terrain, deco = {}) {
   // 1m ごとの縦線
   const startX = deco.startX ?? 0;
   ctx.lineWidth = 1;
-  for (let k = Math.floor((x0 - startX) / 100); k <= Math.ceil((x1 - startX) / 100); k++) {
+  for (let k = Math.floor((x0 - startX) / 100); k <= Math.ceil((x1 - startX) / 100) && !deco.battle; k++) {
     const sx = cam.sx(startX + k * 100, w);
     ctx.strokeStyle = k % 5 === 0 ? 'rgba(120,160,255,0.10)' : 'rgba(120,160,255,0.045)';
     ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, h); ctx.stroke();
@@ -158,6 +161,8 @@ export function drawWorld(ctx, cam, w, h, terrain, deco = {}) {
     if (wx === x0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
   }
   ctx.stroke();
+
+  if (deco.battle) return drawArenaMarks(ctx, cam, w, h, deco.battle);
 
   // 距離マーカー
   ctx.font = '600 11px system-ui, sans-serif';
@@ -185,6 +190,59 @@ export function drawWorld(ctx, cam, w, h, terrain, deco = {}) {
     ctx.textAlign = right ? 'left' : 'right';
     ctx.fillText(deco.record.label, right ? sx + 26 : sx - 6, top + 11);
   }
+}
+
+/** 土俵 / 綱引きの場の目印 */
+function drawArenaMarks(ctx, cam, w, h, mode) {
+  const Z = cam.zoom, gy = cam.sy(0, h);
+  ctx.save();
+  if (mode === 'sumo') {
+    // 土俵の表面と俵
+    const l = cam.sx(-RING_R, w), r = cam.sx(RING_R, w);
+    ctx.fillStyle = 'rgba(214,176,120,0.13)';
+    ctx.fillRect(l, gy, r - l, Math.max(4, 10 * Z));
+    ctx.fillStyle = '#c9a15e';
+    for (const s of [-1, 1]) {
+      const bx = cam.sx(s * (RING_R - 4), w);
+      ctx.beginPath(); ctx.ellipse(bx, gy, Math.max(3, 6 * Z), Math.max(2, 3.5 * Z), 0, Math.PI, 0); ctx.fill();
+    }
+    // 仕切り線
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = Math.max(1.5, 2 * Z);
+    for (const s of [-1, 1]) {
+      const sx = cam.sx(s * 10, w);
+      ctx.beginPath(); ctx.moveTo(sx, gy + 1); ctx.lineTo(sx, gy + Math.max(3, 5 * Z)); ctx.stroke();
+    }
+    ctx.font = '600 11px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(255,209,102,0.7)';
+    ctx.fillText('土俵際', l + 18, gy + 22); ctx.fillText('土俵際', r - 18, gy + 22);
+  } else if (mode === 'tug') {
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    const cx = cam.sx(0, w);
+    ctx.beginPath(); ctx.moveTo(cx, gy); ctx.lineTo(cx, gy + 10); ctx.stroke();
+    ctx.font = '700 11px system-ui'; ctx.textAlign = 'center';
+    const narrow = 2 * TUG_WIN * Z < 230;
+    for (const [s, col, label] of [[-1, '#3fc1ff', narrow ? '◀西' : '◀ 西の勝ちライン'], [1, '#ff7b8a', narrow ? '東▶' : '東の勝ちライン ▶']]) {
+      const sx = cam.sx(s * TUG_WIN, w);
+      ctx.strokeStyle = col; ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(sx, gy + 12); ctx.lineTo(sx, gy - Math.max(40, 70 * Z)); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = col; ctx.fillText(label, sx, gy + 24);
+    }
+  }
+  ctx.restore();
+}
+
+/** 綱 (たるんでいれば垂れる)。中央の赤い印の位置で勝負が決まる */
+export function drawRope(ctx, ax, ay, bx, by, L) {
+  const d = Math.hypot(bx - ax, by - ay), sag = d < L ? Math.sqrt(L * L - d * d) * 0.45 : 0;
+  const mx = (ax + bx) / 2, my = (ay + by) / 2;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#d8b98a'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(ax, ay); ctx.quadraticCurveTo(mx, my - sag * 2, bx, by); ctx.stroke();
+  ctx.fillStyle = '#ff4d5e';
+  const ry = my - sag;
+  ctx.beginPath(); ctx.moveTo(mx, ry); ctx.lineTo(mx - 5, ry - 16); ctx.lineTo(mx + 5, ry - 16); ctx.closePath(); ctx.fill();
+  ctx.restore();
 }
 
 /** 設計図のサムネイル */

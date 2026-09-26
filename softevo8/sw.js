@@ -1,9 +1,10 @@
 // SoftEvo 8 — Service Worker (ネットワーク優先 / オフライン時はキャッシュ)
-const CACHE = 'softevo8-v3';
+const CACHE = 'softevo8-v4';
 const ASSETS = [
   './', './index.html', './style.css', './manifest.json',
   './js/app.js', './js/sim.js', './js/evo.js', './js/worker.js', './js/builder.js',
   './js/theater.js', './js/brainview.js', './js/charts.js', './js/world.js', './js/store.js', './js/ui.js',
+  './js/arena.js', './js/dojo.js',
   './icons/icon-192.png', './icons/icon-512.png',
 ];
 self.addEventListener('install', e => {
