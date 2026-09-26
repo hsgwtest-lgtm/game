@@ -3,9 +3,11 @@
    画面の流れ:  ホーム → 設計 → 進化ラボ
    進化ラボ = 劇場 (再生) + 脳 + 推移/歩容/系統/物語/環境
    ===================================================================== */
-import { DEFAULT_SETTINGS, PRESETS, TERRAINS, OBJECTIVES, brainLayout, validateBlueprint, blueprintStats, formatFitness, rhythmHz, gaitDistance, cloneBlueprint } from './sim.js';
+import { DEFAULT_SETTINGS, PRESETS, TERRAINS, OBJECTIVES, BATTLES, OPENINGS, brainLayout, validateBlueprint, blueprintStats, formatFitness, rhythmHz, gaitDistance, cloneBlueprint, isBattle, prepareFighter, rankName } from './sim.js';
+import { LADDER_STREAK } from './evo.js';
 import { Builder } from './builder.js';
 import { Theater } from './theater.js';
+import { Arena } from './arena.js';
 import { BrainView } from './brainview.js';
 import { TimelineChart, GaitChart, CladeChart } from './charts.js';
 import { drawThumb } from './world.js';
@@ -22,6 +24,7 @@ function show(name) {
   document.body.dataset.screen = name;
   if (name === 'home') renderHome();
   if (name === 'build') requestAnimationFrame(() => builder.fit());
+  if (name === 'arena') arena.enter();
 }
 
 // ════════════════════════════════════════════════════════════
@@ -34,11 +37,13 @@ function renderHome() {
   $('#home-empty').classList.toggle('hidden', runs.length > 0);
   for (const meta of runs) {
     const cv = el('canvas', { class: 'thumb' });
+    const B = BATTLES[meta.objective];
     const card = el('article', { class: 'run-card' },
       cv,
       el('div', { class: 'run-info' },
         el('h3', {}, meta.name),
-        el('p', {}, `第${meta.gen}世代 · ${TERRAINS[meta.terrain]?.icon || ''} ${OBJECTIVES[meta.objective]?.name || ''}`),
+        el('p', {}, B ? `第${meta.gen}世代 · ${B.icon} ${B.name}の特訓 · ${rankName(meta.objective, meta.stage || 0)}`
+          : `第${meta.gen}世代 · ${TERRAINS[meta.terrain]?.icon || ''} ${OBJECTIVES[meta.objective]?.name || ''}`),
         el('p', { class: 'run-best' }, meta.best != null ? `🏆 ${formatFitness(meta.best, meta.objective)}` : '—'),
         el('p', { class: 'run-date' }, new Date(meta.updated).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }))),
       el('div', { class: 'run-actions' },
@@ -112,6 +117,7 @@ function updateBuildInfo(bp) {
 
 function openBuilder(bp, name, settings) {
   buildSettings = { ...DEFAULT_SETTINGS, ...(settings || {}) };
+  if (isBattle(buildSettings.objective)) Object.assign(buildSettings, { objective: DEFAULT_SETTINGS.objective, terrain: DEFAULT_SETTINGS.terrain });
   $('#creature-name').value = name || store.randomName();
   builder.undoStack = []; builder.redoStack = [];
   builder.load(bp || { nodes: [], edges: [] });
@@ -185,9 +191,9 @@ function initBuilderUI() {
 // ════════════════════════════════════════════════════════════
 //  実験 (run) データ
 // ════════════════════════════════════════════════════════════
-function newRun(bp, name, settings) {
+function newRun(bp, name, settings, battle = null) {
   return {
-    id: store.uid(), name, blueprint: bp, settings: { ...settings }, created: Date.now(),
+    id: store.uid(), name, blueprint: bp, settings: { ...settings }, created: Date.now(), battle,
     history: [], envChanges: [], journal: [], clades: {}, cladeHist: [],
     best: null, lastRecordGait: null, flags: { milestones: [], sweeps: {}, stall: false, lastGaitGen: -99 },
     genTimes: [],
@@ -195,7 +201,26 @@ function newRun(bp, name, settings) {
 }
 
 function metaOf(d) {
-  return { id: d.id, name: d.name, gen: d.gen ?? 0, best: d.best ? d.best.fitness : null, terrain: d.settings.terrain, objective: d.settings.objective };
+  const m = { id: d.id, name: d.name, gen: d.gen ?? 0, best: d.best ? d.best.fitness : null, terrain: d.settings.terrain, objective: d.settings.objective };
+  if (d.battle) m.stage = d.battle.stages[d.battle.stages.length - 1].stage;
+  return m;
+}
+
+// ─── 対戦の相手 (保存形式 ⇔ メモリ) ───
+const fighterOut = f => ({ ...f, g: store.f32ToB64(f.g) });
+const fighterIn = f => ({ ...f, g: store.b64ToF32(f.g) });
+function serializeBattle(b) {
+  return b && { mode: b.mode, ladder: b.ladder, stages: b.stages.map(s => ({ gen: s.gen, stage: s.stage, rivals: s.rivals.map(fighterOut) })), flags: b.flags };
+}
+function deserializeBattle(b) {
+  return b && { mode: b.mode, ladder: b.ladder, stages: b.stages.map(s => ({ gen: s.gen, stage: s.stage, rivals: s.rivals.map(fighterIn) })), flags: b.flags || {} };
+}
+/** その段階の相手 (この種目の脳に合わせたもの) */
+function stageOf(run, stage) {
+  const S = run.battle.stages;
+  const s = S.find(x => x.stage === stage) || S[S.length - 1];
+  if (!s.prepared) s.prepared = s.rivals.map(r => prepareFighter(r, run.settings.objective));
+  return s;
 }
 
 function serialize(run) {
@@ -220,15 +245,17 @@ function serialize(run) {
     genomes,
     best: run.best ? { gen: run.best.gen, fitness: run.best.fitness, dist: run.best.dist, g: store.f32ToB64(run.best.g) } : null,
     lastRecordGait: run.lastRecordGait, flags: run.flags,
+    battle: serializeBattle(run.battle),
   };
 }
 
 function deserialize(d) {
   const run = newRun(d.blueprint, d.name, { ...DEFAULT_SETTINGS, ...d.settings });
   Object.assign(run, { id: d.id, created: d.created, envChanges: d.envChanges || [], journal: d.journal || [], clades: d.clades || {}, cladeHist: d.cladeHist || [], lastRecordGait: d.lastRecordGait, flags: { ...run.flags, ...(d.flags || {}) } });
+  run.battle = deserializeBattle(d.battle);
   const base = d.genBase || 0;
   // 各世代の環境を復元
-  const envAt = g => { let env = null; for (const c of run.envChanges) if (c.gen <= g) env = c.env; return env || envOfSettings(run.settings); };
+  const envAt = g => { let env = null; for (const c of run.envChanges) if (c.gen <= g) env = c.env; return env || envOfSettings(run.settings, run, g); };
   const n = d.H ? d.H.best.length : 0;
   for (let i = 0; i < n; i++) {
     run.history.push({ gen: base + i, best: d.H.best[i], median: d.H.median[i], p10: d.H.p10[i], p90: d.H.p90[i], bestEver: d.H.bestEver[i], clade: d.H.clade[i], env: envAt(base + i) });
@@ -241,8 +268,15 @@ function deserialize(d) {
   return run;
 }
 
-function envOfSettings(s) {
-  return { terrain: s.terrain, objective: s.objective, gravity: s.gravity, friction: s.friction, evalSeconds: s.evalSeconds };
+/** 設定 → 環境。対戦なら gen 時点 (省略時は最新) の段階も含む */
+function envOfSettings(s, run = lab.run, gen = Infinity) {
+  const env = { terrain: s.terrain, objective: s.objective, gravity: s.gravity, friction: s.friction, evalSeconds: s.evalSeconds };
+  if (run && run.battle) {
+    let st = run.battle.stages[0].stage;
+    for (const x of run.battle.stages) if (x.gen <= gen) st = x.stage;
+    env.stage = st;
+  }
+  return env;
 }
 
 function saveCurrent(silent) {
@@ -264,7 +298,7 @@ function resumeRun(id) {
 // ════════════════════════════════════════════════════════════
 const lab = {
   run: null, worker: null, mode: 'watch', lastRunMode: 'watch', view: 'live',
-  shown: null, pinned: null, rate: 0, lastSaveGen: 0,
+  shown: null, pinned: null, rate: 0, lastSaveGen: 0, bout: 0, boutInfo: null, streak: 0,
   dirty: { stats: true, timeline: true, clades: true, journal: true },
   tab: 'timeline',
 };
@@ -306,7 +340,12 @@ function startLab(run, resumed = false) {
   renderEnvPane();
   Object.keys(lab.dirty).forEach(k => { lab.dirty[k] = true; });
 
-  if (!resumed) addJournal(0, '🥚', `「${run.name}」誕生。ランダムな脳で進化が始まる`, true, 'start');
+  if (!resumed) {
+    if (run.battle) {
+      const B = BATTLES[run.settings.objective], r = run.battle.stages[0].rivals[0];
+      addJournal(0, B.icon, `${B.name}の特訓開始。相手は「${r.name}」。脳に「対戦感覚」(${B.senses.length}個) が加わった — まだ配線はゼロ`, true, 'start');
+    } else addJournal(0, '🥚', `「${run.name}」誕生。ランダムな脳で進化が始まる`, true, 'start');
+  }
 
   const w = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
   lab.worker = w;
@@ -325,6 +364,13 @@ function startLab(run, resumed = false) {
     if (c) opts.clade = c;
     addJournal(last.gen + 1, '⏯', '保存した続きから進化を再開', false, 'resume');
   }
+  if (run.battle) {
+    const cur = run.battle.stages[run.battle.stages.length - 1];
+    opts.battle = { rivals: cur.rivals, ladder: run.battle.ladder, stage: cur.stage };
+    if (!resumed && run.battle.seed) { opts.seedGenome = run.battle.seed.g; opts.seedObjective = run.battle.seed.obj; }
+  }
+  $('#st-best-label').textContent = run.battle ? '最高得点' : '最高記録';
+  $('#btn-ghosts').classList.toggle('hidden', !!run.battle);
   w.postMessage({ type: 'init', blueprint: run.blueprint, settings: run.settings, opts });
   setMode(lab.mode);
   show('lab');
@@ -348,7 +394,7 @@ function onGen(s) {
   const e = {
     gen: s.gen, best: s.best, median: s.median, p10: s.p10, p90: s.p90, bestEver: s.bestEver,
     clade: s.champ.clade, g: s.champ.genome, pg: s.champ.parentGenome, top: s.top, env: s.env,
-    dist: s.champ.distance, born: s.champ.born, gait: s.champ.gait,
+    dist: s.champ.distance, born: s.champ.born, gait: s.champ.gait, battle: s.champ.battle,
   };
   run.history.push(e);
   if (s.clades) for (const c of s.clades) run.clades[c.id] = c;
@@ -361,10 +407,15 @@ function onGen(s) {
   const prevEntry = run.history[run.history.length - 2];
   if (prevEntry && JSON.stringify(prevEntry.env) !== envKey) {
     run.best = null;
-    run.envChanges.push({ gen: s.gen, env: s.env });
+    const promo = prevEntry.env.stage !== s.env.stage;
+    run.envChanges.push({ gen: s.gen, env: s.env, promo });
     const env = s.env;
-    const desc = `${TERRAINS[env.terrain].icon}${TERRAINS[env.terrain].name} / ${OBJECTIVES[env.objective].name} / 重力${env.gravity.toFixed(1)}G / 摩擦${env.friction.toFixed(2)} / ${env.evalSeconds}秒`;
-    addJournal(s.gen, '🌍', `環境が変わった: ${desc}。ここから新たな適応が始まる`, true, 'env');
+    if (JSON.stringify({ ...prevEntry.env, stage: 0 }) !== JSON.stringify({ ...env, stage: 0 })) {
+      const T = TERRAINS[env.terrain] || { icon: '⭕', name: '土俵' };
+      const O = OBJECTIVES[env.objective] || BATTLES[env.objective];
+      const desc = `${T.icon}${T.name} / ${O.name} / 重力${env.gravity.toFixed(1)}G / 摩擦${env.friction.toFixed(2)} / ${env.evalSeconds}秒`;
+      addJournal(s.gen, '🌍', `環境が変わった: ${desc}。ここから新たな適応が始まる`, true, 'env');
+    }
   }
 
   // ── 記録と物語 ──
@@ -375,7 +426,7 @@ function onGen(s) {
     run.best = { gen: s.gen, fitness: s.best, dist: s.champ.distance, g: s.champ.genome };
     if (old && s.record) {
       const gain = s.best - old.fitness;
-      if (gain > Math.max(30, Math.abs(old.fitness) * 0.25)) addJournal(s.gen, '🚀', `大躍進！ 記録が ${formatFitness(old.fitness, obj)} → ${formatFitness(s.best, obj)} に`, true, 'leap');
+      if (gain > Math.max(run.battle ? 400 : 30, Math.abs(old.fitness) * 0.25)) addJournal(s.gen, '🚀', `大躍進！ 記録が ${formatFitness(old.fitness, obj)} → ${formatFitness(s.best, obj)} に`, true, 'leap');
       if (run.lastRecordGait && s.gen - run.flags.lastGaitGen > 10 && gaitDistance(s.champ.gait, run.lastRecordGait) > 0.22) {
         addJournal(s.gen, '🎼', '新しい動き方を発見！ 筋肉の使い方のパターンががらりと変わった', true, 'gait');
         run.flags.lastGaitGen = s.gen;
@@ -383,8 +434,16 @@ function onGen(s) {
     }
     run.lastRecordGait = s.champ.gait;
     run.flags.stall = false;
-    checkMilestones(s.gen, s.best, obj);
+    if (!run.battle) checkMilestones(s.gen, s.best, obj);
   }
+  if (run.battle && s.champ.battle) battleStory(s);
+  if (s.promoted) {
+    run.battle.stages.push({ gen: s.gen + 1, stage: s.promoted.stage, rivals: s.promoted.rivals });
+    const beaten = s.promoted.beaten.map(n => `「${n}」`).join('と');
+    addJournal(s.gen, '🎖', `昇進！「${rankName(obj, s.promoted.stage)}」へ — ${beaten}に${LADDER_STREAK}世代つづけて全勝。次の相手は第${s.gen}世代の自分と、最初の相手`, true, 'promo');
+    renderEnvPane();
+  }
+  lab.streak = s.streak || 0;
   if (s.newClade) addJournal(s.gen, '🌿', `新系統「${s.newClade.label}」誕生 — 記録を大きく塗り替えた個体が祖となる`, false, 'clade');
   const total = Object.values(s.cladeCounts).reduce((a, b) => a + b, 0);
   for (const [id, n] of Object.entries(s.cladeCounts)) {
@@ -402,6 +461,31 @@ function onGen(s) {
   // 最新表示なら、何も再生していなければすぐ再生
   if (lab.view === 'live' && (!theater.main || lab.waiting)) { lab.waiting = false; playGen(e); }
   if (s.gen - lab.lastSaveGen >= 25) saveCurrent(true);
+}
+
+/** 対戦の物語: 初白星 / 全勝 / 新しい決まり手 / 相手を「見て」戦い始めた */
+function battleStory(s) {
+  const run = lab.run, b = s.champ.battle;
+  const f = run.battle.flags || (run.battle.flags = {});
+  const names = stageOf(run, b.stage).rivals.map(r => `「${r.name}」`).join('と');
+  if (b.wins > 0 && !f.firstWin) {
+    f.firstWin = true;
+    addJournal(s.gen, '🎉', `初白星！ ${names}から初めて勝ちを奪った (${b.bouts.find(x => x.winner === 0).kimarite})`, true, 'win');
+  }
+  if (b.wins === b.n && !f[`sweep${b.stage}`]) {
+    f[`sweep${b.stage}`] = true;
+    addJournal(s.gen, '💯', `${names}に全勝 (${b.n}番)`, b.stage === 0, 'allwin');
+  }
+  f.kim = f.kim || [];
+  for (const bt of b.bouts) {
+    if (bt.winner !== 0 || bt.kimarite === '判定' || f.kim.includes(bt.kimarite)) continue;
+    f.kim.push(bt.kimarite);
+    addJournal(s.gen, '🆕', `決まり手「${bt.kimarite}」で初めて勝った`, false, 'kimarite');
+  }
+  if (!f.eyes && s.best - b.blind > 300 && b.wins > b.blindWins) {
+    f.eyes = true;
+    addJournal(s.gen, '👁', `相手を「見て」戦い始めた — 対戦感覚を遮断すると ${Math.round(s.best)}点 → ${Math.round(b.blind)}点、${b.wins}勝 → ${b.blindWins}勝に落ちる`, true, 'eyes');
+  }
 }
 
 function checkMilestones(gen, best, obj) {
@@ -452,7 +536,7 @@ function nearestWithGenome(gen) {
 
 function recordFlag(env) {
   const b = lab.run.best;
-  if (!b || env.objective === 'jump' || b.dist == null || b.dist < 30) return null;
+  if (!b || env.objective === 'jump' || isBattle(env.objective) || b.dist == null || b.dist < 30) return null;
   return { x: b.dist, label: `最高記録 ${(b.dist / 100).toFixed(2)}m (第${b.gen}世代)` };
 }
 
@@ -460,8 +544,18 @@ function playGen(e) {
   if (!e || !e.g) return;
   lab.shown = e;
   const run = lab.run;
-  const ghosts = (e.top || []).map(t => ({ genome: t.genome, hue: run.clades[t.clade] ? run.clades[t.clade].hue : 200 }));
-  theater.play({ kind: 'single', gen: e.gen, genome: e.g, env: e.env, ghosts, record: recordFlag(e.env) });
+  if (run.battle) {
+    // 対戦: この世代の王者 vs その時の相手。「選択」表示では再生のたびに次の取組へ
+    const st = stageOf(run, e.env.stage ?? 0), O = OPENINGS;
+    const nb = st.prepared.length * O.length;
+    const k = lab.view === 'pinned' ? lab.bout % nb : 0;
+    const ri = Math.floor(k / O.length), oi = k % O.length;
+    lab.boutInfo = { k, nb, rival: st.rivals[ri], gap: O[oi].gap };
+    theater.play({ kind: 'match', gen: e.gen, genome: e.g, env: e.env, rival: st.prepared[ri], opening: O[oi], meName: `第${e.gen}世代` });
+  } else {
+    const ghosts = (e.top || []).map(t => ({ genome: t.genome, hue: run.clades[t.clade] ? run.clades[t.clade].hue : 200 }));
+    theater.play({ kind: 'single', gen: e.gen, genome: e.g, env: e.env, ghosts, record: recordFlag(e.env) });
+  }
   brainView.setGenomes(e.g, e.pg);
   if (lab.mode === 'watch' && lab.view === 'live') lab.worker.postMessage({ type: 'grant' });
   updateCaption();
@@ -485,9 +579,14 @@ function playParade() {
   picks.push(cands[cands.length - 1]);
   picks = [...new Map(picks.map(p => [p.gen, p])).values()].sort((a, b) => a.gen - b.gen);
   const env = picks[picks.length - 1].env;
+  // 対戦では、どの世代も「最初の相手」と取組む = 同じ物差しで成長が見える
+  const first = run.battle ? stageOf(run, run.battle.stages[0].stage) : null;
   theater.play({
-    kind: 'parade',
-    lanes: picks.map(p => ({ gen: p.gen, genome: p.g, env, label: `第${p.gen}世代`, hue: run.clades[p.clade] ? run.clades[p.clade].hue : 200 })),
+    kind: 'lanes',
+    lanes: picks.map(p => ({
+      gen: p.gen, genome: p.g, env, label: `第${p.gen}世代`, hue: run.clades[p.clade] ? run.clades[p.clade].hue : 200,
+      ...(first ? { rival: first.prepared[0], opening: OPENINGS[0] } : {}),
+    })),
   });
   lab.shown = picks[picks.length - 1];
   brainView.setGenomes(lab.shown.g, lab.shown.pg);
@@ -502,7 +601,7 @@ function onReplayFinish() {
     if (latest && lab.shown && latest.gen !== lab.shown.gen) playGen(latest);
     else if (lab.mode === 'watch') { lab.waiting = true; showResult(true); }
     else playGen(lab.shown);
-  } else if (lab.view === 'pinned') playGen(lab.shown);
+  } else if (lab.view === 'pinned') { lab.bout++; playGen(lab.shown); }
   else playParade();
 }
 
@@ -517,6 +616,7 @@ function pinGen(gen) {
   if (!e) return;
   setView('pinned', false);
   lab.pinned = e.gen;
+  lab.bout = 0;
   timeline.selected = e.gen;
   lab.dirty.timeline = true;
   playGen(e);
@@ -537,7 +637,8 @@ function updateCaption() {
   const e = lab.shown, run = lab.run;
   if (!e) return;
   let title;
-  if (lab.view === 'parade') title = '進化のパレード — 節目の世代が同時に走る';
+  if (lab.view === 'parade') title = run.battle ? `パレード: 各世代 vs 最初の相手「${run.battle.stages[0].rivals[0].name}」` : '進化のパレード — 節目の世代が同時に走る';
+  else if (run.battle && lab.boutInfo) title = `第${e.gen}世代の王者 vs ${lab.boutInfo.rival.name}${lab.view === 'pinned' ? ' (選択中)' : ''}`;
   else title = `第${e.gen}世代のチャンピオン${lab.view === 'pinned' ? ' (選択中)' : ''}`;
   $('#th-title').textContent = title;
   const c = run.clades[e.clade];
@@ -547,7 +648,12 @@ function updateCaption() {
     chip.style.setProperty('--h', c.hue);
     chip.classList.remove('hidden');
   } else chip.classList.add('hidden');
-  const age = e.born != null && lab.view !== 'parade' ? (e.born === e.gen ? '今世代に誕生' : `第${e.born}世代生まれ・${e.gen - e.born}世代生存`) : '';
+  let age = e.born != null && lab.view !== 'parade' ? (e.born === e.gen ? '今世代に誕生' : `第${e.born}世代生まれ・${e.gen - e.born}世代生存`) : '';
+  if (run.battle && lab.view !== 'parade') {
+    const b = e.battle, bi = lab.boutInfo;
+    const rec = b ? ` · この世代の成績 ${b.wins}勝${b.losses}敗${b.draws ? b.draws + '分' : ''}` : '';
+    age = `取組 ${bi ? bi.k + 1 : 1}/${bi ? bi.nb : 1} (間合い${bi ? bi.gap : ''}cm)${rec}${age ? ' · ' + age : ''}`;
+  }
   $('#th-sub').textContent = age;
   updateLatestBtn();
 }
@@ -574,6 +680,12 @@ function updateBrainNote() {
     note.innerHTML = '進化で獲得した結合の強さ。<span class="pos">橙</span>=興奮性 / <span class="neg">青</span>=抑制性。太いほど強い結合';
   } else {
     note.innerHTML = 'いま流れている信号 (重み×活性)。光の粒は強い信号。ニューロンや体の筋肉を<b>タップ</b>すると対応関係が見えます';
+  }
+  const b = e.battle;
+  if (lab.run.battle && b && lab.view !== 'parade') {
+    const dep = e.best - b.blind;
+    const verdict = dep > 300 ? '<b style="color:#ff5b6e">相手を見て戦っている</b>' : dep > 60 ? '相手の情報を<b>少し</b>使っている' : '相手を<b>ほぼ見ていない</b> (体の強さと動きのパターンだけで戦っている)';
+    note.innerHTML = `<span style="color:#ff5b6e">●</span> 対戦感覚 目隠しテスト: 遮断すると ${Math.round(e.best)}点 → ${Math.round(b.blind)}点 (${b.wins}勝 → ${b.blindWins}勝)。${verdict}<br>` + note.innerHTML;
   }
 }
 
@@ -634,12 +746,38 @@ let envTimer = null;
 function renderEnvPane() {
   const run = lab.run, s = run.settings, pane = $('#env-pane');
   pane.innerHTML = '';
+  if (run.battle) {
+    const B = BATTLES[s.objective], cur = run.battle.stages[run.battle.stages.length - 1];
+    pane.append(el('p', { class: 'pane-note' }, `${B.icon} ${B.desc}`));
+    pane.append(el('h4', {}, `いまの相手 (${rankName(s.objective, cur.stage)})`));
+    const list = el('div', { class: 'rival-list' });
+    for (const r of cur.rivals) {
+      const cv = el('canvas', { class: 'rival-thumb' });
+      list.append(el('div', { class: 'rival-row' }, cv, el('div', {}, el('b', {}, r.name), el('small', {}, r.src === 'self' ? '過去の自分 (昇進で交代)' : r.src === 'dojo' ? '道場の師範' : 'マイ生物'))));
+      requestAnimationFrame(() => drawThumb(cv, r.bp));
+    }
+    pane.append(list);
+    pane.append(el('p', { class: 'pane-note dim' }, run.battle.ladder
+      ? `昇段戦: 相手すべてに全勝 (半分以上は決着勝ち) を ${LADDER_STREAK}世代つづけると昇進し、その時の自分が次の相手になる (最初の相手も残る)。自分自身との軍拡競争です。`
+      : '固定の相手: この相手に勝つことだけを目指します。'));
+    pane.append(el('h4', {}, '環境'));
+    pane.append(sliderRow('重力', s.gravity, 0.2, 2, 0.1, v => `${v.toFixed(1)}G`, v => changeEnv({ gravity: v }, true)));
+    pane.append(sliderRow('地面の摩擦', s.friction, 0.3, 1, 0.05, v => v.toFixed(2), v => changeEnv({ friction: v }, true)));
+    pane.append(sliderRow('取組の時間', s.evalSeconds, 5, 30, 1, v => `${v}秒`, v => changeEnv({ evalSeconds: v }, true)));
+    appendMutationRows(pane, run);
+    return;
+  }
   pane.append(el('p', { class: 'pane-note' }, '環境を変えると、次の世代から新しい条件で評価されます。生物がどう「適応」していくか観察してみよう。'));
   pane.append(choiceRow('地形', TERRAINS, s.terrain, v => changeEnv({ terrain: v })));
   pane.append(choiceRow('目標', OBJECTIVES, s.objective, v => changeEnv({ objective: v })));
   pane.append(sliderRow('重力', s.gravity, 0.2, 2, 0.1, v => `${v.toFixed(1)}G`, v => changeEnv({ gravity: v }, true)));
   pane.append(sliderRow('地面の摩擦', s.friction, 0.3, 1, 0.05, v => v.toFixed(2), v => changeEnv({ friction: v }, true)));
   pane.append(sliderRow('評価時間', s.evalSeconds, 5, 30, 1, v => `${v}秒`, v => changeEnv({ evalSeconds: v }, true)));
+  appendMutationRows(pane, run);
+}
+
+function appendMutationRows(pane, run) {
+  const s = run.settings;
   pane.append(el('h4', {}, '変異 (即時反映・記録には影響なし)'));
   pane.append(sliderRow('変異の確率', s.mutationRate, 0.01, 0.3, 0.01, v => `${Math.round(v * 100)}%`, v => { s.mutationRate = v; lab.worker.postMessage({ type: 'env', env: { mutationRate: v } }); }));
   pane.append(sliderRow('変異の大きさ', s.mutationSize, 0.05, 1, 0.05, v => v.toFixed(2), v => { s.mutationSize = v; lab.worker.postMessage({ type: 'env', env: { mutationSize: v } }); }));
@@ -674,7 +812,11 @@ function updateStats() {
   const T = run.genTimes;
   const rate = T.length > 1 && performance.now() - T[T.length - 1] < 5000 ? (T.length - 1) / ((T[T.length - 1] - T[0]) / 60000) : 0;
   $('#st-rate').textContent = rate > 0 ? Math.round(rate) : '—';
-  $('#lab-sub').textContent = `${TERRAINS[run.settings.terrain].icon} ${TERRAINS[run.settings.terrain].name} · ${OBJECTIVES[run.settings.objective].name}`;
+  if (run.battle) {
+    const B = BATTLES[run.settings.objective], stage = run.battle.stages[run.battle.stages.length - 1].stage;
+    const toGo = run.battle.ladder ? ` · 昇進まで全勝あと${LADDER_STREAK - (lab.streak || 0)}世代` : '';
+    $('#lab-sub').textContent = `${B.icon} ${B.name}の特訓 · ${run.settings.objective === 'sumo' ? '番付' : '段位'} ${rankName(run.settings.objective, stage)}${toGo}`;
+  } else $('#lab-sub').textContent = `${TERRAINS[run.settings.terrain].icon} ${TERRAINS[run.settings.terrain].name} · ${OBJECTIVES[run.settings.objective].name}`;
 }
 
 function initLabUI() {
@@ -738,6 +880,7 @@ let lastT = performance.now(), slowT = 0;
 function frame(t) {
   const dt = Math.min(0.1, (t - lastT) / 1000); lastT = t;
   if (screen === 'build') builder.render();
+  if (screen === 'arena') arena.frame(dt, t);
   if (screen === 'lab' && lab.run) {
     theater.update(dt);
     theater.render();
@@ -769,6 +912,9 @@ function showHelp() {
       <li><b>推移グラフ</b>をタップすると、その世代の個体を呼び出せます。<b>パレード</b>では節目の世代が並んで走り、進化の歩みがひと目でわかります。</li>
       <li><b>歩容図</b>では筋肉の収縮と足の接地のリズムが「楽譜」のように見えます。</li>
       <li><b>環境</b>を途中で変えると、生物が新しい世界に適応していく過程を観察できます。</li>
+      <li><b>⚔ 闘技場</b> — 育てた生物 (好きな世代) や道場の師範を戦わせます。🏃かけっこ・🤼すもう・🪢つなひき。過去の自分とも戦えます。</li>
+      <li><b>🧬 特訓</b> — 負けた生物を、その相手と戦わせながら進化させます。脳に<span style="color:#ff5b6e">対戦感覚</span>(相手の位置・勢い・接触…) が加わり、最初は配線ゼロ。進化がそれを「使う」ようになる瞬間を、<b>目隠しテスト</b>(対戦感覚を遮断して再戦) で確かめられます。</li>
+      <li><b>昇段戦</b> — 相手に全勝しつづけると昇進し、次はその時の自分が相手になります。終わりのない、自分自身との軍拡競争です。</li>
     </ol>
     <p class="dim">進化は自動保存されます (25世代ごと・画面を離れた時)。ホームから書き出したファイルは、他の端末で読み込めます。</p>`);
 }
@@ -776,9 +922,35 @@ function showHelp() {
 // ════════════════════════════════════════════════════════════
 //  起動
 // ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+//  闘技場 → 特訓
+// ════════════════════════════════════════════════════════════
+const arena = new Arena({ onHome: () => show('home'), onTrain: (f, rival, mode) => startTraining(f, rival, mode) });
+
+const rivalRecord = r => ({ name: r.name, bp: r.bp, hidden: r.hidden, hidden2: r.hidden2 || 0, obj: r.obj, g: Float32Array.from(r.g), src: r.src, gen: r.gen ?? null, hue: 0 });
+
+async function startTraining(f, rival, mode) {
+  const B = BATTLES[mode];
+  const ok = await confirmDialog(`${B.icon} ${B.name}の特訓`,
+    `「${f.name}」の脳をもとに、「${rival.name}」を相手に特訓します。脳には相手を感じる「対戦感覚」が${B.senses.length}個加わります (最初は配線ゼロ)。全勝を${LADDER_STREAK}世代つづけると昇進し、次はその時の自分が相手になります。`, '特訓開始');
+  if (!ok) return;
+  const s = f.settings || DEFAULT_SETTINGS;
+  const settings = {
+    ...DEFAULT_SETTINGS, population: s.population, mutationRate: s.mutationRate, mutationSize: s.mutationSize,
+    hidden: f.hidden, hidden2: f.hidden2 || 0, objective: mode, terrain: B.terrain,
+  };
+  const run = newRun(cloneBlueprint(f.bp), `${f.baseName}・${B.name}`.slice(0, 16), settings, {
+    mode, ladder: true, flags: {},
+    stages: [{ gen: 0, stage: 0, rivals: [rivalRecord(rival)] }],
+    seed: { g: f.g, obj: f.obj },
+  });
+  startLab(run);
+}
+
 function init() {
   initBuilderUI();
   initLabUI();
+  $('#btn-arena').addEventListener('click', () => show('arena'));
   $('#btn-new').addEventListener('click', () => openBuilder(null));
   $('#btn-quick').addEventListener('click', () => openBuilder(PRESETS.quad.bp, store.randomName()));
   $('#btn-import').addEventListener('click', importRun);
@@ -789,4 +961,4 @@ function init() {
 }
 init();
 // デバッグ用
-window.__builder = builder; window.__bv = brainView; window.__lab = lab;
+window.__builder = builder; window.__bv = brainView; window.__lab = lab; window.__arena = arena;

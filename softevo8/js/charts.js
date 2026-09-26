@@ -6,10 +6,10 @@
    ・CladeChart    : 系統の盛衰 (ミュラー図)
    ===================================================================== */
 import { fitCanvas, clamp, muscleHue } from './ui.js';
-import { TERRAINS } from './sim.js';
+import { TERRAINS, isBattle } from './sim.js';
 
-const unitDiv = obj => obj === 'jump' ? 1 : 100;
-const unitName = obj => obj === 'jump' ? 'cm' : obj === 'efficiency' ? 'pt' : 'm';
+const unitDiv = obj => obj === 'jump' || isBattle(obj) ? 1 : 100;
+const unitName = obj => isBattle(obj) ? '点' : obj === 'jump' ? 'cm' : obj === 'efficiency' ? 'pt' : 'm';
 
 export class TimelineChart {
   constructor(canvas, { onPick }) {
@@ -75,7 +75,7 @@ export class TimelineChart {
       ctx.strokeStyle = 'rgba(141,255,176,0.45)'; ctx.setLineDash([3, 3]);
       ctx.beginPath(); ctx.moveTo(x, py0 - 4); ctx.lineTo(x, py1); ctx.stroke(); ctx.setLineDash([]);
       ctx.fillStyle = '#8dffb0'; ctx.font = '10px system-ui';
-      ctx.fillText(TERRAINS[ch.env.terrain]?.icon || '🌍', x, py0 - 8);
+      ctx.fillText(ch.promo ? '🎖' : TERRAINS[ch.env.terrain]?.icon || '🌍', x, py0 - 8);
     }
 
     ctx.save();
@@ -137,7 +137,8 @@ export class TimelineChart {
         const x = X(g);
         ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(x, py0); ctx.lineTo(x, py1); ctx.stroke();
-        const txt = `第${g}世代  最高 ${(e.best / ud).toFixed(2)}  中央 ${(e.median / ud).toFixed(2)}${unitName(obj)}`;
+        const dg = isBattle(obj) ? 0 : 2;
+        const txt = `第${g}世代  最高 ${(e.best / ud).toFixed(dg)}  中央 ${(e.median / ud).toFixed(dg)}${unitName(obj)}`;
         ctx.font = '11px system-ui';
         const tw = ctx.measureText(txt).width + 12, tx = clamp(x + 8, px0, w - tw - 4);
         ctx.fillStyle = 'rgba(10,17,34,0.92)'; ctx.fillRect(tx, py0, tw, 18);

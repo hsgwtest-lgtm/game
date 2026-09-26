@@ -11,8 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="style.css?v=20260925">
-<script>if('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister()));</script>
+<link rel="stylesheet" href="style.css">
 </head>
 <body data-screen="home">
 
@@ -23,6 +22,7 @@
     <p class="tagline">あなたが設計した生き物が、<b>脳を育てて</b>歩き出すまでを観察する。</p>
     <div class="hero-actions">
       <button id="btn-new" class="btn primary big">＋ 新しい生物をつくる</button>
+      <button id="btn-arena" class="btn gold big">⚔ 闘技場</button>
       <button id="btn-quick" class="btn ghost">🐕 おまかせで始める</button>
       <button id="btn-import" class="btn ghost">📂 読み込み</button>
       <button id="btn-help" class="btn ghost">？ 遊び方</button>
@@ -80,7 +80,7 @@
     <div class="lab-title"><span id="lab-name"></span><small id="lab-sub"></small></div>
     <div class="lab-stats">
       <div class="stat"><b id="st-gen">0</b><small>世代</small></div>
-      <div class="stat gold"><b id="st-best">—</b><small>最高記録</small></div>
+      <div class="stat gold"><b id="st-best">—</b><small id="st-best-label">最高記録</small></div>
       <div class="stat"><b id="st-rate">—</b><small>世代/分</small></div>
     </div>
     <div class="seg" id="evo-mode" role="group" aria-label="進化の速さ">
@@ -170,6 +170,50 @@
         <div data-pane="clades" class="pane"><canvas id="clades"></canvas></div>
         <div data-pane="journal" class="pane scroll"><ol id="journal" class="journal"></ol></div>
         <div data-pane="env" class="pane scroll" id="env-pane"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ═══════════════ 闘技場 ═══════════════ -->
+<div id="screen-arena" class="screen">
+  <header class="lab-top arena-top">
+    <button id="arena-home" class="icon-btn" title="ホームへ">←</button>
+    <div class="lab-title"><span>⚔ 闘技場</span><small id="arena-desc"></small></div>
+    <div class="seg" id="arena-mode" role="group" aria-label="種目">
+      <button data-mode="race">🏃<span class="lbl"> かけっこ</span></button>
+      <button data-mode="sumo" class="active">🤼<span class="lbl"> すもう</span></button>
+      <button data-mode="tug">🪢<span class="lbl"> つなひき</span></button>
+    </div>
+  </header>
+  <main class="arena-grid">
+    <section class="panel arena-stage">
+      <div class="th-stage">
+        <canvas id="arena-canvas"></canvas>
+        <div id="arena-score" class="arena-score"></div>
+      </div>
+      <div class="arena-controls">
+        <button id="arena-start" class="btn primary">▶ 三番勝負</button>
+        <div class="seg small" id="arena-speed">
+          <button data-speed="0.25" title="スロー">¼×</button>
+          <button data-speed="1" class="active">1×</button>
+          <button data-speed="2">2×</button>
+          <button data-speed="4">4×</button>
+        </div>
+      </div>
+    </section>
+    <section class="panel arena-side">
+      <div class="panel-head"><h3>出場者</h3></div>
+      <div class="arena-side-body">
+        <div id="arena-entrants" class="entrants"></div>
+        <div id="arena-options"></div>
+        <div id="arena-result" class="arena-result"></div>
+      </div>
+    </section>
+    <section class="panel arena-brains">
+      <div class="brain-duo">
+        <div><div class="duo-head" style="--c:var(--west)">西 <b id="arena-brain-w-name"></b></div><div class="duo-canvas"><canvas id="arena-brain-w"></canvas></div></div>
+        <div><div class="duo-head" style="--c:var(--east)">東 <b id="arena-brain-e-name"></b></div><div class="duo-canvas"><canvas id="arena-brain-e"></canvas></div></div>
       </div>
     </section>
   </main>

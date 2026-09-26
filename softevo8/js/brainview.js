@@ -9,8 +9,17 @@
 import { weightIndex, biasIndex, rhythmHz } from './sim.js';
 import { fitCanvas, clamp, signedColor, muscleHue, POS, NEG } from './ui.js';
 
-const GROUP_COLOR = { stretch: '#ff8fb1', touch: '#ffd166', body: '#7fdcff', clock: '#8dffb0' };
-const GROUP_NAME = { stretch: '筋の伸び', touch: '接地', body: '姿勢/速度', clock: 'リズム' };
+const GROUP_COLOR = { stretch: '#ff8fb1', touch: '#ffd166', body: '#7fdcff', clock: '#8dffb0', foe: '#ff5b6e' };
+const GROUP_NAME = { stretch: '筋の伸び', touch: '接地', body: '姿勢/速度', clock: 'リズム', foe: '対戦感覚' };
+const FOE_DESC = {
+  '相手 前後': '相手が自分の前 (+) にいるか後ろ (−) にいるか、どれだけ離れているか。',
+  '相手 上下': '相手の重心が自分より高い (+) か低い (−) か。下からすくうか、上からのしかかるか。',
+  '相手の勢い': '相手がこちらへ迫ってくる (−) か、離れていく (+) か。',
+  '相手に接触': '相手の体に触れていると 1。組み合った瞬間を知る感覚です。',
+  '土俵の位置': '自分が土俵のどこにいるか。+1 に近いほど前の土俵際、−1 に近いほど背中側の土俵際 (危ない)。',
+  '綱の張り': '綱がどれだけ強く引っぱられているか。0 ならたるんでいる。',
+  '綱の位置': '綱の中心 (赤い印) が自分の側に来ている (+) か相手側 (−) か。±1 で決着。',
+};
 
 export class BrainView {
   constructor(canvas, hooks = {}) {
@@ -92,6 +101,7 @@ export class BrainView {
         touch: 'この点が地面に触れていると 1。足裏の感覚です。',
         body: '体全体の傾きや速さ。バランス感覚です。',
         clock: `脳内の振り子。周期は遺伝子で決まり、この個体は ${rhythmHz(g).toFixed(2)} Hz。歩くリズムの源になりやすい入力です。`,
+        foe: `${FOE_DESC[inp.label] || ''} 対戦の特訓で追加された感覚で、最初は配線ゼロ。進化が「使い道」を見つけると結合が育ちます。`,
       }[inp.group];
       return { title: `感覚: ${inp.label}`, group: inp.group, value: v, desc, links: this.topLinks(n) };
     }
