@@ -12,6 +12,7 @@ import { BrainView } from './brainview.js';
 import { drawThumb } from './world.js';
 import { DOJO } from './dojo.js';
 import * as store from './store.js';
+import { onlineFighter } from './lobby.js';
 import { $, $$, el, toast } from './ui.js';
 
 const RACE_MAX = 6;
@@ -28,6 +29,8 @@ export class Arena {
     this.raceEnv = 'common';
     this.terrain = 'flat';
     this.state = 'idle';
+    this.online = [];   // オンライン道場の生物 (読み込み済みなら)
+    this.replay = null; // 受信箱からの再生中の取組
     this.theater = new Theater($('#arena-canvas'), { onFinish: () => this.onFinish(), onDecision: m => this.onDecision(m) });
     this.brains = [new BrainView($('#arena-brain-w')), new BrainView($('#arena-brain-e'))];
     this.bind();
@@ -81,17 +84,33 @@ export class Arena {
   enter() {
     this.cands = this.candidates();
     const byId = new Map(this.cands.map(c => [c.id, c]));
-    const refresh = f => (f && byId.has(f.cid) ? this.fighter(byId.get(f.cid), f.si) : null);
+    const refresh = f => (!f ? null : f.src === 'online' ? f : byId.has(f.cid) ? this.fighter(byId.get(f.cid), f.si) : null);
     this.duel = this.duel.map(refresh);
     this.racers = this.racers.map(refresh).filter(Boolean);
     this.fillDefaults();
-    this.setMode(this.mode);
+    this.setMode(this.mode, true);
+    if (this.autoplay) { this.autoplay = false; this.start(); }
+  }
+
+  /** 外から出場者を決めて闘技場に入る (オンラインの挑戦・再生・一緒に走る) */
+  setup({ mode, west, east, racer, replay }) {
+    this.stop(false);
+    this.mode = mode;
+    if (west !== undefined) this.duel[0] = west;
+    if (east !== undefined) this.duel[1] = east;
+    if (racer && !this.racers.some(r => r.cid === racer.cid)) {
+      if (this.racers.length >= RACE_MAX) this.racers.pop();
+      this.racers.push(racer);
+    }
+    this.replay = replay || null;
+    this.autoplay = !!replay;
   }
 
   fillDefaults() {
-    const mine = this.cands.filter(c => c.kind === 'run' && !BATTLES[c.obj]);
+    const runs = this.cands.filter(c => c.kind === 'run');
+    const mine = runs.filter(c => !BATTLES[c.obj]);
     const dojo = id => this.cands.find(c => c.id === `dojo:${id}`);
-    if (!this.duel[0]) this.duel[0] = this.fighter(mine[0] || dojo('quad'));
+    if (!this.duel[0]) this.duel[0] = this.fighter(runs.find(c => c.obj === this.mode) || mine[0] || runs[0] || dojo('quad'));
     if (!this.duel[1]) this.duel[1] = this.fighter(dojo(mine.length ? 'biped' : 'inchworm'));
     if (!this.racers.length) {
       const pool = [...mine.slice(0, 3), ...['quad', 'biped', 'inchworm', 'wheel'].map(dojo)];
@@ -99,8 +118,9 @@ export class Arena {
     }
   }
 
-  setMode(mode) {
+  setMode(mode, keepReplay = false) {
     this.stop(false);
+    if (!keepReplay) this.replay = null;
     this.mode = mode;
     $$('#arena-mode button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
     document.body.dataset.arena = mode === 'race' ? 'race' : 'duel';
@@ -140,7 +160,7 @@ export class Arena {
       sel.addEventListener('change', () => onChange(this.fighter(c, +sel.value)));
       info.append(sel);
     }
-    info.append(el('small', {}, c ? c.note : ''));
+    info.append(el('small', {}, c ? c.note : f.note || ''));
     const card = el('div', { class: 'entrant', style: `--c:${color}` },
       el('span', { class: 'ent-side' }, side), cv, info,
       el('div', { class: 'ent-actions' },
@@ -171,6 +191,17 @@ export class Arena {
     section('マイ生物 (世代はあとで選べます)', mine);
     if (!mine.length) box.append(el('p', { class: 'dim' }, 'まだ育てた生物がいません。ホームから生物をつくって進化させると、ここに出場できます。'));
     section('道場', this.cands.filter(c => c.kind === 'dojo'));
+    if (this.online.length) {
+      box.append(el('h4', { class: 'pick-h' }, '🌐 オンライン道場'));
+      const grid = el('div', { class: 'pick-grid' });
+      for (const c of this.online) {
+        const cv = el('canvas', { class: 'pick-thumb' });
+        grid.append(el('button', { class: 'pick-item', onclick: () => { close(); onPick(onlineFighter(c)); } },
+          cv, el('b', {}, c.name), el('small', {}, `${c.owner} さん${c.msg ? `「${c.msg}」` : ''}`)));
+        requestAnimationFrame(() => drawThumb(cv, c.bp));
+      }
+      box.append(grid);
+    }
     box.append(el('div', { class: 'modal-actions' }, el('button', { class: 'btn ghost', onclick: close }, 'とじる')));
     back.append(box);
     back.addEventListener('pointerdown', e => { if (e.target === back) close(); });
@@ -200,6 +231,7 @@ export class Arena {
 
   changed() {
     this.stop(false);
+    this.replay = null;
     this.renderEntrants();
     $('#arena-result').innerHTML = '';
     $('#arena-score').innerHTML = '';
@@ -249,7 +281,7 @@ export class Arena {
       if (!this.racers.length) { this.theater.main = null; return; }
       const lanes = this.raceLanes();
       this.theater.setRun(lanes[0].bp, lanes[0].layout);
-      this.theater.play({ kind: 'lanes', lanes, main: 0, top: 0 });
+      this.theater.play({ kind: 'lanes', lanes, main: 0, top: 0, map: true });
     } else {
       this.prepareDuel();
       this.playBout(0);
@@ -312,6 +344,7 @@ export class Arena {
     const box = $('#arena-result');
     box.innerHTML = '';
     const head = w > l ? `🏆 ${W.name} の勝ち越し` : l > w ? `🏆 ${E.name} の勝ち越し` : '引き分け';
+    if (this.replay) box.append(el('p', { class: 'pane-note' }, `📼 ${new Date(this.replay.created).toLocaleString('ja-JP')} の取組を再生しました。決定論なので、挑戦者が見たのとまったく同じ取組です。`));
     box.append(el('h4', {}, `${head} (${w}勝${l}敗${this.results.length - w - l ? (this.results.length - w - l) + '分' : ''})`));
     const ul = el('ul', { class: 'bout-list' });
     this.results.forEach((r, k) => ul.append(el('li', {},
@@ -331,6 +364,24 @@ export class Arena {
     }
     actions.append(el('button', { class: 'btn ghost small', onclick: () => this.start() }, '↺ もう一度見る'));
     box.append(actions);
+    this.offerPost(box);
+  }
+
+  /** オンラインの生物に自分の生物で挑んだら、結果をひとこと付きで届けられる */
+  offerPost(box) {
+    const oi = this.duel.findIndex(f => f.src === 'online'), mi = this.duel.findIndex(f => f.src === 'run');
+    if (this.replay || oi < 0 || mi < 0 || !this.hooks.onPost) return;
+    const def = this.duel[oi], me = this.duel[mi];
+    const wrap = el('div', { class: 'post-box' }, el('h4', {}, `📨 ${def.owner} さんに結果を届ける`));
+    if (this.hooks.isMe(def.ownerId)) { wrap.append(el('p', { class: 'dim' }, 'これはあなたが公開した生物です。')); box.append(wrap); return; }
+    const inp = el('input', { class: 'on-input', maxlength: 60, placeholder: 'ひとこと (例: いい勝負でした！ / 押し出しを覚えて出直します)' });
+    const btn = el('button', { class: 'btn primary small', onclick: async () => {
+      btn.disabled = true;
+      const ok = await this.hooks.onPost({ mode: this.mode, defender: { id: def.onlineId, name: def.baseName, owner: def.owner, ownerId: def.ownerId }, challenger: me, side: mi, results: this.results, msg: inp.value });
+      if (ok) { wrap.innerHTML = ''; wrap.append(el('p', { class: 'pane-note' }, `📨 届けました。${def.owner} さんの受信箱に、この取組とひとことが並びます。`)); } else btn.disabled = false;
+    } }, '送る');
+    wrap.append(el('p', { class: 'dim' }, `結果と「${me.baseName}」の体・脳が届き、相手は同じ取組を再生できます。`), el('div', { class: 'post-row' }, inp, btn));
+    box.append(wrap);
   }
 
   renderScore() {

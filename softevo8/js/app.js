@@ -8,6 +8,8 @@ import { LADDER_STREAK } from './evo.js';
 import { Builder } from './builder.js';
 import { Theater } from './theater.js';
 import { Arena } from './arena.js';
+import { Lobby, onlineFighter } from './lobby.js';
+import * as online from './online.js';
 import { BrainView } from './brainview.js';
 import { TimelineChart, GaitChart, CladeChart } from './charts.js';
 import { drawThumb } from './world.js';
@@ -25,6 +27,7 @@ function show(name) {
   if (name === 'home') renderHome();
   if (name === 'build') requestAnimationFrame(() => builder.fit());
   if (name === 'arena') arena.enter();
+  if (name === 'online') lobby.enter();
 }
 
 // ════════════════════════════════════════════════════════════
@@ -582,7 +585,7 @@ function playParade() {
   // 対戦では、どの世代も「最初の相手」と取組む = 同じ物差しで成長が見える
   const first = run.battle ? stageOf(run, run.battle.stages[0].stage) : null;
   theater.play({
-    kind: 'lanes',
+    kind: 'lanes', map: !run.battle,
     lanes: picks.map(p => ({
       gen: p.gen, genome: p.g, env, label: `第${p.gen}世代`, hue: run.clades[p.clade] ? run.clades[p.clade].hue : 200,
       ...(first ? { rival: first.prepared[0], opening: OPENINGS[0] } : {}),
@@ -914,6 +917,7 @@ function showHelp() {
       <li><b>環境</b>を途中で変えると、生物が新しい世界に適応していく過程を観察できます。</li>
       <li><b>⚔ 闘技場</b> — 育てた生物 (好きな世代) や道場の師範を戦わせます。🏃かけっこ・🤼すもう・🪢つなひき。過去の自分とも戦えます。</li>
       <li><b>🧬 特訓</b> — 負けた生物を、その相手と戦わせながら進化させます。脳に<span style="color:#ff5b6e">対戦感覚</span>(相手の位置・勢い・接触…) が加わり、最初は配線ゼロ。進化がそれを「使う」ようになる瞬間を、<b>目隠しテスト</b>(対戦感覚を遮断して再戦) で確かめられます。</li>
+      <li><b>🌐 オンライン道場</b> — 生物を公開し、ほかの人の生物に挑戦。結果はひとこと付きで相手に届き、相手は<b>まったく同じ取組を再生</b>して返信やリベンジ特訓ができます。</li>
       <li><b>昇段戦</b> — 相手に全勝しつづけると昇進し、次はその時の自分が相手になります。終わりのない、自分自身との軍拡競争です。</li>
     </ol>
     <p class="dim">進化は自動保存されます (25世代ごと・画面を離れた時)。ホームから書き出したファイルは、他の端末で読み込めます。</p>`);
@@ -925,7 +929,41 @@ function showHelp() {
 // ════════════════════════════════════════════════════════════
 //  闘技場 → 特訓
 // ════════════════════════════════════════════════════════════
-const arena = new Arena({ onHome: () => show('home'), onTrain: (f, rival, mode) => startTraining(f, rival, mode) });
+const arena = new Arena({
+  onHome: () => show('home'),
+  onTrain: (f, rival, mode) => startTraining(f, rival, mode),
+  isMe: id => id === online.profile().id,
+  onPost: async p => {
+    if (!online.profile().name) {
+      const v = prompt('オンラインで表示する名前 (16文字まで)', '');
+      if (!v || !v.trim()) return false;
+      online.setName(v);
+    }
+    try { await online.postBout(p); toast('📨 届けました'); return true; } catch (e) { toast(e.message); return false; }
+  },
+});
+
+// ════════════════════════════════════════════════════════════
+//  オンライン道場
+// ════════════════════════════════════════════════════════════
+const lobby = new Lobby({
+  onHome: () => show('home'),
+  onChallenge: (f, mode) => { arena.setup({ mode, east: f, west: arena.duel[0] && arena.duel[0].src === 'run' ? undefined : null }); show('arena'); },
+  onRace: f => { arena.setup({ mode: 'race', racer: f }); show('arena'); },
+  onTrain: (f, rival, mode) => startTraining(f, rival, mode),
+  onReplay: (b, def) => {
+    arena.setup({ mode: b.mode, west: onlineFighter({ ...b.challenger, id: `ch-${b.id}`, msg: '' }), east: onlineFighter(def), replay: b });
+    show('arena');
+  },
+  myCreatures: () => arena.candidates().filter(c => c.kind === 'run'),
+  fighterOf: (c, si) => arena.fighter(c, si),
+  onData: d => { arena.online = d.creatures; updateOnlineBadge(); },
+});
+
+function updateOnlineBadge() {
+  const n = lobby.unread(), b = $('#btn-online .badge');
+  b.textContent = n || ''; b.classList.toggle('hidden', !n);
+}
 
 const rivalRecord = r => ({ name: r.name, bp: r.bp, hidden: r.hidden, hidden2: r.hidden2 || 0, obj: r.obj, g: Float32Array.from(r.g), src: r.src, gen: r.gen ?? null, hue: 0 });
 
@@ -951,6 +989,9 @@ function init() {
   initBuilderUI();
   initLabUI();
   $('#btn-arena').addEventListener('click', () => show('arena'));
+  $('#btn-online').addEventListener('click', () => show('online'));
+  // 受信箱の新着だけ、そっと確かめておく
+  setTimeout(() => online.fetchAll().then(d => { lobby.data = d; arena.online = d.creatures; updateOnlineBadge(); }).catch(() => {}), 1500);
   $('#btn-new').addEventListener('click', () => openBuilder(null));
   $('#btn-quick').addEventListener('click', () => openBuilder(PRESETS.quad.bp, store.randomName()));
   $('#btn-import').addEventListener('click', importRun);

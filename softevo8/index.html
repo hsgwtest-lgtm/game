@@ -23,6 +23,7 @@
     <div class="hero-actions">
       <button id="btn-new" class="btn primary big">＋ 新しい生物をつくる</button>
       <button id="btn-arena" class="btn gold big">⚔ 闘技場</button>
+      <button id="btn-online" class="btn ghost big">🌐 オンライン道場 <i class="badge hidden"></i></button>
       <button id="btn-quick" class="btn ghost">🐕 おまかせで始める</button>
       <button id="btn-import" class="btn ghost">📂 読み込み</button>
       <button id="btn-help" class="btn ghost">？ 遊び方</button>
@@ -217,6 +218,23 @@
       </div>
     </section>
   </main>
+</div>
+
+<!-- ═══════════════ オンライン道場 ═══════════════ -->
+<div id="screen-online" class="screen">
+  <header class="lab-top online-top">
+    <button id="online-home" class="icon-btn" title="ホームへ">←</button>
+    <div class="lab-title"><span>🌐 オンライン道場</span><small>生物を公開して、挑戦し合い、ひとことを交わす</small></div>
+    <button id="online-name" class="btn ghost small"></button>
+    <button id="online-refresh" class="icon-btn" title="更新">↻</button>
+  </header>
+  <nav class="tabs" id="online-tabs">
+    <button data-tab="sumo" class="active">🤼<span> すもう</span></button>
+    <button data-tab="tug">🪢<span> つなひき</span></button>
+    <button data-tab="race">🏃<span> かけっこ</span></button>
+    <button data-tab="inbox">📬<span> 受信箱</span> <i class="badge hidden"></i></button>
+  </nav>
+  <main id="online-body" class="online-body"></main>
 </div>
 
 <div id="toast" role="status"></div>

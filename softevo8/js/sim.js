@@ -57,7 +57,7 @@ export const BATTLES = {
   },
   tug: {
     name: 'つなひき', icon: '🪢', terrain: 'flat',
-    desc: `綱の中心を自分の側へ ${TUG_WIN}cm 引き込めば勝ち。前に歩くだけでは勝てない。後ずさりと足の踏ん張りが試される`,
+    desc: `綱の赤い印を自分の後ろ側へ ${TUG_WIN}cm 引き込めば勝ち。前へ出ると綱がたるんで印が相手側へ流れ、自滅 (勇み足) する。後ずさりと踏ん張りが試される`,
     senses: ['綱の張り', '綱の位置', '相手の勢い'],
   },
 };
@@ -482,7 +482,7 @@ export class Match {
     this.t = 0; this.done = false; this.ko = false;
     this.winner = -1; this.kimarite = ''; this.endT = 0;
     this.touching = false; this.lastTouch = -999;
-    this.tension = 0;
+    this.tension = 0; this.lastTaut = -999;
     if (mode === 'tug') {
       const A = this.A, B = this.B, fa = A.front, fb = B.front;
       this.ropeL = Math.hypot(B.x[fb] - A.x[fa], B.y[fb] - A.y[fa]);
@@ -527,6 +527,7 @@ export class Match {
     }
     A.post(); B.post();
     if (this.touching) this.lastTouch = this.t;
+    if (this.tension > 0.3) this.lastTaut = this.t;
     this.t++;
     if (!this.done) this.judge();
   }
@@ -617,8 +618,10 @@ export class Match {
       }
     } else {
       const p = this.pull(0);
-      if (p >= TUG_WIN) return finish(0, '引き寄せ', true);
-      if (p <= -TUG_WIN) return finish(1, '引き寄せ', true);
+      // 綱が張っていないのに印が流れた = 負けた側が自分から前へ出た (勇み足)
+      const k = this.t - this.lastTaut > 30 ? '勇み足' : '引き寄せ';
+      if (p >= TUG_WIN) return finish(0, k, true);
+      if (p <= -TUG_WIN) return finish(1, k, true);
     }
     if (this.t >= this.T) {
       const m = this.margin(0);

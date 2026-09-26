@@ -286,15 +286,16 @@ export class Theater {
     const TOP = this.spec.top ?? 46;
     ctx.fillStyle = '#070b16'; ctx.fillRect(0, 0, w, TOP);
     ctx.save(); ctx.translate(0, TOP); h -= TOP;
-    const units = this.units, L = units.length, lh = h / L;
+    const MAP = this.spec.map ? 26 : 0;
+    const units = this.units, L = units.length, lh = (h - MAP) / L;
     const bodies = units.filter(u => !(u instanceof Match));
-    const cam = this.cam;
-    if (bodies.length) {
-      const lead = bodies.reduce((a, b) => (b.centroid()[0] > a.centroid()[0] ? b : a));
-      const Z = clamp(Math.min(w / (this.size * 4.5), lh / (this.size * 1.5)), 0.25, 3) * this.userZoom;
-      cam.zoom = Z;
-      cam.x += (lead.centroid()[0] - w * 0.12 / Z - cam.x) * 0.1;
-    }
+    // 走る生物は各レーンのカメラがそれぞれを追う (ズームは共通 = 大きさを比べられる)
+    const Z = clamp(Math.min(w / (this.size * 4.5), lh / (this.size * 1.5)), 0.25, 3) * this.userZoom;
+    const dist = u => (u.broken ? -Infinity : u.centroid()[0] - u.startX);
+    const order = bodies.slice().sort((a, b) => dist(b) - dist(a));
+    const lead = order.length ? dist(order[0]) : 0;
+    if (MAP) this.renderMap(ctx, w, MAP, bodies, lead);
+    ctx.translate(0, MAP);
     units.forEach((u, i) => {
       ctx.save();
       ctx.beginPath(); ctx.rect(0, i * lh, w, lh); ctx.clip();
@@ -314,15 +315,21 @@ export class Theater {
         ctx.restore();
         if (u.done) label += u.winner === 0 ? `  ○ ${u.kimarite}` : u.winner === 1 ? `  ● ${u.kimarite}` : `  △ ${u.kimarite}`;
       } else {
-        const savedY = cam.y;
-        cam.y = groundY(l.env.terrain, u.centroid()[0]) + lh * 0.25 / cam.zoom;
+        const cx = u.centroid()[0];
+        const cam = u._cam || (u._cam = Object.assign(new Camera(), { x: cx }));
+        cam.zoom = Z;
+        cam.x += (cx - cam.x) * 0.15;
+        cam.y = groundY(l.env.terrain, cx) + lh * 0.25 / Z;
         drawWorld(ctx, cam, w, lh, l.env.terrain, { startX: u.startX });
         ctx.save(); cam.apply(ctx, w, lh);
         drawCreature(ctx, u, {});
         ctx.restore();
-        cam.y = savedY;
         label += `  ${formatFitness(u.fitness(l.env.objective), l.env.objective)}`;
         if (l.rank) label = `${l.rank} ${label}`;
+        else if (bodies.length > 1) {
+          const gap = lead - dist(u);
+          label = `${order.indexOf(u) + 1}位 ${label}${gap > 5 ? `  (−${(gap / 100).toFixed(2)}m)` : ''}`;
+        }
       }
       ctx.font = '700 12px system-ui'; ctx.textAlign = 'left';
       const tw = Math.min(w - 16, ctx.measureText(label).width + 24);
@@ -334,5 +341,28 @@ export class Theater {
       ctx.fillStyle = 'rgba(120,160,255,0.25)'; ctx.fillRect(0, (i + 1) * lh - 1, w, 1);
     });
     ctx.restore();
+  }
+
+  /** 全員の位置関係 (スタート〜先頭) を1本の線に */
+  renderMap(ctx, w, H, bodies, lead) {
+    const x0 = 44, x1 = w - 16, y = H / 2 + 2;
+    const span = Math.max(100, lead) * 1.05;
+    const X = d => x0 + clamp(d / span, 0, 1) * (x1 - x0);
+    ctx.fillStyle = '#0a1122'; ctx.fillRect(0, 0, w, H);
+    ctx.strokeStyle = 'rgba(160,190,255,0.3)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+    ctx.font = '600 10px system-ui'; ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(200,220,255,0.6)';
+    ctx.fillText('START', x0 - 6, y + 3);
+    ctx.textAlign = 'center';
+    for (let m = 1; m * 100 < span; m++) {
+      if (span > 1200 && m % 5) continue;
+      ctx.fillStyle = 'rgba(160,190,255,0.35)'; ctx.fillRect(X(m * 100) - 0.5, y - 3, 1, 6);
+    }
+    for (const u of bodies) {
+      const d = u.broken ? 0 : u.centroid()[0] - u.startX;
+      ctx.fillStyle = `hsl(${u.lane.hue ?? 200},80%,65%)`;
+      ctx.beginPath(); ctx.arc(X(d), y, 5, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#070b16'; ctx.lineWidth = 1.5; ctx.stroke();
+    }
   }
 }
