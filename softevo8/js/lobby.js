@@ -16,7 +16,7 @@ const when = t => new Date(t).toLocaleString('ja-JP', { month: 'numeric', day: '
 /** 公開された生物 → 闘技場の出場者 */
 export function onlineFighter(c) {
   return {
-    cid: `online:${c.id}`, si: 0, src: 'online', onlineId: c.id, owner: c.owner, ownerId: c.ownerId,
+    cid: `online:${c.id}`, si: 0, src: 'online', mode: c.mode, onlineId: c.id, owner: c.owner, ownerId: c.ownerId,
     baseName: c.name, name: `${c.name}(${c.owner})`, bp: c.bp, hidden: c.hidden, hidden2: c.hidden2, obj: c.obj, g: c.g, gen: c.gen,
     settings: { ...DEFAULT_SETTINGS }, hue: 0, note: `🌐 ${c.owner} さんの生物${c.msg ? ` 「${c.msg}」` : ''}`,
   };
@@ -263,7 +263,7 @@ export class Lobby {
       ? el('button', { class: 'btn primary small', onclick: () => this.hooks.onReplay(b, def) }, '▶ この取組を見る')
       : el('span', { class: 'dim' }, '(生物は取り下げ済み)'));
     if (kind === 'toMe') {
-      acts.append(el('button', { class: 'btn ghost small', title: '挑戦者を相手に特訓', onclick: () => this.train(def ? onlineFighter(def) : null, { ...onlineFighter({ ...ch, id: `ch-${b.id}`, msg: '' }), name: `${ch.name}(${ch.owner})` }, b.mode) }, '🧬 リベンジ特訓'));
+      acts.append(el('button', { class: 'btn ghost small', title: '挑戦者を相手に特訓', onclick: () => this.train(def ? onlineFighter(def) : null, { ...onlineFighter({ ...ch, mode: b.mode, id: `ch-${b.id}`, msg: '' }), name: `${ch.name}(${ch.owner})` }, b.mode) }, '🧬 リベンジ特訓'));
       if (!b.reply) {
         const inp = el('input', { class: 'on-input', maxlength: 60, placeholder: '返信 (例: 次は負けない！)' });
         acts.append(inp, el('button', { class: 'btn ghost small', onclick: async () => {

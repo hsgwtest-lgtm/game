@@ -205,6 +205,7 @@ body.brain-full .brain-panel { position: fixed; inset: 0; z-index: 60; border-ra
 .arena-grid { display: grid; gap: 8px; padding: 8px; grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr); grid-template-rows: minmax(0, 1.35fr) minmax(0, 1fr); grid-template-areas: "stage side" "brains side"; height: calc(100dvh - var(--top-h) - env(safe-area-inset-top)); }
 body[data-arena="race"] .arena-grid { grid-template-areas: "stage side" "stage side"; }
 body[data-arena="race"] .arena-brains { display: none; }
+body[data-arena="duel"] #arena-ghosts { display: none; }
 .arena-stage { grid-area: stage; }
 .arena-side { grid-area: side; }
 .arena-brains { grid-area: brains; }

@@ -42,6 +42,7 @@ export class Arena {
       this.theater.speed = +b.dataset.speed;
       $$('#arena-speed button').forEach(x => x.classList.toggle('active', x === b));
     }));
+    $('#arena-ghosts').addEventListener('click', e => { this.theater.showGhosts = !this.theater.showGhosts; e.currentTarget.classList.toggle('active', this.theater.showGhosts); });
     $('#arena-start').addEventListener('click', () => (this.state === 'playing' ? this.stop() : this.start()));
     $('#arena-home').addEventListener('click', () => { this.stop(); this.hooks.onHome(); });
   }
@@ -112,9 +113,9 @@ export class Arena {
     const dojo = id => this.cands.find(c => c.id === `dojo:${id}`);
     if (!this.duel[0]) this.duel[0] = this.fighter(runs.find(c => c.obj === this.mode) || mine[0] || runs[0] || dojo('quad'));
     if (!this.duel[1]) this.duel[1] = this.fighter(dojo(mine.length ? 'biped' : 'inchworm'));
-    if (!this.racers.length) {
-      const pool = [...mine.slice(0, 3), ...['quad', 'biped', 'inchworm', 'wheel'].map(dojo)];
-      this.racers = pool.slice(0, 4).map(c => this.fighter(c));
+    if (this.racers.length < 2) {
+      const pool = [...mine.slice(0, 3), ...['quad', 'biped', 'inchworm', 'wheel'].map(dojo)].filter(c => c && !this.racers.some(r => r.cid === c.id));
+      this.racers.push(...pool.slice(0, 4 - this.racers.length).map(c => this.fighter(c)));
     }
   }
 
@@ -122,6 +123,10 @@ export class Arena {
     this.stop(false);
     if (!keepReplay) this.replay = null;
     this.mode = mode;
+    // オンラインの生物は、公開された種目にしか出られない (かけっこに出た生物ですもうはとれない)
+    const fits = f => !f || f.src !== 'online' || f.mode === mode;
+    if (mode !== 'race') this.duel = this.duel.map(f => (fits(f) ? f : null));
+    this.fillDefaults();
     $$('#arena-mode button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
     document.body.dataset.arena = mode === 'race' ? 'race' : 'duel';
     $('#arena-desc').textContent = `${ARENA_MODES[mode].icon} ${ARENA_MODES[mode].desc}`;
@@ -191,10 +196,11 @@ export class Arena {
     section('マイ生物 (世代はあとで選べます)', mine);
     if (!mine.length) box.append(el('p', { class: 'dim' }, 'まだ育てた生物がいません。ホームから生物をつくって進化させると、ここに出場できます。'));
     section('道場', this.cands.filter(c => c.kind === 'dojo'));
-    if (this.online.length) {
-      box.append(el('h4', { class: 'pick-h' }, '🌐 オンライン道場'));
+    const online = this.online.filter(c => c.mode === this.mode);
+    if (online.length) {
+      box.append(el('h4', { class: 'pick-h' }, `🌐 オンライン道場 (${ARENA_MODES[this.mode].name}に出ている生物)`));
       const grid = el('div', { class: 'pick-grid' });
-      for (const c of this.online) {
+      for (const c of online) {
         const cv = el('canvas', { class: 'pick-thumb' });
         grid.append(el('button', { class: 'pick-item', onclick: () => { close(); onPick(onlineFighter(c)); } },
           cv, el('b', {}, c.name), el('small', {}, `${c.owner} さん${c.msg ? `「${c.msg}」` : ''}`)));

@@ -248,7 +248,7 @@ export class Theater {
     ctx.save(); this.cam.apply(ctx, w, h);
     drawCreature(ctx, B, sp.tintRival === false ? {} : { tint: sp.rival.hue ?? 0 });
     drawCreature(ctx, A, this.glow());
-    if (m.mode === 'tug') drawRope(ctx, A.x[A.front], A.y[A.front], B.x[B.front], B.y[B.front], m.ropeL);
+    if (m.mode === 'tug') drawRope(ctx, A.x[A.back], A.y[A.back], B.x[B.back], B.y[B.back], m.ropeL);
     ctx.restore();
 
     // 名札
@@ -311,7 +311,7 @@ export class Theater {
         ctx.save(); lc.apply(ctx, w, lh);
         drawCreature(ctx, u.B, { tint: l.rival.hue ?? 0 });
         drawCreature(ctx, u.A, {});
-        if (u.mode === 'tug') drawRope(ctx, u.A.x[u.A.front], u.A.y[u.A.front], u.B.x[u.B.front], u.B.y[u.B.front], u.ropeL);
+        if (u.mode === 'tug') drawRope(ctx, u.A.x[u.A.back], u.A.y[u.A.back], u.B.x[u.B.back], u.B.y[u.B.back], u.ropeL);
         ctx.restore();
         if (u.done) label += u.winner === 0 ? `  ○ ${u.kimarite}` : u.winner === 1 ? `  ● ${u.kimarite}` : `  △ ${u.kimarite}`;
       } else {
@@ -322,6 +322,13 @@ export class Theater {
         cam.y = groundY(l.env.terrain, cx) + lh * 0.25 / Z;
         drawWorld(ctx, cam, w, lh, l.env.terrain, { startX: u.startX });
         ctx.save(); cam.apply(ctx, w, lh);
+        // ほかのレーンの生物をゴーストで重ねる (同じ地形のときだけ: スタート位置をそろえて描く)
+        if (this.showGhosts) for (const o of bodies) {
+          if (o === u || o.lane.env.terrain !== l.env.terrain) continue;
+          ctx.save(); ctx.translate(u.startX - o.startX, 0);
+          drawCreature(ctx, o, { ghost: o.lane.hue ?? 200, alpha: 0.22, eyes: false });
+          ctx.restore();
+        }
         drawCreature(ctx, u, {});
         ctx.restore();
         label += `  ${formatFitness(u.fitness(l.env.objective), l.env.objective)}`;
