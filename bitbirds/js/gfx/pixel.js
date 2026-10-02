@@ -94,11 +94,13 @@ function hexToVec3(h) {
 }
 
 export class PixelRenderer {
-  constructor(canvas) {
+  // opts.fixed = { w, h, k } で出力サイズを固定（広告動画の書き出し用）
+  constructor(canvas, opts = {}) {
     this.canvas = canvas;
+    this.fixed = opts.fixed || null;
     const r = new THREE.WebGLRenderer({
       canvas, antialias: false, alpha: false, depth: true, stencil: false,
-      powerPreference: 'high-performance', preserveDrawingBuffer: false,
+      powerPreference: 'high-performance', preserveDrawingBuffer: !!opts.preserve,
     });
     r.setPixelRatio(1);
     r.autoClear = false;
@@ -155,6 +157,7 @@ export class PixelRenderer {
 
   // 画面サイズから「仮想ピクセル」の大きさを決める
   resize() {
+    if (this.fixed) return this._resizeFixed();
     const cssW = Math.max(1, window.innerWidth), cssH = Math.max(1, window.innerHeight);
     const dpr = Math.min(3, window.devicePixelRatio || 1);
     const devW = Math.round(cssW * dpr), devH = Math.round(cssH * dpr);
@@ -185,6 +188,24 @@ export class PixelRenderer {
     this.safe.l = Math.max(0, Math.ceil((ins.l * dpr - this.offX) / k));
     this.safe.r = Math.max(0, Math.ceil((ins.r * dpr - this.offX) / k));
     // UIフレームバッファとテクスチャ
+    this._setupUI(VW, VH, k);
+  }
+
+  _resizeFixed() {
+    const { w, h, k } = this.fixed;
+    const cssW = Math.max(1, window.innerWidth), cssH = Math.max(1, window.innerHeight - (this.fixed.reserve || 0));
+    const sc = Math.min(cssW / w, cssH / h);
+    this.canvas.style.width = Math.floor(w * sc) + 'px';
+    this.canvas.style.height = Math.floor(h * sc) + 'px';
+    this.canvas.style.left = Math.floor((cssW - w * sc) / 2) + 'px';
+    this.renderer.setSize(w, h, false);
+    this.k = k; this.VW = Math.floor(w / k); this.VH = Math.floor(h / k); this.dpr = 1;
+    this.devW = w; this.devH = h; this.offX = 0; this.offY = 0;
+    this.safe.t = this.safe.b = this.safe.l = this.safe.r = 0;
+    this._setupUI(this.VW, this.VH, k);
+  }
+
+  _setupUI(VW, VH, k) {
     this.fb.resize(VW, VH);
     if (this.uiTex) this.uiTex.dispose();
     this.uiTex = new THREE.DataTexture(this.fb.data, VW, VH, THREE.RGBAFormat, THREE.UnsignedByteType);

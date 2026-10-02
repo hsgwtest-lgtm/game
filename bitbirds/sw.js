@@ -1,7 +1,8 @@
 // 自動生成（tools/build_sw.py）: オフラインでも遊べるようにファイルをキャッシュする
-const CACHE = 'bitbirds-08541fbcb1';
+const CACHE = 'bitbirds-d0c0712d37';
 const ASSETS = [
   './',
+  './ad.html',
   './index.html',
   './manifest.json',
   './style.css',
@@ -10,6 +11,8 @@ const ASSETS = [
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
   './js/main.js',
+  './js/ad/addata.js',
+  './js/ad/admain.js',
   './js/core/audio.js',
   './js/core/config.js',
   './js/core/rng.js',
@@ -41,7 +44,8 @@ const ASSETS = [
   './js/ui/viz.js',
   './js/ui/widgets.js',
   './js/world/world3d.js',
-  './lib/three.min.js'
+  './lib/three.min.js',
+  './tmp_test/ad.html'
 ];
 
 self.addEventListener('install', (e) => {

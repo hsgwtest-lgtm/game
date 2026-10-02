@@ -40,6 +40,13 @@ export class Sound {
     } catch (e) { /* 音が出せなくてもゲームは続ける */ }
   }
 
+  // 録画用：全体の音を MediaStream としても取り出す
+  recordStream() {
+    if (!this.ctx || !this.ctx.createMediaStreamDestination) return null;
+    if (!this.recDest) { this.recDest = this.ctx.createMediaStreamDestination(); this.master.connect(this.recDest); }
+    return this.recDest.stream;
+  }
+
   setOn(on) {
     this.on = on;
     if (this.master) this.master.gain.setTargetAtTime(on ? 0.9 : 0, this.ctx.currentTime, 0.02);
