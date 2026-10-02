@@ -75,18 +75,19 @@ def main():
              "function __req(n) { if (!(n in __cache)) { if (!__defs[n]) throw new Error('module not found: ' + n); __cache[n] = __defs[n](); } return __cache[n]; }\n"]
     for p in sorted(js_files):
         parts.append(transform(p))
-    parts.append("__req('js/main.js');\n")
+    entry = os.environ.get('ENTRY', 'js/main.js')
+    parts.append(f"__req('{entry}');\n")
     bundle = ''.join(parts)
     with open(os.path.join(ROOT, 'lib', 'three.min.js'), encoding='utf-8') as fh:
         three = fh.read()
     with open(os.path.join(ROOT, 'style.css'), encoding='utf-8') as fh:
         css = fh.read()
-    with open(os.path.join(ROOT, 'index.html'), encoding='utf-8') as fh:
+    with open(os.path.join(ROOT, os.environ.get('PAGE', 'index.html')), encoding='utf-8') as fh:
         html = fh.read()
     html = re.sub(r'<link rel="(manifest|apple-touch-icon|icon)"[^>]*>\s*', '', html)
     html = html.replace('<link rel="stylesheet" href="style.css">', f'<style>{css}</style>')
     html = html.replace('<script src="lib/three.min.js"></script>', f'<script>{three}</script>')
-    html = html.replace('<script type="module" src="js/main.js"></script>', f'<script>\n{bundle}\n</script>')
+    html = re.sub(r'<script type="module" src="[^"]+"></script>', lambda m: f'<script>\n{bundle}\n</script>', html)
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, 'w', encoding='utf-8') as fh:
         fh.write(html)
