@@ -1,0 +1,17 @@
+{
+  "name": "DOT DOJO — AI三流派 修行録",
+  "short_name": "DOT DOJO",
+  "description": "進化・強化学習・模倣学習。3つの流派でAIのでしを鍛える、全画面ドット絵の機械学習ゲーム",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#181425",
+  "theme_color": "#181425",
+  "lang": "ja",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
