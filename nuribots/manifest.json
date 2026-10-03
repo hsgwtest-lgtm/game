@@ -1,0 +1,17 @@
+{
+  "name": "NURIBOTS — ごほうびで育てるAIぬりバトル",
+  "short_name": "NURIBOTS",
+  "description": "ごほうび（報酬）を設計して、強化学習でAIロボを育てる。床をぬり合うドット絵の陣取りバトル。オンライン対戦つき。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#2e222f",
+  "theme_color": "#2e222f",
+  "lang": "ja",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
