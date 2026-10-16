@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="AI EYE 64">
+  <meta name="theme-color" content="#e4e8eb">
+  <meta name="description" content="あなたの運転をお手本に、64×64ピクセルの目で見るAIが運転を覚える。どこを見て判断したかをヒートマップで確かめる、模倣学習の教習所。">
+  <title>AI EYE 64 — 64×64の目で走る教習所</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app" id="app">
+  <header class="bar">
+    <h1 class="logo">AI EYE <span class="limit" aria-label="64">64</span></h1>
+    <button class="help-btn" id="helpBtn" aria-label="遊び方を見る">?</button>
+  </header>
+
+  <section class="stage" id="stage" aria-label="コース">
+    <canvas id="view"></canvas>
+
+    <div class="eye" id="eye">
+      <button class="eye-btn" id="eyeBtn" aria-label="AIの目を大きく表示する">
+        <div class="eye-frame">
+          <canvas id="eyeCanvas" width="64" height="64"></canvas>
+          <canvas id="heatCanvas" width="64" height="64"></canvas>
+        </div>
+        <div class="eye-cap">
+          <b>AIの目</b><span>64×64</span>
+        </div>
+      </button>
+    </div>
+
+    <div class="hud" aria-live="off">
+      <span class="chip">周回<b id="hudLaps">0</b></span>
+      <span class="chip">コースアウト<b id="hudOffs">0</b></span>
+      <span class="chip">連続<b id="hudRun">0 m</b></span>
+    </div>
+    <button class="speed" id="speedBtn">速さ：ふつう</button>
+    <span class="badge" id="expertBadge" hidden>お手本：自動</span>
+    <div class="empty" id="emptyMsg" hidden></div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </section>
+
+  <nav class="modes" role="tablist" aria-label="進め方">
+    <button class="mode" role="tab" id="tab-teach" data-mode="teach" aria-selected="true" aria-controls="panel-teach"><span class="num">1</span>教える</button>
+    <button class="mode" role="tab" id="tab-train" data-mode="train" aria-selected="false" aria-controls="panel-train"><span class="num">2</span>学習<i class="run" id="trainRun" hidden></i></button>
+    <button class="mode" role="tab" id="tab-drive" data-mode="drive" aria-selected="false" aria-controls="panel-drive"><span class="num">3</span>AIが運転</button>
+  </nav>
+
+  <!-- 1 教える -->
+  <section class="panel" id="panel-teach" role="tabpanel" aria-labelledby="tab-teach">
+    <p class="lead">◀ ▶ を押している間だけハンドルを切ります。コースを<strong>2〜3周</strong>走って、お手本を記録しましょう。</p>
+    <div class="row">
+      <div class="count"><b id="sampleCount">0</b>場面を記録</div>
+      <span class="spacer"></span>
+      <button class="link" id="clearBtn">記録を消す</button>
+    </div>
+    <div class="mix" id="mix" aria-label="記録した操作の内訳">
+      <span>左</span><span class="track"><i class="fill" id="mixL"></i></span><span class="num" id="mixLn">0</span>
+      <span>直進</span><span class="track"><i class="fill" id="mixS"></i></span><span class="num" id="mixSn">0</span>
+      <span>右</span><span class="track"><i class="fill" id="mixR"></i></span><span class="num" id="mixRn">0</span>
+    </div>
+    <div class="opt">
+      <button class="toggle" id="augToggle" aria-pressed="false">ずらした目でも記録</button>
+      <p class="hint">オンにすると、左右に10°向きを変えた画像にも「戻す操作」をつけて記録します（データの水増し）。AIが立て直しを苦手にしているときに試してみてください。記録と学習の時間はおよそ2倍になります。</p>
+    </div>
+  </section>
+
+  <!-- 2 学習 -->
+  <section class="panel" id="panel-train" role="tabpanel" aria-labelledby="tab-train" hidden>
+    <div class="row">
+      <button class="btn" id="trainBtn">学習をはじめる</button>
+      <span class="spacer"></span>
+      <div class="seg" id="epochSeg" role="group" aria-label="学習の回数">
+        <button data-ep="3" aria-pressed="false">3回</button>
+        <button data-ep="6" aria-pressed="true">6回</button>
+        <button data-ep="12" aria-pressed="false">12回</button>
+      </div>
+    </div>
+    <p class="warn" id="trainWarn" hidden></p>
+    <div class="progress" aria-hidden="true"><i id="trainBar"></i></div>
+    <p class="status" id="trainStatus">まだ学習していません。</p>
+    <div class="chart-box" id="chartBox">
+      <p class="chart-title">正解率（AIの操作があなたと同じだった割合）</p>
+      <div class="legend">
+        <span><svg width="22" height="10" aria-hidden="true"><line x1="0" y1="5" x2="22" y2="5" stroke="#1d5daf" stroke-width="2"/><circle cx="11" cy="5" r="4" fill="#1d5daf" stroke="#fff" stroke-width="2"/></svg>学習データ</span>
+        <span><svg width="22" height="10" aria-hidden="true"><line x1="0" y1="5" x2="22" y2="5" stroke="#0e9f4b" stroke-width="2"/><circle cx="11" cy="5" r="4" fill="#0e9f4b" stroke="#fff" stroke-width="2"/></svg>検証データ</span>
+      </div>
+      <svg id="chart" viewBox="0 0 320 150" role="img" aria-label="正解率のグラフ"></svg>
+      <div class="tip" id="chartTip" hidden></div>
+      <p class="hint">検証データは、学習に使わずに取っておいた記録（7枚に1枚）です。初めて見る場面でも当てられるかの目安になります。</p>
+      <table class="sr-only" id="chartTable"><caption>回ごとの正解率</caption><thead><tr><th>回</th><th>学習データ</th><th>検証データ</th></tr></thead><tbody></tbody></table>
+    </div>
+    <p class="hint">記録した場面から、AIが「この見え方ならこう切る」を覚えます。学習中もAIが走るので、回を重ねるごとの上達を見てください。「回数」はデータ全体を何周して学ぶかです。</p>
+    <button class="link" id="resetBtn" hidden>はじめから学習し直す</button>
+  </section>
+
+  <!-- 3 AIが運転 -->
+  <section class="panel" id="panel-drive" role="tabpanel" aria-labelledby="tab-drive" hidden>
+    <div>
+      <p class="chart-title">AIの判断</p>
+      <div class="probs" id="probs">
+        <span>左</span><span class="track"><i class="fill" id="pL"></i></span><span class="pct" id="pLn">–</span>
+        <span>直進</span><span class="track"><i class="fill" id="pS"></i></span><span class="pct" id="pSn">–</span>
+        <span>右</span><span class="track"><i class="fill" id="pR"></i></span><span class="pct" id="pRn">–</span>
+      </div>
+    </div>
+    <p class="key-line"><span class="heat-key" aria-hidden="true">弱<i></i>強</span>ヒートマップは、AIが判断の手がかりにした場所です。</p>
+    <div class="toggles">
+      <button class="toggle" id="heatToggle" aria-pressed="true">注目ヒートマップ</button>
+      <button class="toggle" id="featToggle" aria-pressed="false">特徴マップ（1層目）</button>
+      <button class="toggle" id="bigToggle" aria-pressed="false">AIの目を大きく</button>
+    </div>
+    <div class="feat" id="featBox" hidden>
+      <canvas id="featCanvas" width="123" height="61"></canvas>
+      <p>1層目の8枚のフィルターが反応した場所です。白いほど強く反応しています。縁石やコースの端を拾っているものを探してみてください。</p>
+    </div>
+    <p class="lead" id="driveLead">危ない場面で ◀ ▶ を押すと、その場面を正しい操作として記録に足せます。</p>
+    <div class="row">
+      <div class="count"><b id="addCount">0</b>場面を追加</div>
+      <span class="spacer"></span>
+      <button class="btn small" id="retrainBtn" disabled>追加分も入れて学習する</button>
+    </div>
+  </section>
+
+  <div class="pads" id="pads">
+    <button class="pad" id="padL" aria-label="左にハンドルを切る">
+      <svg viewBox="0 0 30 30" aria-hidden="true"><path d="M19 5 L8 15 L19 25" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>左
+    </button>
+    <button class="pad" id="padR" aria-label="右にハンドルを切る">右
+      <svg viewBox="0 0 30 30" aria-hidden="true"><path d="M11 5 L22 15 L11 25" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+</div>
+
+<div class="sheet" id="help" hidden>
+  <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <h2 id="helpTitle"><span class="wakaba" aria-hidden="true"></span>64×64の目で走る教習所</h2>
+    <p class="sub">AIはあなたの運転を見て、まねをして運転を覚えます（模倣学習）。</p>
+    <ol class="steps">
+      <li><span class="n">1</span><div><h3>教える</h3><p>◀ ▶ でコースを2〜3周走ります。そのあいだ、AIの目に映った64×64の画像と、あなたの操作がセットで記録されます。</p></div></li>
+      <li><span class="n">2</span><div><h3>学習</h3><p>記録をもとに、小さなCNN（画像向けのニューラルネット）が「この見え方なら左・直進・右のどれか」を覚えます。計算はすべてこの端末の中で行います。</p></div></li>
+      <li><span class="n">3</span><div><h3>AIが運転</h3><p>覚えたAIがハンドルを握ります。AIの目の上で赤く光るところが、判断の手がかりにした場所です（Grad-CAM）。</p></div></li>
+    </ol>
+    <p class="note">うまく走れないときは、AIが外れそうな場面で ◀ ▶ を押して教え直し、もう一度学習させてみてください。お手本から外れた場面に弱いのが、模倣学習の特徴です。</p>
+    <button class="btn" id="helpClose">はじめる</button>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

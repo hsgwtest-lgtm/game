@@ -1,0 +1,522 @@
+/* AI EYE 64 — 教習所の昼のコースと道路標識の色を下地にしたテーマ */
+:root {
+  --road: #e4e8eb;      /* コンクリートの地色 */
+  --paper: #ffffff;
+  --sign: #1d5daf;      /* 標識ブルー */
+  --sign-deep: #123f7c;
+  --stop: #d7263d;      /* 制限速度の赤 */
+  --leaf-g: #0e9f4b;    /* 若葉マークの緑 */
+  --leaf-y: #ffd60a;    /* 若葉マークの黄 */
+  --ink: #1b2026;
+  --ink-2: #4a5560;
+  --line: #c9d0d6;
+  --sky: #a9d9f2;
+  --pad-h: 92px;
+  --font: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+
+html, body { height: 100%; }
+
+body {
+  background: var(--road);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.6;
+  font-variant-numeric: tabular-nums;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  overscroll-behavior: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+button:focus-visible, [tabindex]:focus-visible {
+  outline: 3px solid var(--leaf-y);
+  outline-offset: 2px;
+}
+
+.app {
+  height: 100vh;
+  height: 100svh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* ---------- ヘッダー ---------- */
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px 6px;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+/* 「64」は最高速度の標識：白地に赤い輪、青い数字 */
+.limit {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 4px solid var(--stop);
+  color: var(--sign);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+.help-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  font-weight: 800;
+  font-size: 17px;
+  display: grid;
+  place-items: center;
+}
+
+/* ---------- 3D ステージ ---------- */
+.stage {
+  position: relative;
+  flex: none;
+  height: 44vh;
+  height: 44svh;
+  min-height: 220px;
+  margin: 0 10px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--sky);
+}
+#view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* AIの目：64×64 をそのままドットで拡大する */
+.eye {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  width: 38%;
+  max-width: 190px;
+  min-width: 128px;
+  transition: all 0.25s ease;
+  z-index: 3;
+}
+.eye-btn { display: block; width: 100%; text-align: left; }
+.eye-frame {
+  position: relative;
+  aspect-ratio: 1;
+  background: var(--ink);
+  border: 3px solid var(--ink);
+  border-radius: 8px 8px 0 0;
+  overflow: hidden;
+}
+.eye-frame canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+.eye-cap {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  padding: 5px 7px 6px;
+  border-radius: 0 0 8px 8px;
+}
+.eye-cap b { font-weight: 700; }
+.eye-cap span { opacity: 0.8; }
+.key-line { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-2); line-height: 1.5; }
+.heat-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--ink-2);
+  flex: none;
+}
+.heat-key i {
+  display: inline-block;
+  width: 30px;
+  height: 7px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(255, 214, 10, 0.35), #ffd60a 40%, #f08a24 70%, #d7263d);
+}
+
+.stage.big .eye {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(78%, calc(100% - 60px));
+  max-width: min(78%, calc(46svh - 60px));
+}
+.stage.big .hud, .stage.big .speed, .stage.big .badge { display: none; }
+.stage.big::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(27, 32, 38, 0.45);
+  z-index: 2;
+}
+
+.hud {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  z-index: 3;
+}
+.chip {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+.chip b { color: var(--ink); font-size: 14px; font-weight: 800; margin-left: 4px; }
+
+.speed {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 3;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.badge {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 3;
+  background: var(--leaf-y);
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.toast {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%) scale(0.9);
+  background: var(--stop);
+  color: #fff;
+  font-weight: 800;
+  font-size: 17px;
+  padding: 6px 16px;
+  border-radius: 999px;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+  z-index: 4;
+  white-space: nowrap;
+}
+.toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.toast.info { background: var(--sign); }
+
+.empty {
+  position: absolute;
+  inset: auto 12px 50px 12px;
+  z-index: 3;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+/* ---------- モード切り替え（順番に進むので番号つき） ---------- */
+.modes {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 10px 10px 0;
+}
+.mode {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--paper);
+  font-weight: 700;
+  font-size: 15px;
+  position: relative;
+}
+.mode .num {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+.mode[aria-selected="true"] { background: var(--sign); color: #fff; }
+.mode .run {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 4px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--leaf-y);
+  transform-origin: left;
+  transform: scaleX(0);
+}
+
+/* ---------- パネル ---------- */
+.panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 8px 10px 10px;
+  background: var(--paper);
+  border-radius: 14px;
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.panel[hidden] { display: none; }
+.lead { font-size: 14px; color: var(--ink-2); line-height: 1.6; }
+.hint { font-size: 12px; color: var(--ink-2); line-height: 1.55; }
+.opt { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.lead strong { color: var(--ink); }
+
+.row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.spacer { flex: 1; }
+
+.count {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.count b { font-size: 24px; font-weight: 800; color: var(--ink); margin-right: 2px; }
+
+.mix { display: grid; grid-template-columns: auto 1fr auto; gap: 3px 8px; align-items: center; font-size: 12px; color: var(--ink-2); }
+.mix .track { height: 8px; border-radius: 4px; background: var(--road); overflow: hidden; }
+.mix .fill { display: block; height: 100%; border-radius: 4px; background: var(--ink-2); width: 0; transition: width 0.2s; }
+.mix .num { text-align: right; min-width: 3.2em; color: var(--ink); }
+
+.btn {
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 15px;
+  background: var(--sign);
+  color: #fff;
+}
+.btn:active { background: var(--sign-deep); }
+.btn[disabled] { background: var(--line); color: var(--ink-2); cursor: default; }
+.btn.stop { background: var(--stop); }
+.btn.ghost { background: transparent; color: var(--sign); border: 2px solid var(--sign); }
+.btn.small { height: 34px; padding: 0 12px; font-size: 13px; }
+.link {
+  align-self: flex-start;
+  color: var(--sign);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 6px 2px;
+}
+
+.seg { display: inline-flex; border: 2px solid var(--sign); border-radius: 9px; overflow: hidden; }
+.seg button { padding: 4px 12px; font-size: 13px; font-weight: 700; color: var(--sign); }
+.seg button[aria-pressed="true"] { background: var(--sign); color: #fff; }
+
+.progress { height: 8px; background: var(--road); border-radius: 4px; overflow: hidden; }
+.progress i { display: block; height: 100%; width: 0; background: var(--leaf-g); border-radius: 4px; }
+.status { font-size: 13px; color: var(--ink-2); }
+.status b { color: var(--ink); }
+.warn { font-size: 13px; color: var(--stop); font-weight: 700; }
+
+/* 学習グラフ */
+.chart-box { position: relative; }
+.chart-title { font-size: 13px; font-weight: 700; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--ink-2); margin: 2px 0 2px; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.legend svg { overflow: visible; }
+#chart { width: 100%; height: auto; display: block; touch-action: none; }
+.tip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--ink);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  transform: translate(-50%, -100%);
+}
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* AIの判断（確率） */
+.probs { display: grid; grid-template-columns: 2.6em 1fr 3em; gap: 5px 8px; align-items: center; font-size: 13px; }
+.probs .track { height: 12px; border-radius: 4px; background: var(--road); overflow: hidden; }
+.probs .fill { display: block; height: 100%; width: 0; border-radius: 4px; background: var(--sign); }
+.probs .pct { text-align: right; font-weight: 700; }
+.probs .top { color: var(--sign); }
+
+.toggles { display: flex; flex-wrap: wrap; gap: 6px; }
+.toggle {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 2px solid var(--line);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+.toggle[aria-pressed="true"] { border-color: var(--sign); color: var(--sign); background: #eaf1fb; }
+
+.feat { display: flex; gap: 10px; align-items: center; }
+.feat canvas { width: 62%; max-width: 260px; image-rendering: pixelated; image-rendering: crisp-edges; background: var(--ink); border-radius: 6px; }
+.feat p { font-size: 12px; color: var(--ink-2); line-height: 1.5; }
+
+/* ---------- ハンドル用の大きなボタン ---------- */
+.pads {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 0 10px 12px;
+}
+.pad {
+  height: var(--pad-h);
+  border-radius: 16px;
+  background: var(--sign);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 800;
+  touch-action: none;
+  -webkit-touch-callout: none;
+}
+.pad svg { width: 30px; height: 30px; }
+.pad.on { background: var(--sign-deep); transform: scale(0.98); }
+.pads.compact { --pad-h: 60px; }
+.pads.compact .pad { background: var(--paper); color: var(--sign); border: 2px solid var(--sign); font-size: 14px; }
+.pads.compact .pad.on { background: var(--sign); color: #fff; }
+
+/* ---------- 遊び方シート ---------- */
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgba(27, 32, 38, 0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.sheet[hidden] { display: none; }
+.sheet-card {
+  background: var(--paper);
+  width: 100%;
+  max-width: 520px;
+  max-height: 92svh;
+  overflow-y: auto;
+  border-radius: 18px 18px 0 0;
+  padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
+  user-select: text;
+  -webkit-user-select: text;
+}
+.sheet h2 { font-size: 21px; font-weight: 800; line-height: 1.35; margin-bottom: 4px; }
+.sheet .sub { font-size: 14px; color: var(--ink-2); margin-bottom: 14px; }
+.steps { list-style: none; display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
+.steps li { display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: start; }
+.steps .n {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--sign); color: #fff; font-weight: 800;
+  display: grid; place-items: center; font-size: 14px; margin-top: 1px;
+}
+.steps h3 { font-size: 15px; font-weight: 800; line-height: 1.5; }
+.steps p { font-size: 14px; color: var(--ink-2); line-height: 1.65; }
+.note {
+  font-size: 13px;
+  color: var(--ink-2);
+  border-left: 4px solid var(--leaf-g);
+  padding: 2px 0 2px 10px;
+  margin-bottom: 16px;
+  line-height: 1.65;
+}
+.wakaba {
+  display: inline-block;
+  width: 14px; height: 18px;
+  vertical-align: -3px;
+  background: linear-gradient(90deg, var(--leaf-y) 50%, var(--leaf-g) 50%);
+  clip-path: polygon(0 0, 50% 22%, 100% 0, 100% 72%, 50% 100%, 0 72%);
+  margin-right: 4px;
+}
+.sheet .btn { width: 100%; height: 48px; font-size: 16px; }
+
+/* ---------- 広い画面：ステージを左、操作を右に ---------- */
+@media (min-width: 900px) {
+  .app {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 400px;
+    grid-template-rows: auto auto 1fr auto;
+    column-gap: 0;
+    max-width: 1400px;
+    margin: 0 auto;
+    height: 100vh;
+  }
+  .bar { grid-column: 1 / -1; }
+  .stage { grid-column: 1; grid-row: 2 / 5; height: auto; margin: 0 10px 14px 14px; }
+  .modes { grid-column: 2; grid-row: 2; margin: 0 14px 0 0; }
+  .panel { grid-column: 2; grid-row: 3; margin: 8px 14px 10px 0; overflow-y: auto; }
+  .pads { grid-column: 2; grid-row: 4; margin: 0 14px 14px 0; }
+  .stage.big .eye { max-width: min(70%, calc(100vh - 220px)); }
+  .eye { max-width: 230px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eye, .toast, .mix .fill { transition: none; }
+}
