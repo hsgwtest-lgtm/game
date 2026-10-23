@@ -1,0 +1,17 @@
+{
+  "name": "SoftEvo 3D — ボクセル生物 しんかラボ",
+  "short_name": "SoftEvo 3D",
+  "description": "ブロックで つくった3Dの生き物が、世代を かさねて すこしずつ 歩きかたを おぼえていく進化シミュレーター",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#181425",
+  "theme_color": "#181425",
+  "lang": "ja",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
