@@ -1,6 +1,10 @@
 // 動きの連続写真（コンタクトシート）を作る: node tools/sheet.mjs <key> <genes.json|-> <out.png> [times] [query]
-import { chromium } from '/opt/node-tools/node_modules/playwright/index.mjs';
+// （ローカルサーバー: リポジトリの一つ上で python3 -m http.server 8765。genes.json は tools/tmp/ に置く）
+import { createRequire } from 'module';
 import { execFileSync } from 'child_process';
+import { mkdirSync } from 'fs';
+const { chromium } = createRequire(import.meta.url)('playwright');
+mkdirSync('tools/tmp', { recursive: true });
 const [key, g, out, timesArg, extra] = process.argv.slice(2);
 const times = (timesArg || '0,0.5,1,1.5,2,2.5,3,3.5,4,5,6,8').split(',').map(Number);
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
@@ -14,7 +18,7 @@ await page.waitForFunction(() => window.__ready, null, { timeout: 30000 });
 const files = [];
 for (const t of times) {
   const r = await page.evaluate((t) => window.__seek(t), t);
-  const f = `/tmp/claude-0/-home-claude/5a420261-25a1-5a7d-806d-c7a9d1baa61c/scratchpad/sheet_${files.length}.png`;
+  const f = `tools/tmp/sheet_${files.length}.png`;
   await page.screenshot({ path: f });
   files.push(f);
   if (r.fell) { console.log('fell at', r.t.toFixed(2)); }

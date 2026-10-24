@@ -32,7 +32,7 @@ export class SumoBout {
       const shift = sgn * (gap / 2 + m.size.maxX);
       for (let i = 0; i < c.n; i++) { c.pos[3 * i] += shift; c.pp[3 * i] += shift; }
       this.world.add(c);
-      const nv = new Nerves(m, f.genes, { mimic: !!f.mimic, vstar: f.vstar });
+      const nv = new Nerves(m, f.genes, { vstar: f.vstar });
       nv.goal = [-sgn, 0, 0];
       const restY = c.pos[3 * m.sense + 1];
       c.spinal = (cc, h) => nv.spinal(cc, h);

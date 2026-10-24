@@ -6,7 +6,7 @@ import { CreatureView, lin } from '../render/creature.js';
 import { Episode } from '../sim/sim.js';
 import { SumoBout } from '../sim/bout.js';
 import { compileModel } from '../sim/model.js';
-import { REGIONS, officialEnv, RACE_T, goalEnv } from '../game/world.js';
+import { REGIONS, officialEnv, RACE_T, goalEnv, regionAt, envOf } from '../game/world.js';
 import * as O from '../online.js';
 
 export class ArenaScreen {
@@ -34,8 +34,8 @@ export class ArenaScreen {
     this.mode = params.mode || 'race';
     this.fighters = params.fighters.map(f => ({ ...f, model: compileModel(f.design) }));
     clear(this.top).append(
-      h('button.iconbtn', { 'aria-label': 'もどる', onclick: () => this.app.go('online') }, '←'),
-      h('div.grow', h('div.title', this.mode === 'race' ? `かけっこ　${REGIONS[params.region].name}` : 'すもう'), h('div.sub', this.mode === 'race' ? `${RACE_T}秒で、どこまで行けるか` : '土俵の外に出るか、倒れたら負け')),
+      h('button.iconbtn', { 'aria-label': 'もどる', onclick: () => this.app.go(params.back || 'online', params.back === 'home' ? { region: params.region } : {}) }, '←'),
+      h('div.grow', h('div.title', this.mode === 'race' ? (this.fighters.length === 1 ? `${this.fighters[0].name}の走り` : `かけっこ　${REGIONS[params.region].name}`) : 'すもう'), h('div.sub', this.mode === 'race' ? `${RACE_T}秒で、どこまで行けるか` : '土俵の外に出るか、倒れたら負け')),
     );
     this.start();
   }
@@ -56,10 +56,11 @@ export class ArenaScreen {
     this.views = this.fighters.map(f => new CreatureView(f.model, { mode: 'skin', color: f.color }));
     for (const v of this.views) this.stage.actors.add(v.group);
     if (this.mode === 'race') {
-      const env = officialEnv(this.params.region, { assist: 0 });
-      const R = REGIONS[this.params.region];
+      // ぬしを見るときは、いまの時代のその地方。対戦は公式コース（はじまりの時代）
+      const R = this.params.era !== undefined ? regionAt(this.params.region, this.params.era) : REGIONS[this.params.region];
+      const env = this.params.era !== undefined ? envOf(R, { assist: 0 }) : officialEnv(this.params.region, { assist: 0 });
       this.stage.setBiome(R.biome);
-      // 神経のしくみ（お手本をまねるか）は、その種が育った「めざす動き」に合わせる
+      // めざす速さなどは、その種が育った「めざす動き」に合わせる
       this.eps = this.fighters.map(f => new Episode(f.model, f.genes, { ...env, ...goalEnv(f.goal || 'distance', f.model) }));
       const lane = Math.max(0.35, ...this.fighters.map(f => f.model.size.z + 0.25));
       const overlap = env.terrain === 'rough';
@@ -71,7 +72,7 @@ export class ArenaScreen {
     } else {
       this.stage.setBiome('plain');
       this.stage.setTerrain('flat');
-      this.bout = new SumoBout(this.fighters.map(f => ({ model: f.model, genes: f.genes, mimic: f.goal === 'human', vstar: goalEnv(f.goal || 'distance', f.model).vstar })));
+      this.bout = new SumoBout(this.fighters.map(f => ({ model: f.model, genes: f.genes, vstar: goalEnv(f.goal || 'distance', f.model).vstar })));
       // 土俵
       const R = this.bout.R;
       const ring = new THREE.Group();
@@ -107,6 +108,7 @@ export class ArenaScreen {
     res.sort((a, b) => b.d - a.d);
     const w = res[0];
     const f = this.fighters[w.k];
+    if (this.fighters.length === 1) { clear(this.verdict).append(h('div.t', fmtM(w.d)), h('div.d', `${RACE_T}秒で進んだ距離${w.fell ? '（転倒）' : ''}`)); return; }
     clear(this.verdict).append(h('div.t', `${f.name} の勝ち`), h('div.d', res.map((r, i) => `${i + 1}位 ${this.fighters[r.k].name} ${fmtM(r.d)}${r.fell ? '（転倒）' : ''}`).join('　')));
   }
 

@@ -23,6 +23,8 @@ class App {
     let g = null;
     try { g = await store.load(SAVE_KEY); } catch { g = null; }
     this.game = g && g.v === 1 ? g : newGame();
+    // 「めざす動き」は はやさ・省エネで歩く の2つ（それ以外が残っていたら、はやさに戻す）
+    for (const sp of this.game.species) if (sp.goal && sp.goal !== 'walk' && sp.goal !== 'distance') { sp.goal = 'distance'; sp.evo = null; }
     this.setEra(this.game.era);
     this.screens = {
       home: new HomeScreen(this, $('#s-home')),

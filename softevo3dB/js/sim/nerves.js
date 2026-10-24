@@ -21,7 +21,6 @@
 //      足の組ごと: 着地する位相
 
 import { dsin, dcos, dexp, datan2, TWO_PI, PI } from './dmath.js';
-import { mimicMap, refAt } from './gait.js';
 
 export const G_GLOBAL = 7;
 export const G_PER = 10;
@@ -88,6 +87,7 @@ export class Nerves {
       this.a2[d.i] = s * 0.5 * amp * W * g(b + 3);
       this.b2[d.i] = s * 0.5 * amp * W * g(b + 4);
       const pr = opts.noPrior ? { st: 0, sw: 0, osw: 0 } : (d.prior || { st: 0, sw: 0, osw: 0 });
+      // 足ぶみ反射（生まれつき）＋ 遺伝子
       this.osw[d.i] = opts.noSwingOff ? 0 : pr.osw + s * 0.4 * W * g(b + 9);
       for (const f of model.feet || []) if (d.sub.includes(f.i)) { this.legPair[d.i] = f.pair; break; }
       const kp = dexp(0.6 * g(b + 5));
@@ -161,20 +161,7 @@ export class Nerves {
     this.com = [0, 0, 0];
     this.knock = new Uint8Array(nd);  // しゅじゅつ（この軸の神経を止める）
     this.fvComp = !!opts.fvComp;
-    // お手本をまねる（「ヒトの歩き方をまねる」のとき）: 股・ひざ・足首の目標に、ヒトの歩行の角度を足す
-    this.mimic = opts.mimic ? mimicMap(model) : [];
-    this.stanceTorso = !!opts.stanceTorso;
     this.rampT = opts.rampT || 0.8;
-    // 足首の立ち直り（実験）
-    if (opts.anklePrior) for (const d of model.dofs) {
-      if (d.leg && !d.proximal && model.feet.some(f => f.i === model.joints[d.joint].child)) this.kst[d.i] += opts.anklePrior;
-    }
-    this.kstT = opts.kstT !== undefined ? opts.kstT : -1;
-    this.mimicOf = new Int32Array(nd).fill(-1);
-    this.mimic.forEach((m, k) => {
-      this.mimicOf[m.dof] = k;
-      this.osw[m.dof] -= (model.dofs[m.dof].prior ? model.dofs[m.dof].prior.osw : 0);   // 足ぶみ反射のかわりにお手本
-    });
   }
 
   // ── 60Hz: 脳と平衡感覚 → 目標の角度 ──
@@ -256,15 +243,6 @@ export class Nerves {
       const s1 = dsin(p), c1 = dcos(p), s2 = 2 * s1 * c1, c2 = c1 * c1 - s1 * s1;
       const rp = this.ramp;
       let th = this.o[i] + rp * (this.a1[i] * s1 + this.b1[i] * c1 + this.a2[i] * s2 + this.b2[i] * c2);
-      const mk = this.mimicOf[i];
-      let mref = 0;
-      if (mk >= 0) {
-        const m = this.mimic[mk];
-        const lp = this.legPair[i];
-        let q = (p - (lp >= 0 ? this.pairPsi[lp] : 0)) / TWO_PI;
-        q -= Math.floor(q);
-        mref = rp * m.sign * refAt(m.kind, q * 100) * (PI / 180);
-      }
       // 立脚か遊脚か
       let st = 0;
       const sub = this.dofSub[i];
@@ -283,8 +261,7 @@ export class Nerves {
       const jo = model.joints[d.joint];
       const ax = axisWorld(c, jo, d.axis);
       const proj = this.eps[0] * ax[0] + this.eps[1] * ax[1] + this.eps[2] * ax[2];
-      if (mk >= 0) th += this.stanceTorso && d.proximal ? mref * this.swS[i] : mref;
-      if (st) th += (this.stanceTorso && d.proximal && mk >= 0 ? this.kstT : this.kst[i]) * proj;
+      if (st) th += this.kst[i] * proj;
       else if (d.leg && this.split) th += this.ksw[i] * (this.epsS[0] * ax[0] + this.epsS[2] * ax[2]);
       else th += this.ksw[i] * proj;
       const wp = this.wfParent[i];

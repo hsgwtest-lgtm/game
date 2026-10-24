@@ -18,7 +18,7 @@ import { growthChart, footfallChart, angleChart, phaseDial } from './charts.js';
 import { envChips } from './home.js';
 
 const SPEEDS = { slow: 'ゆっくり', fast: 'はやく' };
-const GOALS = { distance: 'はやさ', walk: '省エネで歩く', human: 'ヒトの歩き方をまねる' };
+const GOALS = { distance: 'はやさ', walk: '省エネで歩く' };
 
 export class LabScreen {
   constructor(app, el) {
@@ -276,7 +276,8 @@ export class LabScreen {
     const a = this.rec.analyze();
     if (a && !this.knock.size) {
       const nm = GAIT_NAMES[a.type] || GAIT_NAMES.walk;
-      this.gaitInfo = { ...a, name: nm.name, desc: nm.desc };
+      // 足あと図は、分析した再生の記録から描く（次の再生の記録はまだ途中なので）
+      this.gaitInfo = { ...a, name: nm.name, desc: nm.desc, rec: this.rec };
       if (!this.fossil && !this.replayingOld) {
         const out = G.noteGait(this.g, this.sp, this.gaitInfo, { x: this.champ.x, assist: this.champ.assist });
         for (const e of out || []) this.queue.push(e);
@@ -377,14 +378,13 @@ export class LabScreen {
     if (v === 'edit') this.app.go('design', { mode: 'edit', id: sp.id });
     else if (v === 'rename') { const n = await ask('種の名前', sp.name, { max: 12 }); if (n) { sp.name = n; this.renderTop(); this.app.save(); } }
     else if (v === 'goal') {
-      const biped = new GaitRecorder(this.model, 2).biped;
       const gv = await modal({
         title: 'めざす動き',
         body: h('div',
           h('p', '「はやさ」は10秒でどれだけ遠くへ行けるか。'),
           h('p', '「省エネで歩く」は、決まった速さより速くても点にならず、筋肉を使いすぎると減点される。ゆったりした歩き方が育ちやすい。'),
-          biped ? h('p', '「ヒトの歩き方をまねる」は、省エネで歩きながら、股・ひざ・足首の動きがヒトの歩行の記録に近いほど点がふえる。体はあなたの設計のまま、ヒトの動きを再現できるかの実験。') : h('p.muted', '「ヒトの歩き方をまねる」は、股・ひざ・足首のある二本足の体で選べる。')),
-        actions: [{ label: 'はやさ', value: 'distance' }, { label: '省エネで歩く', value: 'walk' }, ...(biped ? [{ label: 'ヒトをまねる', value: 'human' }] : [])],
+          h('p.muted', 'どんな動き方になるかは決めない。その体とその目的にとっていちばんよい動きを、進化が見つける。')),
+        actions: [{ label: 'はやさ', value: 'distance' }, { label: '省エネで歩く', value: 'walk' }],
       });
       if (gv) this.setGoal(gv);
     } else if (v === 'branch') this.app.go('home', { region: sp.region });
@@ -476,32 +476,26 @@ export class LabScreen {
       h('span.chip.num', `浮いている時間 ${Math.round(a.airFrac * 100)}%`)));
     const cv = h('canvas', { style: { width: '100%', height: `${Math.max(40, a.feet.length * 16 + 8)}px`, display: 'block' } });
     s.append(h('h3', '足あと図（白: 地面についている）'), cv);
-    const F = this.rec.n, n = this.model.n;
+    const rec = a.rec, F = rec.n, n = this.model.n;
     const rows = a.feet.map(f => {
       const arr = new Uint8Array(F);
-      for (let k = 0; k < F; k++) arr[k] = this.rec.contact[k * n + f.i];
+      for (let k = 0; k < F; k++) arr[k] = rec.contact[k * n + f.i];
       return { name: this.model.bodies[f.i].name, contact: arr };
     });
     requestAnimationFrame(() => footfallChart(cv, rows, F));
+    // 二本足なら、参考としてヒトの歩行と重ねて見られる（どちらが正しいということはない）
     if (a.human) {
       const hm = a.human;
-      s.append(h('h3', 'ヒトの歩行とくらべる'));
-      s.append(h('div.row', h('div.score-big.num', `${Math.round(hm.total)}`), h('div.muted', '点 / 100（股・ひざ・足首の角度の形と大きさが、ヒトの平地歩行の代表的な曲線にどれだけ近いか）')));
+      s.append(h('h3', '参考: ヒトの歩行と重ねる'));
+      s.append(h('p.muted', `股・ひざ・足首の動きの近さ ${Math.round(hm.total)}%。近くても遠くても、それがこの体の見つけた歩き方。`));
       s.append(h('div.legend', h('span', h('i', { style: { background: 'var(--era)' } }), 'あなた'), h('span', h('i', { style: { background: 'var(--ink-2)' } }), 'ヒト'), h('span', '横軸: 片足の着地から次の着地まで')));
       const figs = h('div.cmp');
       for (const [k, nm] of [['hip', '股'], ['knee', 'ひざ'], ['ankle', '足首']]) {
         const c = h('canvas');
-        figs.append(h('figure', c, h('figcaption', h('span', nm), h('span.num', `${Math.round(hm.score[k].score)}点`))));
+        figs.append(h('figure', c, h('figcaption', h('span', nm))));
         requestAnimationFrame(() => angleChart(c, hm.curves[k], hm.ref[k]));
       }
       s.append(figs);
-    } else if (this.rec.biped) {
-      s.append(h('p.muted', '二本足の生き物は、ヒトの歩行と股・ひざ・足首の動きをくらべられる。足が地面から離れて歩くようになると、比較が表示される。'));
-    }
-    if (this.rec.biped && (this.sp.goal || 'distance') !== 'human' && !this.fossil) {
-      s.append(h('div.notice', { style: { marginTop: '10px' } },
-        h('div', 'この体は二本足。めざす動きを「ヒトの歩き方をまねる」にすると、ヒトの歩行の記録をお手本に、この体でその動きを再現できるか試せる。'),
-        h('button.btn.small', { style: { marginTop: '8px' }, onclick: () => this.setGoal('human') }, 'ヒトの歩き方をまねる')));
     }
   }
 

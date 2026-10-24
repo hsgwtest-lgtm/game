@@ -177,23 +177,11 @@ export function noteGait(g, sp, gait, c) {
   if (!gait) return null;
   const out = [];
   const key = `gait:${gait.type}`;
-  sp.gait = { type: gait.type, human: gait.human ? Math.round(gait.human.total) : null, gen: sp.gens, assist: c.assist || 0 };
+  sp.gait = { type: gait.type, gen: sp.gens, assist: c.assist || 0 };
   const helped = (c.assist || 0) > 0;
   if (!helped && !['stand', 'crawl', 'wiggle'].includes(gait.type) && !sp.milestones.some(x => x.key === key)) {
     const m = milestone(g, sp, key, `「${gait.name}」を身につけた`, gait.desc, c);
     if (m) out.push(m);
-  }
-  if (gait.human) {
-    for (const th of [50, 70, 85]) {
-      // 支えの手を借りた達成と、ひとりでの達成は別の節目
-      const k2 = `human${th}${helped ? 'h' : ''}`;
-      if (gait.human.total >= th && !sp.milestones.some(x => x.key === k2)) {
-        const title = th >= 85 ? 'ヒトそっくりの歩き方' : th >= 70 ? 'ヒトに近い歩き方' : 'ヒトの歩き方に似てきた';
-        const via = helped ? `（支えの手 ${Math.round(c.assist * 100)}%）` : '（支えなし）';
-        const m = milestone(g, sp, k2, title + via, `股・ひざ・足首の動きが、ヒトの歩行と ${Math.round(gait.human.total)}点 一致した。`, c);
-        if (m) out.push(m);
-      }
-    }
   }
   return out;
 }

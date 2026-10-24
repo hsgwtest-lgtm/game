@@ -74,34 +74,6 @@ export function findArms(model) {
   return out;
 }
 
-// お手本（ヒトの歩行）を当てはめる関節: 股・ひざ・足首の「曲げ」の軸
-//   向き（どちらが曲げか）は、足を持ちあげる向き（model の生まれつきの反射）から決める
-export function mimicMap(model) {
-  const legs = findLegs(model);
-  if (legs.length !== 2 || legs[0].side === legs[1].side) return [];
-  const out = [];
-  for (const L of legs) {
-    for (const [kind, jo] of [['hip', L.hip], ['knee', L.knee], ['ankle', L.ankle]]) {
-      if (!jo) continue;
-      const di = jo.dofs[0];
-      if (di < 0) continue;
-      const d = model.dofs[di];
-      const sg = d.prior && d.prior.osw ? Math.sign(d.prior.osw) : (kind === 'knee' ? -1 : 1);
-      out.push({ dof: di, kind, sign: sg });
-    }
-  }
-  return out;
-}
-// 0..100% の周期での、お手本の角度（度）
-const REF_TABLE = {};
-export function refAt(kind, pct) {
-  let t = REF_TABLE[kind];
-  if (!t) t = REF_TABLE[kind] = refCurve(kind, 101);
-  const x = pct < 0 ? 0 : pct > 100 ? 100 : pct;
-  const i = Math.floor(x), f = x - i;
-  return i >= 100 ? t[100] : t[i] * (1 - f) + t[i + 1] * f;
-}
-
 export class GaitRecorder {
   constructor(model, maxFrames = 1800) {
     this.model = model;

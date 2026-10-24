@@ -119,7 +119,7 @@ export function changedRegions(era) {
 
 // 「めざす動き」による環境の違い（神経の「めざす速さ」も変わるので、記録・対戦・公開でも必ず同じものを使う）
 export function goalEnv(goal, model) {
-  if (goal === 'walk' || goal === 'human') {
+  if (goal === 'walk') {
     const vc = Math.sqrt(1.2 * Math.max(0.05, model.size.h));
     return { goal, vcap: vc, vstar: 0.9 * vc };
   }

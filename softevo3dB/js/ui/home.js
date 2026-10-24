@@ -2,7 +2,7 @@
 import { h, clear, gestures, fmtM, hex, modal } from './dom.js';
 import { Planet } from '../render/planet.js';
 import { REGIONS, REGION_KEYS, ERAS, RACE_T } from '../game/world.js';
-import { eraName, regionNow, masterOf, masterModel, masterRecord, modelFor, living, settledCount } from '../game/game.js';
+import { eraName, regionNow, masterOf, masterModel, masterRecord, masterGenes, modelFor, living, settledCount } from '../game/game.js';
 import { showHelp } from './help.js';
 
 const INTRO = [
@@ -185,8 +185,10 @@ export class HomeScreen {
       const mr = masterRecord(k, g.era);
       s.append(h('h3', 'ぬし'), h('div.master',
         h('span.dot', { style: { background: '#2a3550' } }),
-        h('div', h('div', { style: { fontWeight: 700 } }, M.name), h('div.muted', M.desc)),
-        h('div.rec.num', fmtM(mr))));
+        h('div.grow', h('div', { style: { fontWeight: 700 } }, M.name), h('div.muted', M.desc)),
+        h('div.rec.num', fmtM(mr)),
+        h('button.btn.small', { onclick: () => this.app.go('arena', { mode: 'race', region: k, back: 'home', era: g.era,
+          fighters: [{ key: 'm:' + k, name: M.name, owner: `${R.name}のぬし`, design: M.design, genes: masterGenes(k), color: 0x8a96b8, region: k }] }) }, '見る')));
       s.append(h('p.muted', `試練: ${RACE_T}秒でぬしより遠くへ進むと、この地方に定着できる。`));
     }
     const mine = g.species.filter(sp => sp.region === k);

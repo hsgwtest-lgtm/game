@@ -1,7 +1,8 @@
 // ブラウザなしで進化させる: node tools/train.mjs <見本のkey> <世代数> [JSONのオプション]
 // 例) node tools/train.mjs dog 60
 //     node tools/train.mjs human 200 '{"assist":1,"T":8}'
-import { writeFileSync } from 'fs';
+// 結果は tools/tmp/best_<key><tag>.json（out で変えられる）
+import { writeFileSync, mkdirSync } from 'fs';
 import { compileModel } from '../js/sim/model.js';
 import { templateByKey } from '../js/sim/templates.js';
 import { geneCount } from '../js/sim/nerves.js';
@@ -17,6 +18,8 @@ const es = new CMAES(n, { sigma: opt.sigma || 0.6, lambda: opt.lambda, seed: opt
 let assist = opt.assist || 0;
 const env = { terrain: opt.terrain || 'flat', water: opt.water, T: opt.T || 8, vstar: opt.vstar, nv: opt.nv, goal: opt.goal, vcap: opt.vcap };
 let okStreak = 0, best = null;
+mkdirSync('tools/tmp', { recursive: true });
+const out = opt.out || `tools/tmp/best_${key}${opt.tag || ''}.json`;
 const t0 = Date.now();
 console.log(`${key}: genes=${n} lambda=${es.lambda} dofs=${model.nDof} groups=${model.nGroup}`);
 for (let g = 0; g < gens; g++) {
@@ -29,16 +32,14 @@ for (let g = 0; g < gens; g++) {
   if (!best || assist < best.assist || (assist === best.assist && b.fitness > best.r.fitness)) best = { r: b, x: Array.from(S[idx[0]].x), assist, gen: g };
   // 支えの手: 倒れずに進めたら少しずつ外す
   if (assist > 0) {
-    const okH = opt.goal !== 'human' || (b.human || 0) >= (opt.hneed || 60);
-    if (!b.fell && b.dist > (opt.need || 1.5) && okH) okStreak++; else okStreak = 0;
+    if (!b.fell && b.dist > (opt.need || 1.5)) okStreak++; else okStreak = 0;
     if (okStreak >= (opt.streak || 3)) { assist = Math.max(0, +(assist - (opt.astep || 0.1)).toFixed(2)); okStreak = 0; }
   }
-  if (g % 10 === 9) writeFileSync(opt.out || `/tmp/claude-0/-home-claude/5a420261-25a1-5a7d-806d-c7a9d1baa61c/scratchpad/best_${key}${opt.tag || ''}.json`, JSON.stringify({ key, ...best, cur: Array.from(S[idx[0]].x), curAssist: assist, mean: Array.from(es.m), assistEnd: assist }));
+  if (g % 10 === 9) writeFileSync(out, JSON.stringify({ key, ...best, cur: Array.from(S[idx[0]].x), curAssist: assist, mean: Array.from(es.m), assistEnd: assist }));
   if (g % (opt.every || 5) === 0 || g === gens - 1) {
     const meanFit = fits.reduce((a, c) => a + c, 0) / fits.length;
-    console.log(`g${String(g).padStart(3)} best=${b.fitness.toFixed(2)} dist=${b.dist.toFixed(2)}m fell=${b.fell ? 'Y@' + b.time.toFixed(1) : 'N'} up=${b.upright.toFixed(2)} E=${b.energy.toFixed(2)}${b.human !== null && b.human !== undefined ? " H=" + b.human.toFixed(0) : ""} mean=${meanFit.toFixed(2)} σ=${es.sigma.toFixed(3)} assist=${assist.toFixed(1)} ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+    console.log(`g${String(g).padStart(3)} best=${b.fitness.toFixed(2)} dist=${b.dist.toFixed(2)}m fell=${b.fell ? 'Y@' + b.time.toFixed(1) : 'N'} up=${b.upright.toFixed(2)} E=${b.energy.toFixed(2)} mean=${meanFit.toFixed(2)} σ=${es.sigma.toFixed(3)} assist=${assist.toFixed(1)} ${((Date.now() - t0) / 1000).toFixed(0)}s`);
   }
 }
-const out = opt.out || `/tmp/claude-0/-home-claude/5a420261-25a1-5a7d-806d-c7a9d1baa61c/scratchpad/best_${key}${opt.tag || ''}.json`;
 writeFileSync(out, JSON.stringify({ key, ...best, mean: Array.from(es.m), assistEnd: assist, nv: opt.nv }));
 console.log('saved', out, 'best', best.r.fitness.toFixed(2), 'at gen', best.gen, 'assist', best.assist);

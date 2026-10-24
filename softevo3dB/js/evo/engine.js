@@ -110,9 +110,7 @@ export class Evolver {
     const events = [];
     // 支えの手を外していく
     if (this.assist > 0) {
-      // 「ヒトの歩き方をまねる」では、ヒトらしさ（60点以上）を保ったまま歩けたときだけ手を放す
-      const okH = this.goal !== 'human' || (b.human || 0) >= 60;
-      if (!b.fell && b.dist > this.need && okH) this.okStreak++; else this.okStreak = 0;
+      if (!b.fell && b.dist > this.need) this.okStreak++; else this.okStreak = 0;
       if (this.okStreak >= 4) {
         this.assist = Math.max(0, +(this.assist - 0.05).toFixed(2));
         this.okStreak = 0;

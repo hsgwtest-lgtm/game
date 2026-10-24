@@ -65,7 +65,7 @@ export function checkCreature(id, x) {
   return {
     id, name: clean(x.name, 12) || '名無し', owner: clean(x.owner, 16) || '名無し', ownerId: clean(x.ownerId, 40),
     region: x.region, design, genes: g, record: Number.isFinite(record) ? record : 0,
-    gens: Number.isInteger(x.gens) ? x.gens : 0, goal: x.goal === 'walk' || x.goal === 'human' ? x.goal : 'distance',
+    gens: Number.isInteger(x.gens) ? x.gens : 0, goal: x.goal === 'walk' ? 'walk' : 'distance',
     color: Number.isInteger(x.color) ? x.color & 0xffffff : 0xd9a58c, created: Number(x.created) || 0, msg: clean(x.msg, 60),
   };
 }

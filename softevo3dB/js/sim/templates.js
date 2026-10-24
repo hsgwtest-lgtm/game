@@ -69,11 +69,11 @@ export const TEMPLATES = [
     key: 'frog', name: 'カエル', desc: '長くたたんだ後ろ足で、はねる', habitat: 'land',
     build: () => make('カエル', [
       { id: 'body', name: '胴', parent: null, a: [-0.06, 0.085, 0], b: [0.06, 0.1, 0], r: 0.05 },
-      { id: 'armR', name: '右うで', parent: 'body', j: [0.05, 0.075, 0.04], a: [0.05, 0.075, 0.04], b: [0.07, 0.045, 0.08], r: 0.014, joint: { type: 'ball', lim: [[-50, 50], [-40, 40], [0, 0]] } },
-      { id: 'handR', name: '右手', parent: 'armR', j: [0.07, 0.045, 0.08], a: [0.07, 0.045, 0.08], b: [0.085, 0.008, 0.09], r: 0.011, joint: { type: 'hinge', lim: [[-60, 60]] } },
-      { id: 'thighR', name: '右もも', parent: 'body', j: [-0.05, 0.075, 0.045], a: [-0.05, 0.075, 0.045], b: [0.01, 0.06, 0.1], r: 0.022, joint: { type: 'ball', lim: [[-70, 70], [-40, 40], [0, 0]], str: 1.6 } },
-      { id: 'shinR', name: '右すね', parent: 'thighR', j: [0.01, 0.06, 0.1], a: [0.01, 0.06, 0.1], b: [-0.07, 0.035, 0.11], r: 0.018, joint: { type: 'hinge', lim: [[-110, 110]], str: 1.8 } },
-      { id: 'footR', name: '右足', parent: 'shinR', j: [-0.07, 0.035, 0.11], shape: 'box', a: [-0.08, 0.009, 0.11], b: [0.0, 0.009, 0.12], r: 0.009, w: 0.045, joint: { type: 'hinge', lim: [[-90, 90]], str: 2 } },
+      { id: 'armR', name: '右うで', parent: 'body', j: [0.05, 0.075, 0.04], a: [0.05, 0.075, 0.04], b: [0.07, 0.045, 0.08], r: 0.016, dens: 1.4, joint: { type: 'ball', lim: [[-50, 50], [-40, 40], [0, 0]] } },
+      { id: 'handR', name: '右手', parent: 'armR', j: [0.07, 0.045, 0.08], a: [0.07, 0.045, 0.08], b: [0.085, 0.008, 0.09], r: 0.013, dens: 1.4, joint: { type: 'hinge', lim: [[-60, 60]] } },
+      { id: 'thighR', name: '右もも', parent: 'body', j: [-0.05, 0.075, 0.045], a: [-0.05, 0.075, 0.045], b: [0.01, 0.06, 0.1], r: 0.024, dens: 1.3, joint: { type: 'ball', lim: [[-70, 70], [-40, 40], [0, 0]], str: 1.6 } },
+      { id: 'shinR', name: '右すね', parent: 'thighR', j: [0.01, 0.06, 0.1], a: [0.01, 0.06, 0.1], b: [-0.07, 0.035, 0.11], r: 0.02, dens: 1.3, joint: { type: 'hinge', lim: [[-110, 110]], str: 1.8 } },
+      { id: 'footR', name: '右足', parent: 'shinR', j: [-0.07, 0.035, 0.11], shape: 'box', a: [-0.08, 0.009, 0.11], b: [0.0, 0.009, 0.12], r: 0.011, w: 0.05, dens: 1.3, joint: { type: 'hinge', lim: [[-90, 90]], str: 2 } },
     ]),
   },
   {

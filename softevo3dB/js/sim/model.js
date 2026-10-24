@@ -554,8 +554,8 @@ export function compileModel(design) {
         const score = dp[1] + (proximal ? 0.1 * dp[0] : 0);
         if (score > bs) { bs = score; best = sg * th; }
       }
-      // 二本足ははっきりと、多くの足を持つ体はひかえめに（たくさんの足が一度に浮くと転ぶ）
-      d.prior.osw = best * (biped ? 0.85 : 0.45);
+      // 生まれたての二本足はふらつきやすいので、ほんの軽い足ぶみだけ（たくさんの足を持つ体は少し大きく）
+      d.prior.osw = best * (biped ? 0.15 : 0.45);
     }
   }
   return {

@@ -29,7 +29,8 @@ export function growthChart(cv, sp, masterRec, marks = []) {
   for (let k = 0; k <= 4; k++) {
     const v = lo + (hi - lo) * k / 4, y = Y(v);
     g.beginPath(); g.moveTo(L, y); g.lineTo(w - R, y); g.stroke();
-    g.fillText(`${v.toFixed(v < 10 ? 1 : 0)}m`, 2, y + 4);
+    const vv = Math.abs(v) < 0.05 ? 0 : v;
+    g.fillText(`${vv.toFixed(Math.abs(vv) < 10 ? 1 : 0)}m`, 2, y + 4);
   }
   g.fillText(n ? `第${n}世代` : '', w - R - 52, h - 5);
   g.fillText('第1世代', L, h - 5);
