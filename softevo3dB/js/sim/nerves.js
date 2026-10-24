@@ -45,10 +45,10 @@ export class Nerves {
     let freq = 0.35 / tH * dexp(0.5 * g(0));
     this.freq = freq < 0.25 ? 0.25 : freq > 4 ? 4 : freq;
     this.delta = PI + 1.0 * g(1);
-    this.cv = (0.8 + 0.4 * g(2)) / gH;
+    this.cv = (opts.cv0 !== undefined ? opts.cv0 : 0.8) * (1 + 0.5 * g(2)) / gH;
     this.cw = 0.3 * tH * dexp(0.5 * g(3));
     this.vstar = opts.vstar !== undefined ? opts.vstar : 0.25 * gH * dexp(0.5 * g(4));
-    this.cd = opts.noCd ? 0 : (1.0 + 0.5 * g(5)) / Hn;
+    this.cd = opts.noCd ? 0 : (opts.cd0 !== undefined ? opts.cd0 : 1.0) * (1 + 0.5 * g(5)) / Hn;
     const kp = 0.7 * sat(g(6));
     this.kappa = opts.noReset || kp < 0 ? 0 : kp;   // 0 = そろえない（はじめは0。進化で使うようになる）
     // 足の組ごとの着地の位相
@@ -100,7 +100,7 @@ export class Nerves {
       this.Dsw[d.i] = 2 * 0.5 * Math.sqrt(this.Ksw[d.i] * d.Ieff);
       this.cc[d.i] = 0.05 * (1 + sat(g(b + 6)));
       this.kst[d.i] = pr.st + 0.6 * g(b + 7);
-      this.ksw[d.i] = pr.sw + 0.6 * g(b + 8);
+      this.ksw[d.i] = (opts.swP !== undefined && pr.sw ? opts.swP : pr.sw) + 0.6 * g(b + 8);
       this.ph[d.i] = d.secondary ? this.delta : 0;
       this.lo[d.i] = d.lo; this.hi[d.i] = d.hi;
     }

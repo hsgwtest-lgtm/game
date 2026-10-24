@@ -1,7 +1,7 @@
 // オンライン: 地方ごとのランキング・公開・かけっこ・すもう（ネットがなくても、自分の種どうし・ぬしと対戦できる）
 import { h, clear, toast, modal, ask, fmtM, hex } from './dom.js';
 import * as O from '../online.js';
-import { REGIONS, REGION_KEYS, officialEnv, RACE_T } from '../game/world.js';
+import { REGIONS, REGION_KEYS, officialEnv, RACE_T, goalEnv } from '../game/world.js';
 import * as G from '../game/game.js';
 import { evaluate } from '../sim/sim.js';
 import { compileModel } from '../sim/model.js';
@@ -91,7 +91,7 @@ export class OnlineScreen {
     for (const s of G.living(this.g)) {
       const x = s.best ? s.best.x : s.champ && s.champ.x;
       if (!x) continue;
-      out.push({ key: 's:' + s.id, name: s.name, owner: 'あなた', design: s.design, genes: b64ToF64(x), color: s.color, region: s.region });
+      out.push({ key: 's:' + s.id, name: s.name, owner: 'あなた', design: s.design, genes: b64ToF64(x), color: s.color, region: s.region, goal: s.goal || 'distance' });
     }
     for (const k of REGION_KEYS) {
       const M = G.masterOf(k);
@@ -131,7 +131,7 @@ export class OnlineScreen {
     const p = modal({ title: c.name, body, actions: [{ label: 'とじる', value: null }] });
     const box = document.querySelector('.modal-wrap:last-child .modal');
     const v = await p;
-    const them = { key: 'o:' + c.id, id: c.id, name: c.name, owner: c.owner, design: c.design, genes: c.genes, color: c.color, region: c.region, online: true };
+    const them = { key: 'o:' + c.id, id: c.id, name: c.name, owner: c.owner, design: c.design, genes: c.genes, color: c.color, region: c.region, goal: c.goal, online: true };
     if (v === 'race' || v === 'sumo') {
       const mine = await this.pick(v === 'race' ? 'あなたの走者' : 'あなたの力士');
       if (!mine) return;
@@ -146,7 +146,7 @@ export class OnlineScreen {
     if (!sp || !sp.best) return;
     const genes = b64ToF64(sp.best.x);
     const model = compileModel(sp.design);
-    const r = evaluate(model, genes, officialEnv(sp.region, { assist: 0, goal: sp.goal === 'walk' ? 'walk' : 'distance' }));
+    const r = evaluate(model, genes, officialEnv(sp.region, { assist: 0, ...goalEnv(sp.goal || 'distance', model) }));
     const rec = Math.max(0, r.dist);
     if (!O.profile().name) await this.rename();
     const msg = h('input.text', { maxLength: 60, placeholder: 'ひとこと（なくてもよい）' });

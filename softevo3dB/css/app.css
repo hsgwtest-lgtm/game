@@ -171,6 +171,7 @@ input.text { width: 100%; padding: 10px 12px; border-radius: var(--r-s); border:
 
 /* ── ラボ（進化を見る）── */
 .lab-hud { position: absolute; left: 0; right: 0; top: calc(56px + var(--safe-t)); padding: 0 12px; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+.lab-hud .scoreline { align-self: flex-start; background: rgba(13, 17, 36, 0.55); border-radius: var(--r-m); padding: 6px 12px 8px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 .lab-hud > * { pointer-events: auto; }
 .scoreline { display: flex; align-items: flex-end; gap: 14px; }
 .big { font-size: 34px; font-weight: 900; letter-spacing: -0.02em; line-height: 1; text-shadow: 0 2px 16px rgba(0, 0, 0, 0.45); }
@@ -215,7 +216,8 @@ input.text { width: 100%; padding: 10px 12px; border-radius: var(--r-s); border:
 
 /* 神経 */
 .nerve-grid { display: grid; grid-template-columns: 1fr; gap: 3px; }
-.nrow { display: grid; grid-template-columns: 7.4em 1fr 2.6em; gap: 6px; align-items: center; font-size: 12px; color: var(--ink-2); cursor: pointer; padding: 2px 0; }
+.nrow { display: grid; grid-template-columns: 9.5em 1fr 2.6em; gap: 6px; align-items: center; font-size: 12px; color: var(--ink-2); cursor: pointer; padding: 2px 0; }
+.nrow > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nrow .bar { height: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 3px; position: relative; overflow: hidden; }
 .nrow .bar i { position: absolute; top: 0; bottom: 0; left: 50%; background: var(--muscle); }
 .nrow .bar b { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--nerve); }

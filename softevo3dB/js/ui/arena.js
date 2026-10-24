@@ -6,7 +6,7 @@ import { CreatureView, lin } from '../render/creature.js';
 import { Episode } from '../sim/sim.js';
 import { SumoBout } from '../sim/bout.js';
 import { compileModel } from '../sim/model.js';
-import { REGIONS, officialEnv, RACE_T } from '../game/world.js';
+import { REGIONS, officialEnv, RACE_T, goalEnv } from '../game/world.js';
 import * as O from '../online.js';
 
 export class ArenaScreen {
@@ -59,7 +59,8 @@ export class ArenaScreen {
       const env = officialEnv(this.params.region, { assist: 0 });
       const R = REGIONS[this.params.region];
       this.stage.setBiome(R.biome);
-      this.eps = this.fighters.map(f => new Episode(f.model, f.genes, env));
+      // 神経のしくみ（お手本をまねるか）は、その種が育った「めざす動き」に合わせる
+      this.eps = this.fighters.map(f => new Episode(f.model, f.genes, { ...env, ...goalEnv(f.goal || 'distance', f.model) }));
       const lane = Math.max(0.35, ...this.fighters.map(f => f.model.size.z + 0.25));
       const overlap = env.terrain === 'rough';
       this.offsets = this.fighters.map((f, k) => [0, 0, overlap ? 0 : (k - (this.fighters.length - 1) / 2) * lane]);
@@ -70,7 +71,7 @@ export class ArenaScreen {
     } else {
       this.stage.setBiome('plain');
       this.stage.setTerrain('flat');
-      this.bout = new SumoBout(this.fighters.map(f => ({ model: f.model, genes: f.genes })));
+      this.bout = new SumoBout(this.fighters.map(f => ({ model: f.model, genes: f.genes, mimic: f.goal === 'human', vstar: goalEnv(f.goal || 'distance', f.model).vstar })));
       // 土俵
       const R = this.bout.R;
       const ring = new THREE.Group();

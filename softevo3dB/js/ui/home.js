@@ -80,7 +80,11 @@ export class HomeScreen {
     this.refreshFigures();
     this.updateLabels();
     this.banner.replaceChildren(h('div.n', `第${this.g.era + 1}紀`), h('div.t', ERAS[this.g.era].name));
-    if (!this.g.introDone) this.showIntro();
+    if (this.intro && this.g.introDone) {
+      this.intro.remove(); this.intro = null;
+      for (const el of [this.sheet, this.banner, this.labels]) el.classList.remove('hidden');
+    }
+    if (!this.g.introDone) { if (!this.intro) this.showIntro(); }
     else if (params.region) this.select(params.region);
     else if (this.sel) this.select(this.sel);
     else this.renderSheet();

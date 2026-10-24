@@ -220,7 +220,7 @@ export class Planet {
       const fake = poseOf(f.model);
       view.update(fake);
       const holder = new THREE.Group();
-      const s = 0.13 / Math.max(0.15, Math.max(f.model.size.h, f.model.size.x * 0.8));
+      const s = 0.16 / Math.max(0.15, Math.max(f.model.size.h, f.model.size.x * 0.8));
       view.group.scale.setScalar(s);
       view.group.position.set(-f.model.com[0] * s, -f.model.minY * s, -f.model.com[2] * s);
       holder.add(view.group);
@@ -288,12 +288,14 @@ export class Planet {
     this.w = w; this.h = h;
     this.camera.aspect = w / Math.max(1, h);
     // 下にパネルがあるときは、星を上にずらして見せる
-    if (bottomInset > 0) this.camera.setViewOffset(w, h, 0, bottomInset * 0.45, w, h);
+    if (bottomInset > 0) this.camera.setViewOffset(w, h, 0, bottomInset * 0.42, w, h);
     else this.camera.clearViewOffset();
     // 星がちょうど画面の幅（たて長なら幅、横長なら高さ）に収まる距離
     const t = Math.tan((this.camera.fov / 2) * Math.PI / 180);
     const fit = 1.32 / (t * Math.min(1, this.camera.aspect));
-    this.camera.position.z = Math.max(3.2, fit) / this.zoom;
+    // 下のパネルが大きいほど、少し引いて星全体が見える所に収める
+    const shrink = 1 + 0.9 * Math.min(0.5, bottomInset / Math.max(1, h));
+    this.camera.position.z = Math.max(3.2, fit) * shrink / this.zoom;
     this.camera.updateProjectionMatrix();
   }
 

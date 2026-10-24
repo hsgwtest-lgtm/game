@@ -11,7 +11,7 @@ import { geneCount, GENE_NAMES_GLOBAL } from '../sim/nerves.js';
 import { GaitRecorder, GAIT_NAMES } from '../sim/gait.js';
 import { AXIS_NAME } from '../sim/model.js';
 import { Evolver, needsSupport } from '../evo/engine.js';
-import { REGIONS, ERAS, RACE_T } from '../game/world.js';
+import { REGIONS, ERAS, RACE_T, goalEnv } from '../game/world.js';
 import * as G from '../game/game.js';
 import { b64ToF64, f64ToB64, downloadJSON } from '../game/store.js';
 import { growthChart, footfallChart, angleChart, phaseDial } from './charts.js';
@@ -123,12 +123,7 @@ export class LabScreen {
   }
 
   envFor(sp) {
-    const env = G.envFor(this.g, sp.region, {});
-    if (sp.goal === 'walk' || sp.goal === 'human') {
-      const vc = Math.sqrt(1.2 * this.model.size.h);
-      env.goal = sp.goal; env.vcap = vc; env.vstar = 0.9 * vc;
-    }
-    return env;
+    return G.envFor(this.g, sp.region, goalEnv(sp.goal || 'distance', this.model));
   }
 
   saveEvo() {
@@ -282,7 +277,7 @@ export class LabScreen {
     if (a && !this.knock.size) {
       const nm = GAIT_NAMES[a.type] || GAIT_NAMES.walk;
       this.gaitInfo = { ...a, name: nm.name, desc: nm.desc };
-      if (this.champ.assist === 0 && !this.fossil) {
+      if (!this.fossil && !this.replayingOld) {
         const out = G.noteGait(this.g, this.sp, this.gaitInfo, { x: this.champ.x, assist: this.champ.assist });
         for (const e of out || []) this.queue.push(e);
         this.flushEvents();
@@ -290,8 +285,8 @@ export class LabScreen {
       if (this.tab === 'gait') this.renderSheet();
       this.renderHud();
     }
-    if (this.speed === 'fast' && this.latest) { this.champ = this.latest; this.latest = null; }
-    if (this.speed === 'slow' && this.pending) { this.champ = this.pending; this.pending = null; }
+    if (this.speed === 'fast' && this.latest) { this.champ = this.latest; this.latest = null; this.replayingOld = false; }
+    if (this.speed === 'slow' && this.pending) { this.champ = this.pending; this.pending = null; this.replayingOld = false; }
     this.startReplay();
   }
 
@@ -430,6 +425,7 @@ export class LabScreen {
   }
 
   replayMilestone(m) {
+    this.replayingOld = true;
     this.champ = { x: b64ToF64(m.x), assist: m.assist, gen: m.gen, r: null };
     this.pending = null;
     toast(`第${m.gen}世代「${m.title}」を再生`);

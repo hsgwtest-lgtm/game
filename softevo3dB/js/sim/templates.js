@@ -99,7 +99,7 @@ export const TEMPLATES = [
       { id: 'fArmR', name: '右前腕', parent: 'uArmR', j: [0, 1.14, 0.2], a: [0, 1.14, 0.2], b: [0, 0.86, 0.2], r: 0.034, joint: { type: 'hinge', lim: [[0, 140]], arm: 0.035 } },
       { id: 'thighR', name: '右もも', parent: 'pelvis', j: [0, 0.92, 0.09], a: [0, 0.92, 0.09], b: [0, 0.52, 0.09], r: 0.068, joint: { type: 'ball', lim: [[-20, 110], [-20, 40], [0, 0]], arm: 0.06, str: 1.4 } },
       { id: 'shinR', name: '右すね', parent: 'thighR', j: [0, 0.505, 0.09], a: [0, 0.505, 0.09], b: [0, 0.1, 0.09], r: 0.048, joint: { type: 'hinge', lim: [[-140, 0]], arm: 0.045, str: 2.4 } },
-      { id: 'footR', name: '右足', parent: 'shinR', j: [0, 0.085, 0.09], shape: 'box', a: [-0.06, 0.035, 0.09], b: [0.17, 0.035, 0.09], r: 0.032, w: 0.09, joint: { type: 'saddle', lim: [[-40, 25], [-15, 15]], arm: 0.05, str: 4 } },
+      { id: 'footR', name: '右足', parent: 'shinR', j: [0, 0.085, 0.09], shape: 'box', a: [-0.075, 0.035, 0.09], b: [0.19, 0.035, 0.09], r: 0.032, w: 0.105, joint: { type: 'saddle', lim: [[-40, 25], [-15, 15]], arm: 0.05, str: 4 } },
     ], {
       muscles: {
         extra: [

@@ -31,7 +31,7 @@ for (const [region, p] of Object.entries(PLAN)) {
   } else console.warn('missing', f);
   const recs = ERAS.map((e, i) => Math.max(0, evaluate(model, genes, envOf(regionAt(region, i), { assist: 0 })).dist));
   console.log(region.padEnd(7), p.name.padEnd(8), recs.map(r => r.toFixed(2)).join(' / '));
-  out[region] = { ...p, genes: Array.from(genes, v => Math.round(v * 1e6) / 1e6) };
+  out[region] = { ...p, genes: Array.from(genes) };   // 丸めない（わずかな違いでも動きが変わるので）
 }
 const src = `// 地方の「ぬし」（先住の生き物）。見本の体を、その地方の環境であらかじめ進化させたもの
 // tools/make_masters.mjs が書き出す（手で直さない）

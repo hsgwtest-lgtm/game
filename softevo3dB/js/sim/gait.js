@@ -55,6 +55,25 @@ export function findLegs(model) {
   return legs;
 }
 
+// 腕: 胴（根もと→平衡感覚の骨）から生えた、左右の相方のいる、地面に届かない枝のつけ根
+export function findArms(model) {
+  const trunk = new Set();
+  for (let b = model.sense; b >= 0; b = model.bodies[b].parent) trunk.add(b);
+  const feet = new Set((model.feet || []).map(f => f.i));
+  const out = [];
+  for (const jo of model.joints) {
+    if (!trunk.has(jo.parent) || trunk.has(jo.child)) continue;
+    const C = model.bodies[jo.child];
+    if (C.mirror < 0) continue;
+    const sub = [jo.child];
+    for (let k = 0; k < sub.length; k++) sub.push(...model.bodies[sub[k]].children);
+    if (sub.some(b => feet.has(b) || model.bodies[b].lowY < model.minY + 0.15 * model.size.h)) continue;
+    if (jo.dofs[1] < 0) continue;
+    out.push(jo);
+  }
+  return out;
+}
+
 // お手本（ヒトの歩行）を当てはめる関節: 股・ひざ・足首の「曲げ」の軸
 //   向き（どちらが曲げか）は、足を持ちあげる向き（model の生まれつきの反射）から決める
 export function mimicMap(model) {
@@ -93,6 +112,11 @@ export class GaitRecorder {
     this.legs = findLegs(model);
     this.biped = this.legs.length === 2 && this.legs[0].side !== this.legs[1].side;
     this.ang = this.legs.map(() => ({ hip: new Float32Array(maxFrames), knee: new Float32Array(maxFrames), ankle: new Float32Array(maxFrames) }));
+    // 曲げの向き（足を持ちあげる向きを＋に）
+    const sg = (jo, def) => { if (!jo || jo.dofs[0] < 0) return def; const d = model.dofs[jo.dofs[0]]; return d.prior && d.prior.osw ? Math.sign(d.prior.osw) : def; };
+    this.signs = this.legs.map(L => ({ hip: sg(L.hip, 1), knee: sg(L.knee, -1), ankle: sg(L.ankle, 1) }));
+    this.arms = findArms(model);
+    this.armAbd = 0; this.armN = 0;
     this.phase = new Float64Array(maxFrames);
   }
   record(ep) {
@@ -103,11 +127,12 @@ export class GaitRecorder {
     this.phase[f] = ep.nerves.phase;
     const D = 180 / Math.PI;
     this.legs.forEach((L, k) => {
-      const A = this.ang[k];
-      A.hip[f] = c.jang[3 * L.hip.i] * D;
-      A.knee[f] = -c.jang[3 * L.knee.i] * D;
-      A.ankle[f] = L.ankle ? c.jang[3 * L.ankle.i] * D : 0;
+      const A = this.ang[k], S = this.signs[k];
+      A.hip[f] = S.hip * c.jang[3 * L.hip.i] * D;
+      A.knee[f] = S.knee * c.jang[3 * L.knee.i] * D;
+      A.ankle[f] = L.ankle ? S.ankle * c.jang[3 * L.ankle.i] * D : 0;
     });
+    for (const jo of this.arms) { const a = c.jang[3 * jo.i + 1] * D; this.armAbd += a < 0 ? -a : a; this.armN++; }
     this.n++;
   }
 
@@ -257,6 +282,12 @@ export class GaitRecorder {
       tot += sc;
     }
     res.total = tot / 3;
+    // 腕: だらりと下ろしているほどヒトらしい（横に広げて釣り合いをとると減点）
+    if (this.armN) {
+      const abd = this.armAbd / this.armN;
+      res.arm = { abd, score: 100 * dexp(-(abd / 30) * (abd / 30)) };
+      res.total = 0.8 * res.total + 0.2 * res.arm.score;
+    }
     return res;
   }
 }
@@ -283,9 +314,13 @@ function classify(feet, period, phaseOf, airFrac, belly, model, rec) {
   if (!feet.length || belly > 0.5) return feet.length >= 2 && !belly ? 'walk' : (belly > 0.5 ? (feet.length ? 'crawl' : 'wiggle') : 'wiggle');
   const duty = feet.reduce((a, f) => a + f.duty, 0) / feet.length;
   if (feet.length === 2) {
-    const ph = phaseOf(feet[0], feet[1]);
-    if (ph !== null && (ph < 0.15 || ph > 0.85)) return 'hop';
-    return airFrac > 0.08 ? 'run' : 'biwalk';
+    // 片足だけが地面についている時間が長ければ「交互」、両足がそろって浮き沈みするなら「ホップ」
+    const n = model.n, F = rec.n, st = Math.floor(F * 0.3);
+    let single = 0;
+    for (let f = st; f < F; f++) if (rec.contact[f * n + feet[0].i] !== rec.contact[f * n + feet[1].i]) single++;
+    const sf = single / Math.max(1, F - st);
+    if (sf < 0.12 && airFrac > 0.08) return 'hop';
+    return airFrac > 0.1 && sf > 0.25 ? 'run' : 'biwalk';
   }
   if (feet.length >= 4) {
     // 前後・左右をきめる
