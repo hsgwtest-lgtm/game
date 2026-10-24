@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SoftEvo 3D B — debug viewer</title>
+<style>html,body{margin:0;height:100%;background:#111;overflow:hidden}canvas{width:100%;height:100%;display:block}#info{position:fixed;left:8px;top:8px;color:#fff;font:12px monospace;background:rgba(0,0,0,.4);padding:4px 6px}</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info"></div>
+<script src="../lib/three.min.js"></script>
+<script type="module">
+import { compileModel } from '../js/sim/model.js';
+import { templateByKey } from '../js/sim/templates.js';
+import { Episode } from '../js/sim/sim.js';
+import { Stage } from '../js/render/scene.js';
+import { CreatureView } from '../js/render/creature.js';
+const q = new URLSearchParams(location.search);
+const key = q.get('k') || 'human';
+const model = compileModel(templateByKey(key).build());
+let genes = new Float64Array(200);
+let env = { terrain: q.get('terrain') || 'flat', T: 30, assist: +(q.get('assist') || 0) };
+if (q.get('g')) {
+  const j = await (await fetch(q.get('g'))).json();
+  genes = Float64Array.from(j.x || j.genes);
+  if (j.assist !== undefined && !q.get('assist')) env.assist = j.assist;
+  if (j.nv) env.nv = j.nv;
+  if (j.env) Object.assign(env, j.env);
+}
+const canvas = document.getElementById('c');
+const stage = new Stage(canvas);
+stage.setBiome(q.get('biome') || 'plain');
+stage.setTerrain(env.terrain, env.water ? model.size.h + 0.6 : env.terrain === 'beach' ? 0.12 : null);
+if (env.water) stage.setBiome('sea');
+const view = new CreatureView(model, { mode: q.get('mode') || 'muscle' });
+stage.actors.add(view.group);
+let ep = new Episode(model, genes, env);
+function resize() { stage.renderer.setSize(innerWidth, innerHeight, false); stage.resize(innerWidth, innerHeight); }
+resize(); addEventListener('resize', resize);
+const yaw = +(q.get('yaw') || 0.9), pitch = +(q.get('pitch') || 0.25), dist = +(q.get('dist') || (model.size.h * 2.2 + 0.8));
+stage.setView(yaw, pitch, dist, true);
+function sync() {
+  view.update(ep.c);
+  const com = ep.nerves.com;
+  stage.focus(com[0], Math.max(0.2, com[1] * 0.8), com[2]);
+  document.getElementById('info').textContent = `${model.name} t=${ep.t.toFixed(2)}s v=${ep.nerves.comV[0].toFixed(2)} vz=${ep.nerves.comV[2].toFixed(2)} dist=${ep.progress.toFixed(2)}m tilt=${(ep.nerves.tilt * 57.3).toFixed(0)}° assist=${env.assist} ${ep.fell ? 'FELL' : ''}`;
+}
+// 決定論的に時刻 t まで進めて描画（スクリーンショット用）
+window.__seek = (t) => {
+  if (ep.t > t) ep = new Episode(model, genes, env);
+  while (ep.t < t && !ep.done) ep.step();
+  sync();
+  for (let i = 0; i < 60; i++) stage.update(1 / 30);
+  stage.render();
+  return { t: ep.t, dist: ep.progress, fell: ep.fell };
+};
+window.__ready = true;
+if (!q.get('static')) {
+  let last = performance.now();
+  (function loop(now) {
+    requestAnimationFrame(loop);
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    for (let i = 0; i < Math.round(dt * 60); i++) ep.step();
+    if (ep.done) ep = new Episode(model, genes, env);
+    sync(); stage.update(dt); stage.render();
+  })(last);
+}
+</script>
+</body>
+</html>

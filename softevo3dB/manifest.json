@@ -1,0 +1,15 @@
+{
+  "name": "SoftEvo 3D B — 骨と筋肉の進化記",
+  "short_name": "SoftEvo 3D B",
+  "description": "骨・関節・筋肉を自由に組んだ生き物が、神経を進化させて動きを身につける。変わりゆく惑星で、あなたの種の物語を広げていく。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0d1124",
+  "theme_color": "#0d1124",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

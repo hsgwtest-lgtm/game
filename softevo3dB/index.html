@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d1124">
+<meta name="description" content="骨・関節・筋肉を自由に組んだ生き物が、神経を進化させて動きを身につける。変わりゆく惑星で、あなたの種の物語を広げていく3D進化シミュレーション。">
+<title>SoftEvo 3D B — 骨と筋肉の進化記</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body data-era="0">
+<canvas id="gl"></canvas>
+
+<div id="boot" class="boot"><b>SoftEvo 3D B</b><span>惑星を呼びだしています…</span></div>
+
+<!-- ホーム（惑星） -->
+<section id="s-home" class="screen"></section>
+<!-- 設計 -->
+<section id="s-design" class="screen"></section>
+<!-- 進化のラボ -->
+<section id="s-lab" class="screen"></section>
+<!-- 系統樹と年代記 -->
+<section id="s-tree" class="screen"></section>
+<!-- オンライン -->
+<section id="s-online" class="screen"></section>
+<!-- 対戦（かけっこ・すもう） -->
+<section id="s-arena" class="screen"></section>
+
+<noscript>このゲームを遊ぶには JavaScript を有効にしてください。</noscript>
+<script src="lib/three.min.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
