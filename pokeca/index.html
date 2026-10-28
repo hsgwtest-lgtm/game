@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#07090f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ポケカ番号">
+<title>ポケカ番号サーチ</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="dot"></span>ポケカ番号サーチ</div>
+  <div class="meta" id="meta">読み込み中…</div>
+</header>
+
+<main>
+  <!-- 左下の表記を模した入力欄 -->
+  <section class="plate" aria-label="カード左下の番号">
+    <div class="plate-label">カード左下の表記をそのまま入力</div>
+    <div class="plate-row">
+      <label class="fld fld-set">
+        <span>エキスパンション</span>
+        <input id="inSet" list="setList" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sv3">
+      </label>
+      <label class="fld fld-num">
+        <span>番号</span>
+        <input id="inNum" inputmode="numeric" autocomplete="off" placeholder="066">
+      </label>
+      <div class="slash">/</div>
+      <label class="fld fld-tot">
+        <span>総数</span>
+        <input id="inTot" inputmode="numeric" autocomplete="off" placeholder="108">
+      </label>
+    </div>
+    <datalist id="setList"></datalist>
+    <div class="plate-help">エキスパンション記号は省略OK（番号/総数から候補を出します）。まとめて <b>sv3 066/108</b> と貼り付けても分解します。</div>
+    <div class="actions">
+      <button id="btnCam" class="btn btn-ghost">📷 カメラで読む <small>β</small></button>
+      <button id="btnClear" class="btn btn-ghost">クリア</button>
+    </div>
+  </section>
+
+  <section id="status" class="status"></section>
+  <section id="results" class="results"></section>
+
+  <section class="history" id="historyWrap" hidden>
+    <h2>最近の検索</h2>
+    <div id="history" class="chips"></div>
+  </section>
+
+  <footer class="foot">
+    データ: <a href="https://github.com/tcgdex/cards-database" target="_blank" rel="noopener">TCGdex cards-database</a>（日本語版） / 画像: TCGdex assets。<br>
+    非公式ファンツールです。ポケモンカードは株式会社ポケモンの商標です。
+  </footer>
+</main>
+
+<!-- カメラ読み取り -->
+<div id="cam" class="cam" hidden>
+  <video id="video" playsinline muted autoplay></video>
+  <div class="cam-guide"><div class="cam-box" id="camBox"><span>左下の「sv3 066/108」をこの枠に</span></div></div>
+  <div class="cam-bar">
+    <button id="camClose" class="btn btn-ghost">閉じる</button>
+    <button id="camShot" class="btn btn-main">読み取る</button>
+  </div>
+  <div id="camMsg" class="cam-msg"></div>
+  <canvas id="camCanvas" hidden></canvas>
+</div>
+
+<template id="tplCard">
+  <article class="card">
+    <div class="card-img"><img loading="lazy" alt=""><div class="noimg" hidden>画像なし</div></div>
+    <div class="card-body">
+      <div class="card-code"></div>
+      <h3 class="card-name"></h3>
+      <div class="card-set"></div>
+      <div class="badges"></div>
+      <div class="card-detail"></div>
+      <div class="links"></div>
+    </div>
+  </article>
+</template>
+
+<script src="app.js"></script>
+</body>
+</html>
