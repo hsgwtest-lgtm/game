@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>view</title>
+<style>html,body{margin:0;background:#000}canvas{width:390px;height:844px;display:block}</style></head>
+<body><canvas id="c"></canvas>
+<script type="module">
+// 学習させてから、モザイクと本番の絵を撮る（開発用）
+//   node tools/shots.mjs "tools/view.html?stage=cradle&gens=6"
+import { createGL } from '../js/gl/gpu.js';
+import { Swarm } from '../js/sim/swarm.js';
+import { activeLayout, randomRow } from '../js/sim/brain.js';
+import { STAGE_DEFS } from '../js/sim/stages.js';
+import { Evolution } from '../js/ml/evolve.js';
+import { Renderer } from '../js/gfx/render.js';
+import { RNG } from '../js/sim/rng.js';
+import { growRow, inheritSigma } from '../js/game/session.js';
+
+const q = new URLSearchParams(location.search);
+const stageId = q.get('stage') || 'cradle';
+const gens = +(q.get('gens') || 4);
+const shotSteps = (q.get('at') || '150,450').split(',').map(Number);
+const showSteps = (q.get('show') || '200,600').split(',').map(Number);
+const showB = +(q.get('sb') || 256);
+const ov = q.get('ov') ? JSON.parse(q.get('ov')) : {};
+const out = { shots: [], log: [] };
+const frame = () => new Promise((r) => setTimeout(r, 0));
+try {
+  const canvas = document.getElementById('c');
+  const gl = createGL(canvas);
+  const R = new Renderer(gl, canvas);
+  R.resize(2);
+  const sw = new Swarm(gl, { tilesX: 4, tilesY: 4, blockW: +(q.get('bw') || 16), blockH: +(q.get('bh') || 16) });
+  const def = STAGE_DEFS[stageId];
+  const L = activeLayout(q.get('senses') ? q.get('senses').split(',') : def.senses, +(q.get('hidden') || def.hidden));
+  const makeCfg = (s) => Object.assign(def.make(s), ov);
+  let row0 = randomRow(L, new RNG(10)), sigmaVec = null;
+  if (q.get('row')) {
+    const r = await (await fetch(q.get('row'))).json();
+    row0 = Float32Array.from(r.row || r);
+  } else if (q.get('pre')) {
+    const [pid, pg] = q.get('pre').split(':');
+    const pdef = STAGE_DEFS[pid];
+    const PL = activeLayout(pdef.senses, pdef.hidden);
+    const pevo = new Evolution(sw, { stage: pdef, layout: PL, row0: randomRow(PL, new RNG(10)), seed: 77, makeCfg: (s) => pdef.make(s) });
+    while (pevo.gen < +pg) { pevo.advance(100000); await frame(); }
+    row0 = growRow(pevo.eliteRow(), PL, L, new RNG(5));
+    sigmaVec = inheritSigma(PL, L, { oldS: def.inheritOld ?? 0.1 });
+  }
+  const evo = new Evolution(sw, { stage: def, layout: L, row0, seed: +(q.get('seed') || 1), makeCfg, sigmaVec });
+  while (evo.gen < gens) {
+    evo.advance(100000);
+    const r = evo.history[evo.history.length - 1];
+    out.log.push(`g${r.gen} center=${r.center.toFixed(3)} best=${r.best.toFixed(3)} alive=${r.aliveCenter.toFixed(2)}`);
+    await frame();
+  }
+  // モザイク
+  evo.startGeneration();
+  const W = 390, H = 844;
+  const pad = 6, top = 100, tw = (W - pad * 5) / 4, th = tw * 1.5;
+  const rects = [];
+  for (let k = 0; k < 16; k++) rects.push({ x: pad + (k % 4) * (tw + pad), y: top + Math.floor(k / 4) * (th + pad), w: tw, h: th });
+  let done = 0;
+  for (const s of shotSteps) {
+    evo.advance(s - done); done = s;
+    R.time = s / 60;
+    R.clear();
+    R.drawWorlds(sw, rects, { pointSize: 1.3 });
+    out.shots.push({ name: `mosaic_${s}`, url: canvas.toDataURL('image/png') });
+    await frame();
+  }
+  // 本番（大きな群れ）
+  const big = new Swarm(gl, { tilesX: 1, tilesY: 1, blockW: showB, blockH: showB });
+  big.setLayout(L);
+  big.setRows([evo.eliteRow()]);
+  const cfg = makeCfg(12345);
+  big.setStage(cfg);
+  big.beaconPath = cfg.beaconPath || null;
+  big.reset(777);
+  let t = 0;
+  const full = [{ x: 0, y: 0, w: W, h: W * 1.5 }];
+  full[0].y = (H - full[0].h) / 2;
+  for (const s of showSteps) {
+    while (t < s) {
+      big.step(1); t++;
+      if (t > s - 24) { R.time = t / 60; R.clear(); R.drawWorlds(big, full, { trails: true, pointSize: 1.2, bright: 0.5 }); }
+    }
+    out.shots.push({ name: `show_${s}`, url: canvas.toDataURL('image/png') });
+    const { C } = big.reduce();
+    out.log.push(`show t=${s} alive=${(C[0] / big.P).toFixed(3)}`);
+    await frame();
+  }
+  out.eliteRow = Array.from(evo.eliteRow());
+  out.ok = true;
+} catch (e) { out.err = String(e && e.stack || e); }
+window.__out = out;
+document.title = 'done';
+</script></body></html>

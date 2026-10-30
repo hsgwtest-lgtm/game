@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>ablate</title></head>
+<body><canvas id="c" width="64" height="64"></canvas>
+<script type="module">
+// 本能に手で重みを足して、成績がどう変わるか比べる（開発用）
+//   node tools/run.mjs "tools/ablate.html?stage=signal&seeds=4"
+import { createGL } from '../js/gl/gpu.js';
+import { Swarm } from '../js/sim/swarm.js';
+import { activeLayout, randomRow, idxDE, idxDT, idxOB, E, O, OUT } from '../js/sim/brain.js';
+import { STAGE_DEFS } from '../js/sim/stages.js';
+import { RNG } from '../js/sim/rng.js';
+
+const q = new URLSearchParams(location.search);
+const stageId = q.get('stage') || 'signal';
+const seeds = +(q.get('seeds') || 3);
+const out = { res: {} };
+try {
+  const gl = createGL(document.getElementById('c'));
+  const def = STAGE_DEFS[stageId];
+  const L = activeLayout(def.senses, def.hidden);
+  const sw = new Swarm(gl, { tilesX: 2, tilesY: 2, blockW: 16, blockH: 16 });
+  void 0;
+  const base = randomRow(L, new RNG(3));
+  // 手作りの本能: 餌へ向かい、危険から逃げる
+  const mk = (f) => { const r = Float32Array.from(base); for (let i = 0; i < r.length; i++) r[i] *= 0.2; r[idxDT(O.FOOD)] = 3; r[idxDE(OUT.SPEED, E.FOOD)] = -3; r[idxDT(O.DANGER)] = -4; r[idxDE(OUT.SPEED, E.DANGER)] = 4; f(r); return r; };
+  const jellySet = {
+    random: base,
+    forage: mk((r) => { r[idxDT(O.DANGER)] = 0; r[idxDE(OUT.SPEED, E.DANGER)] = 0; }),
+    forageFlee: mk(() => {}),
+    forageFleeFast: mk((r) => { r[idxDT(O.DANGER)] = -8; r[idxDE(OUT.SPEED, E.DANGER)] = 8; }),
+  };
+  const moonSet = {
+    noGlow: mk(() => {}),
+    lightGlow: mk((r) => { r[idxDE(OUT.GLOW, E.LIGHT)] = 2.5; }),
+    lightGlowRelay: mk((r) => { r[idxDE(OUT.GLOW, E.LIGHT)] = 2.5; r[idxDE(OUT.GLOW, E.GLOW)] = 0.7; }),
+    lightGlowRelay2: mk((r) => { r[idxDE(OUT.GLOW, E.LIGHT)] = 2.5; r[idxDE(OUT.GLOW, E.GLOW)] = 1.4; }),
+  };
+  const rows = q.get('set') === 'jelly' ? jellySet : q.get('set') === 'moon' ? moonSet : {
+    flee: mk(() => {}),
+    fleeGlowDanger: mk((r) => { r[idxDE(OUT.GLOW, E.DANGER)] = 3; }),
+    fleeGlowDangerFleeGlow: mk((r) => { r[idxDE(OUT.GLOW, E.DANGER)] = 3; r[idxDT(O.GLOW)] = -4; r[idxDE(OUT.SPEED, E.GLOW)] = 3; }),
+    fleeConstGlow: mk((r) => { r[idxOB(OUT.GLOW)] = 1.0; }),
+  };
+  const names = Object.keys(rows);
+  sw.setLayout(L);
+  sw.setRows(names.map((n) => rows[n]));
+  const acc = names.map(() => 0), accG = names.map(() => 0), accS = names.map(() => 0);
+  for (let s = 0; s < seeds; s++) {
+    const cfg = Object.assign(def.make(1000 + s), q.get('ov') ? JSON.parse(q.get('ov')) : {});
+    sw.setStage(cfg);
+    sw.reset(1000 + s);
+    sw.step(cfg.steps);
+    const { C } = sw.reduce();
+    names.forEach((n, k) => { acc[k] += C[k * 4] / sw.P / seeds; accG[k] += C[k * 4 + 3] / (sw.P * cfg.steps) / seeds; accS[k] += C[k * 4 + 2] / (sw.P * cfg.steps) / 0.1638 / seeds; });
+    await new Promise((r) => setTimeout(r, 0));
+  }
+  names.forEach((n, k) => { out.res[n] = { alive: +acc[k].toFixed(3), glow: +accG[k].toFixed(4), sync: +accS[k].toFixed(3) }; });
+  out.ok = true;
+} catch (e) { out.err = String(e && e.stack || e); }
+window.__out = out;
+document.title = 'done';
+</script></body></html>

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>evotest</title></head>
+<body><canvas id="c" width="64" height="64"></canvas>
+<script type="module">
+// ブラウザだけで進化を回して、学習曲線を出す（開発用）
+//   node tools/run.mjs "tools/evotest.html?stage=cradle&gens=40" 3000
+import { createGL } from '../js/gl/gpu.js';
+import { Swarm } from '../js/sim/swarm.js';
+import { activeLayout, randomRow } from '../js/sim/brain.js';
+import { growRow, inheritSigma } from '../js/game/session.js';
+import { STAGE_DEFS } from '../js/sim/stages.js';
+import { Evolution } from '../js/ml/evolve.js';
+import { RNG } from '../js/sim/rng.js';
+
+const q = new URLSearchParams(location.search);
+const stageId = q.get('stage') || 'cradle';
+const gens = +(q.get('gens') || 30);
+const tiles = +(q.get('tiles') || 4), bw = +(q.get('bw') || 16), bh = +(q.get('bh') || 16);
+const sigma = +(q.get('sigma') || 0.3);
+const seed = +(q.get('seed') || 1);
+const ov = q.get('ov') ? JSON.parse(q.get('ov')) : {};
+const out = { hist: [] };
+try {
+  const gl = createGL(document.getElementById('c'));
+  const sw = new Swarm(gl, { tilesX: tiles, tilesY: tiles, blockW: bw, blockH: bh });
+  const def = STAGE_DEFS[stageId];
+  const senses = q.get('senses') ? q.get('senses').split(',') : def.senses;
+  const hidden = +(q.get('hidden') || def.hidden);
+  const L = activeLayout(senses, hidden);
+  let row0 = randomRow(L, new RNG(seed * 7 + 3));
+  let sigmaVec = null;
+  // pre=jelly:25 … 先に別の試練で進化させてから受けつぐ（ゲームの流れと同じ）
+  if (q.get('pre')) {
+    const [pid, pg] = q.get('pre').split(':');
+    const pdef = STAGE_DEFS[pid];
+    const PL = activeLayout(pdef.senses, pdef.hidden);
+    const pevo = new Evolution(sw, { stage: pdef, layout: PL, row0: randomRow(PL, new RNG(seed * 7 + 3)), seed: seed + 99, sigma0: sigma, makeCfg: (s) => pdef.make(s) });
+    while (pevo.gen < +pg) {
+      pevo.advance(100000);
+      const r = pevo.history[pevo.history.length - 1];
+      console.log(`pre ${pid} g${r.gen} center=${r.center.toFixed(3)} alive=${r.aliveCenter.toFixed(2)}`);
+      await new Promise((res) => setTimeout(res, 0));
+    }
+    row0 = growRow(pevo.eliteRow(), PL, L, new RNG(5));
+    sigmaVec = inheritSigma(PL, L);
+  }
+  const makeCfg = (s) => Object.assign(def.make(s), ov);
+  const evo = new Evolution(sw, { stage: def, layout: L, row0, seed, sigma0: sigma, makeCfg, sigmaVec });
+  const t0 = performance.now();
+  while (evo.gen < gens) {
+    evo.advance(100000);
+    await new Promise((r) => setTimeout(r, 0));
+    const r = evo.history[evo.history.length - 1];
+    const line = `g${r.gen} center=${r.center.toFixed(3)} elite=${r.elite.toFixed(3)} best=${r.best.toFixed(3)} mean=${r.mean.toFixed(3)} alive=${r.aliveCenter.toFixed(2)} goal=${(r.goalCenter||0).toFixed(2)} glow=${r.glowCenter.toFixed(3)} ms=${r.moonSync.toFixed(4)} sigma=${r.sigma.toFixed(3)}${r.restored ? ' RESTORED' : ''} t=${((performance.now() - t0) / 1000).toFixed(0)}s`;
+    console.log(line);
+    out.hist.push(r);
+  }
+  out.ok = true;
+  out.dim = L.idx.length;
+  out.center = Array.from(evo.es.mu);
+  out.eliteRow = Array.from(evo.eliteRow());
+} catch (e) { out.err = String(e && e.stack || e); console.log(out.err); }
+window.__out = out;
+document.title = 'done';
+</script></body></html>

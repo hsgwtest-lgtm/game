@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NOCTILUCA">
+<meta name="theme-color" content="#02060f">
+<meta name="description" content="リーダーのいない十万の光の群れ。命令はできない。変えられるのは、全員が共有するひとつの本能だけ。16の並列世界で本能を進化させ、深海から満月の海面をめざす機械学習ゲーム。">
+<title>NOCTILUCA — 十万の光、ひとつの本能</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<canvas id="gl"></canvas>
+
+<div id="boot" class="boot">
+  <b>NOCTILUCA</b>
+  <span id="boot-msg">光の粒を呼びだしています…</span>
+</div>
+
+<section id="s-title" class="screen"></section>
+<section id="s-map" class="screen"></section>
+<section id="s-evolve" class="screen"></section>
+<section id="s-show" class="screen"></section>
+<section id="s-lab" class="screen"></section>
+<section id="s-how" class="screen"></section>
+
+<div id="modal" class="modal"></div>
+<div id="toast" class="toast"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "NOCTILUCA — 十万の光、ひとつの本能",
+  "short_name": "NOCTILUCA",
+  "description": "リーダーのいない十万の光の群れ。変えられるのは、全員が共有するひとつの本能だけ。16の並列世界で本能を進化させ、深海から満月の海面をめざす機械学習ゲーム。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#01040b",
+  "theme_color": "#02060f",
+  "lang": "ja",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
