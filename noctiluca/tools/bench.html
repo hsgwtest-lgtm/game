@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>bench</title></head>
+<body><canvas id="c" width="64" height="64"></canvas>
+<script type="module">
+import { createGL } from '../js/gl/gpu.js';
+import { Swarm } from '../js/sim/swarm.js';
+import { activeLayout, randomRow } from '../js/sim/brain.js';
+import { buildEnv } from '../js/sim/sdf.js';
+import { RNG } from '../js/sim/rng.js';
+
+const q = new URLSearchParams(location.search);
+const tiles = +(q.get('tiles') || 4), bw = +(q.get('bw') || 32), bh = +(q.get('bh') || 32), steps = +(q.get('steps') || 120);
+const out = {};
+try {
+  const gl = createGL(document.getElementById('c'));
+  const sw = new Swarm(gl, { tilesX: tiles, tilesY: tiles, blockW: bw, blockH: bh });
+  const env = buildEnv([{ t: 'c', x: 0.5, y: 0.75, r: 0.1 }]);
+  const cfg = {
+    env, spawn: [0.5, 0.3, 0.2, 0], energy0: 0.5,
+    phys: [0.004, 0.25, 0.08, 0.00006], sensor: [0.045, 0.7, 4, 0],
+    energy: [0.001, 0.0015, 0.0006, 0.2], foodP: [0.02, 0, 0, 0],
+    rew: [1, 0.5, 0, 0], rew2: [0, 0, 1.4, 0],
+    predP: [2, 0.025, 0.25, 0.15], predM: [0.0046, 0.06, 0.25, 0], predSpawns: [[0.2, 1.2], [0.8, 1.2]],
+    light: [0, 1, 0, 0.1], flow: [0, 0, 0, 0],
+    glowP: [0.9, 0.5, 1, 0], foodR: [0.015, 0, 0, 0], foodFill: 1,
+    patches: [[0.25, 0.4, 0.12, 1], [0.75, 0.5, 0.12, 1], [0.5, 1.1, 0.14, 1], [0.2, 1.2, 0.1, 1]],
+  };
+  sw.setStage(cfg);
+  const L = activeLayout(['food', 'crowd', 'touch', 'vibe', 'glow', 'light', 'memory', 'flow'], +(q.get('h') || 16));
+  sw.setLayout(L);
+  const rng = new RNG(5);
+  const rows = []; for (let k = 0; k < sw.K; k++) rows.push(randomRow(L, rng));
+  sw.setRows(rows);
+  sw.reset(123);
+  sw.step(2); sw.reduce();
+  const t0 = performance.now();
+  sw.step(steps);
+  const r = sw.reduce();
+  const t1 = performance.now();
+  out.ok = true; out.N = sw.N; out.msPerStep = (t1 - t0) / steps;
+  out.alive = Array.from({ length: sw.K }, (_, k) => r.C[k * 4]);
+  out.score = Array.from({ length: sw.K }, (_, k) => r.C[k * 4 + 1] / (sw.P * steps));
+  const pa = sw.readParticles(0, 16);
+  out.sample = Array.from(pa.A.slice(0, 16)).map((v) => +v.toFixed(4));
+  out.sampleB = Array.from(pa.B.slice(0, 16)).map((v) => +v.toFixed(4));
+  out.pred = Array.from(sw.readPredators().slice(0, 8)).map((v) => +v.toFixed(4));
+} catch (e) { out.err = String(e && e.stack || e); }
+window.__out = out;
+document.title = 'done';
+</script></body></html>
