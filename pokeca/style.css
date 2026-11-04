@@ -154,6 +154,10 @@ main { max-width: 640px; margin: 0 auto; padding: 14px 16px; }
 .cam-hit .hc { font: 600 12px ui-monospace, monospace; color: var(--accent); }
 .cam-hit .hn { font-weight: 800; font-size: 18px; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cam-hit .hs { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cam-box.reading:not(.locked) { border-color: var(--accent2); }
+.cam-cands { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.cam-cands .chip { background: rgba(16,20,31,.95); border-color: var(--accent2); padding: 8px 12px; font-size: 13px; }
+.cam-cands .chip small { display: block; font-size: 10px; color: var(--muted); }
 .cam-log { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
 .cam-log:empty { display: none; }
 .cam-log .chip { flex: 0 0 auto; background: rgba(22,28,43,.9); }
