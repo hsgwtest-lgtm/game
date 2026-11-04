@@ -1,6 +1,6 @@
 // ポケカ番号サーチ service worker
 // アプリ本体+索引は事前キャッシュ、弾ごとの詳細とカード画像は見たものから順にキャッシュ
-const VER = 'pokeca-v1';
+const VER = 'pokeca-v2';
 const CORE = ['./', './index.html', './style.css', './app.js', './manifest.json',
   './icons/icon-192.png', './icons/icon-512.png', './data/index.json'];
 
