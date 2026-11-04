@@ -256,9 +256,13 @@ inNum.addEventListener('keydown', (e) => { if (e.key === 'Enter') inTot.focus();
 inTot.addEventListener('keydown', (e) => { if (e.key === 'Enter') inTot.blur(); });
 $('#btnClear').onclick = () => { fill({}); inSet.focus(); };
 
-/* ---------- camera OCR (β) ---------- */
-const cam = $('#cam'), video = $('#video'), camMsg = $('#camMsg');
-let stream = null, worker = null;
+/* ---------- camera: real-time detection ---------- */
+const cam = $('#cam'), video = $('#video'), camMsg = $('#camMsg'), camRead = $('#camRead');
+const camBox = $('#camBox'), camHit = $('#camHit'), camLog = $('#camLog');
+let stream = null, worker = null, live = false, paused = false, loopId = 0;
+let lastHit = null;              // 直近に確定したカード
+const votes = [];                // 直近フレームの読み取り結果（多数決用）
+const VOTE_WINDOW = 4, VOTE_NEED = 2;
 
 async function getWorker() {
   if (worker) return worker;
@@ -266,7 +270,7 @@ async function getWorker() {
   if (!window.Tesseract) {
     await new Promise((ok, ng) => {
       const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+      s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
       s.onload = ok; s.onerror = () => ng(new Error('OCRの読み込みに失敗（オフライン？）'));
       document.head.appendChild(s);
     });
@@ -274,45 +278,78 @@ async function getWorker() {
   worker = await Tesseract.createWorker('eng');
   await worker.setParameters({
     tessedit_char_whitelist: '0123456789/abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-. ',
-    tessedit_pageseg_mode: '7'
+    tessedit_pageseg_mode: '7' // 1行として読む
   });
   return worker;
 }
 
 $('#btnCam').onclick = async () => {
-  cam.hidden = false;
+  cam.hidden = false; cam.classList.remove('paused'); paused = false;
+  $('#camPause').textContent = '⏸ 一時停止';
+  camHit.hidden = true; camRead.textContent = ''; votes.length = 0; lastHit = null;
   camMsg.textContent = 'カメラを起動中…';
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 }, focusMode: 'continuous' },
+      audio: false
+    });
     video.srcObject = stream;
-    camMsg.textContent = 'カードを近づけて、左下の番号を枠に合わせてください';
-    getWorker().then(() => { camMsg.textContent = '準備OK — 枠に合わせて「読み取る」'; }).catch((e) => { camMsg.textContent = e.message; });
+    await video.play().catch(() => {});
+    setupTorch();
+    await getWorker();
+    camMsg.textContent = '左下の番号を枠に合わせると自動で検知します';
+    startLoop();
   } catch (e) {
-    camMsg.textContent = 'カメラを使えません: ' + e.message;
+    camMsg.textContent = (e && e.name === 'NotAllowedError') ? 'カメラの使用が許可されていません' : 'カメラを使えません: ' + (e.message || e);
   }
 };
+
 function closeCam() {
+  live = false; loopId++;
   cam.hidden = true;
   if (stream) { stream.getTracks().forEach((t) => t.stop()); stream = null; }
 }
 $('#camClose').onclick = closeCam;
+$('#camPause').onclick = () => {
+  paused = !paused;
+  cam.classList.toggle('paused', paused);
+  $('#camPause').textContent = paused ? '▶ 再開' : '⏸ 一時停止';
+  camMsg.textContent = paused ? '一時停止中' : '左下の番号を枠に合わせると自動で検知します';
+};
+$('#camOpen').onclick = () => { if (lastHit) { closeCam(); showHit(lastHit); } };
+camHit.querySelector('img').onclick = $('#camOpen').onclick;
+
+// ライト（Android Chrome などトーチ対応端末のみ）
+function setupTorch() {
+  const btn = $('#camTorch'); btn.hidden = true; btn.classList.remove('on');
+  const track = stream && stream.getVideoTracks()[0];
+  const caps = track && track.getCapabilities ? track.getCapabilities() : {};
+  if (!caps.torch) return;
+  btn.hidden = false;
+  let on = false;
+  btn.onclick = async () => {
+    on = !on;
+    try { await track.applyConstraints({ advanced: [{ torch: on }] }); btn.classList.toggle('on', on); } catch { on = false; }
+  };
+}
 
 // 画面上の枠 → 動画座標に変換して切り出し（object-fit: cover を考慮）
 function grabBox() {
   const vw = video.videoWidth, vh = video.videoHeight;
-  const r = video.getBoundingClientRect(), b = $('#camBox').getBoundingClientRect();
+  const r = video.getBoundingClientRect(), b = camBox.getBoundingClientRect();
   const scale = Math.max(r.width / vw, r.height / vh);
   const ox = (r.width - vw * scale) / 2, oy = (r.height - vh * scale) / 2;
   const sx = (b.left - r.left - ox) / scale, sy = (b.top - r.top - oy) / scale;
   const sw = b.width / scale, sh = b.height / scale;
-  const cv = $('#camCanvas'), up = Math.max(1, 1200 / sw);
+  const cv = $('#camCanvas'), up = Math.min(3, Math.max(1, 900 / sw)); // 速度優先で幅~900px
   cv.width = Math.round(sw * up); cv.height = Math.round(sh * up);
   const ctx = cv.getContext('2d', { willReadFrequently: true });
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(video, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
   return cv;
 }
-// グレースケール + 大津の二値化（invert=true で白文字対応）
+
+// グレースケール + 大津の二値化（invert=true で暗い背景の白文字に対応）
 function binarize(src, invert) {
   const cv = document.createElement('canvas'); cv.width = src.width; cv.height = src.height;
   const ctx = cv.getContext('2d'); ctx.drawImage(src, 0, 0);
@@ -325,36 +362,113 @@ function binarize(src, invert) {
   ctx.putImageData(img, 0, 0);
   return cv;
 }
+
+// OCR文字列 → {set,num,tot}。数字部分の o/O→0, l/I/|→1 など誤認識を補正
 function parseOcr(text) {
-  const t = toHalf(text).replace(/[|\\]/g, '/').replace(/\s*\/\s*/g, '/').toLowerCase();
-  const m = t.match(/(\d{2,3})\/(\d{2,3}|[a-z]+-?p)/);
+  let t = toHalf(text).toLowerCase().replace(/[\\]/g, '/').replace(/\s*\/\s*/g, '/');
+  const fixDigits = (s) => s.replace(/[oq]/g, '0').replace(/[il|]/g, '1').replace(/z/g, '2').replace(/s/g, '5').replace(/b/g, '8');
+  // "066/108" 部分を探す（誤認識補正しながら）
+  let m = t.match(/([0-9oqilzsb|]{2,3})\/([0-9oqilzsb|]{2,3}|[a-z]{1,3}-?p)(?![0-9])/);
   if (!m) return null;
-  const before = t.slice(0, m.index);
-  const sm = before.match(/((?:sv|sm|s|m)[0-9]{0,2}[a-z]?(?:-p)?)\s*$/);
-  let set = sm ? sm[1] : '';
-  if (set && !setById.has(set)) set = '';
-  return { set, num: m[1], tot: m[2] };
-}
-$('#camShot').onclick = async () => {
-  if (!video.videoWidth) return;
-  try {
-    const w = await getWorker();
-    camMsg.textContent = '読み取り中…';
-    const raw = grabBox();
-    let found = null, seen = '';
-    for (const inv of [false, true]) {
-      const { data } = await w.recognize(binarize(raw, inv));
-      seen = seen || data.text.trim();
-      found = parseOcr(data.text);
-      if (found) break;
+  const num = fixDigits(m[1]);
+  let tot = /p$/.test(m[2]) ? m[2] : fixDigits(m[2]);
+  if (!/^\d+$/.test(num)) return null;
+  const before = t.slice(0, m.index).trim();
+  let set = '';
+  const sm = before.match(/([a-z]{1,3}[0-9oilz]{0,2}[a-z]?(?:-p)?)\s*$/);
+  if (sm) {
+    const cand = sm[1];
+    // "sv3" "svo" → 数字補正版も試す
+    for (const c of [cand, cand.replace(/^([a-z]+)([0-9oilz]+)/, (_, a, b) => a + fixDigits(b))]) {
+      if (setById.has(c)) { set = c; break; }
     }
-    if (!found) { camMsg.textContent = `読めませんでした${seen ? `（認識: ${seen.slice(0, 30)}）` : ''}。近づけて明るい所でもう一度`; return; }
-    closeCam();
-    fill(found);
-  } catch (e) {
-    camMsg.textContent = 'エラー: ' + e.message;
   }
-};
+  return { set, num, tot };
+}
+
+// 読み取り結果を実在カードに照合（1枚に絞れたときだけ採用）
+function resolve(p) {
+  if (!p) return null;
+  const r = search(p);
+  return r.hits.length === 1 ? r.hits[0] : null;
+}
+
+function startLoop() {
+  if (live) return;
+  live = true;
+  const my = ++loopId;
+  let frame = 0;
+  (async function tick() {
+    while (live && my === loopId) {
+      if (paused || !video.videoWidth || document.hidden) { await sleep(250); continue; }
+      const t0 = performance.now();
+      try {
+        const raw = grabBox();
+        // 通常/反転を交互に試す（カード下部の地色によって読みやすさが変わる）
+        const { data } = await worker.recognize(binarize(raw, frame++ % 2 === 1));
+        if (!live || my !== loopId) break;
+        const txt = data.text.replace(/\s+/g, ' ').trim();
+        camRead.textContent = txt ? `認識: ${txt.slice(0, 32)}` : '';
+        const hit = resolve(parseOcr(data.text));
+        vote(hit);
+      } catch (e) {
+        camRead.textContent = 'エラー: ' + (e.message || e);
+        await sleep(500);
+      }
+      // 端末負荷を抑える（最低 ~150ms 間隔）
+      const dt = performance.now() - t0;
+      if (dt < 150) await sleep(150 - dt);
+    }
+  })();
+}
+
+const keyOf = (h) => h ? `${h.set.id}#${h.id}` : '';
+function vote(hit) {
+  votes.push(keyOf(hit) ? hit : null);
+  if (votes.length > VOTE_WINDOW) votes.shift();
+  const counts = new Map();
+  for (const v of votes) if (v) counts.set(keyOf(v), (counts.get(keyOf(v)) || 0) + 1);
+  let bestK = '', bestN = 0;
+  for (const [k, n] of counts) if (n > bestN) { bestK = k; bestN = n; }
+  if (bestN >= VOTE_NEED && bestK !== keyOf(lastHit)) {
+    confirmHit(votes.find((v) => v && keyOf(v) === bestK));
+  }
+  camBox.classList.toggle('locked', !!hit && keyOf(hit) === keyOf(lastHit));
+}
+
+function confirmHit(h) {
+  lastHit = h;
+  camBox.classList.add('locked');
+  if (navigator.vibrate) navigator.vibrate(60);
+  const tot = h.set.o ? String(h.set.o).padStart(3, '0') : '';
+  camHit.hidden = false;
+  camHit.style.animation = 'none'; void camHit.offsetWidth; camHit.style.animation = '';
+  camHit.querySelector('.hc').textContent = `${h.set.id.toLowerCase()} ${h.id}${tot ? '/' + tot : ''}`;
+  camHit.querySelector('.hn').textContent = h.name;
+  camHit.querySelector('.hs').textContent = h.set.n;
+  const img = camHit.querySelector('img');
+  img.style.visibility = 'visible';
+  img.onerror = () => { img.style.visibility = 'hidden'; };
+  img.src = imgUrl(h).replace('high.webp', 'low.webp');
+  camMsg.textContent = '検知しました — 次のカードもそのまま読めます';
+  pushHistory(h);
+  // カメラ内のスキャン履歴（連続スキャン用）
+  const chip = document.createElement('button');
+  chip.className = 'chip';
+  chip.innerHTML = `<i>${esc(h.set.id.toLowerCase())} ${esc(h.id)}</i>${esc(h.name)}`;
+  chip.onclick = () => { closeCam(); showHit(h); };
+  camLog.prepend(chip);
+  while (camLog.children.length > 20) camLog.lastChild.remove();
+}
+
+// 検知したカードをメイン画面に表示
+function showHit(h) {
+  const tot = h.set.o ? String(h.set.o).padStart(3, '0') : '';
+  fill({ set: h.set.id.toLowerCase(), num: h.id, tot });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /* ---------- boot ---------- */
 loadDB().then(() => {

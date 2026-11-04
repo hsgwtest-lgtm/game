@@ -40,7 +40,7 @@
     <datalist id="setList"></datalist>
     <div class="plate-help">エキスパンション記号は省略OK（番号/総数から候補を出します）。まとめて <b>sv3 066/108</b> と貼り付けても分解します。</div>
     <div class="actions">
-      <button id="btnCam" class="btn btn-ghost">📷 カメラで読む <small>β</small></button>
+      <button id="btnCam" class="btn btn-ghost">📷 カメラでリアルタイム検知</button>
       <button id="btnClear" class="btn btn-ghost">クリア</button>
     </div>
   </section>
@@ -62,12 +62,26 @@
 <!-- カメラ読み取り -->
 <div id="cam" class="cam" hidden>
   <video id="video" playsinline muted autoplay></video>
-  <div class="cam-guide"><div class="cam-box" id="camBox"><span>左下の「sv3 066/108」をこの枠に</span></div></div>
-  <div class="cam-bar">
-    <button id="camClose" class="btn btn-ghost">閉じる</button>
-    <button id="camShot" class="btn btn-main">読み取る</button>
-  </div>
+  <div class="cam-guide"><div class="cam-box" id="camBox"><span>左下の「sv3 066/108」をこの枠に</span><i class="scanline"></i></div></div>
   <div id="camMsg" class="cam-msg"></div>
+  <div id="camRead" class="cam-read"></div>
+  <div class="cam-bottom">
+    <div id="camHit" class="cam-hit" hidden>
+      <img alt="">
+      <div class="hb">
+        <div class="hc"></div>
+        <div class="hn"></div>
+        <div class="hs"></div>
+      </div>
+      <button id="camOpen" class="btn btn-main">詳細</button>
+    </div>
+    <div id="camLog" class="cam-log"></div>
+    <div class="cam-bar">
+      <button id="camClose" class="btn btn-ghost">閉じる</button>
+      <button id="camTorch" class="btn btn-ghost" hidden>💡 ライト</button>
+      <button id="camPause" class="btn btn-ghost">⏸ 一時停止</button>
+    </div>
+  </div>
   <canvas id="camCanvas" hidden></canvas>
 </div>
 
