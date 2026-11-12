@@ -1,0 +1,17 @@
+{
+  "name": "門番の目 — 手法で変わる学習パズル",
+  "short_name": "門番の目",
+  "description": "門番に見本を見せて「止める・通す」を教える機械学習パズル。線形・決定木・k近傍法・ニューラルネット・森の5つの手法で、同じ見本からまったく違う脳が育つ。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "lang": "ja",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
