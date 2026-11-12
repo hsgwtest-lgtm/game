@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="門番の目">
+<meta name="theme-color" content="#ffffff">
+<meta name="description" content="門番に見本を見せて「止める・通す」を教える機械学習パズル。線形・決定木・k近傍法・ニューラルネット・森の5つの手法は、同じ見本からまったく違う脳を育てる。">
+<title>門番の目 — 手法で変わる学習パズル</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<canvas id="gl" aria-label="門と門番と訪問者の3D表示"></canvas>
+
+<main id="home" class="screen"></main>
+
+<div id="play" class="screen" hidden>
+  <header class="hud">
+    <button class="btn-icon" id="btn-back" aria-label="一覧へもどる">←</button>
+    <div class="hud-title"><b id="hud-name"></b><span id="hud-hint"></span></div>
+    <div class="hud-count" aria-live="polite"><span>見本</span><b id="hud-count"></b></div>
+  </header>
+  <button class="inset inset-map" id="map-box" aria-label="頭の中の地図。タップでレンズの組み合わせを切り替え">
+    <canvas id="map"></canvas><span id="map-cap"></span>
+  </button>
+  <div class="inset inset-eye" id="eye-box"><div id="eye-win"></div><span>門番の目</span></div>
+  <div id="chip" class="chip" hidden></div>
+
+  <section class="sheet" id="sheet-teach">
+    <div class="row cards" id="cards" role="radiogroup" aria-label="手法"></div>
+    <div class="row dial" id="dial"></div>
+    <div class="row lens" id="lens" aria-label="レンズ（門番が見る特徴）"></div>
+    <div class="row act">
+      <div class="pool-acc"><span>列での正解</span><b id="pool-acc">–</b></div>
+      <button class="btn btn-outline" id="btn-clear">見本を外す</button>
+      <button class="btn btn-solid" id="btn-run">本番へ</button>
+    </div>
+  </section>
+  <section class="sheet" id="sheet-run" hidden>
+    <div class="tally"><div id="dots" class="dots"></div><p><b id="run-ok">0</b> 正解 ／ <b id="run-ng">0</b> ミス</p></div>
+    <div class="row act">
+      <button class="btn btn-outline" id="btn-fast">早送り</button>
+      <button class="btn btn-solid" id="btn-skip">結果へ</button>
+    </div>
+  </section>
+</div>
+
+<div id="modal" class="modal" hidden></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
