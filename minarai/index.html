@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="見習いアーム">
+<meta name="theme-color" content="#05070f">
+<meta name="description" content="32×32ピクセルの目しか持たないロボットアームに仕事を教えるゲーム。お手本を見せる模倣学習、自分で練習させる強化学習、その合わせ技の3通りで育てて、検定の合格率をくらべる。学習はすべて端末の中で行う。">
+<title>見習いアーム — 32×32の目で仕事をおぼえる</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<canvas id="gl" aria-label="ロボットアームの作業場の3D表示"></canvas>
+
+<main id="home" class="screen"></main>
+
+<div id="play" class="screen" hidden>
+  <header class="hud">
+    <button class="icon-btn" id="btn-back" aria-label="現場の一覧へもどる">←</button>
+    <div class="hud-title"><b id="st-name"></b><span id="st-brief"></span></div>
+    <button class="icon-btn txt" id="btn-speed" aria-label="見る速さ">×1</button>
+    <button class="icon-btn txt" id="btn-view" aria-label="視点を切り替える">真上</button>
+  </header>
+
+  <div class="eye" id="eye-box">
+    <div class="eye-win"><canvas id="eye" width="32" height="32"></canvas><canvas id="eye-ov" width="192" height="192"></canvas></div>
+    <span>AIの目 32×32</span>
+  </div>
+  <div class="probs" id="probs" hidden>
+    <div class="pg"><i>肩</i><div class="bars"><b></b><b></b><b></b></div><em>⟳ ・ ⟲</em></div>
+    <div class="pg"><i>ひじ</i><div class="bars"><b></b><b></b><b></b></div><em>⟳ ・ ⟲</em></div>
+    <div class="pg"><i>手</i><div class="bars two"><b></b><b></b></div><em>開 握</em></div>
+  </div>
+  <div class="status" id="status"></div>
+  <div class="ticker" id="ticker" aria-live="polite"></div>
+
+  <section class="sheet">
+    <nav class="methods" id="methods" role="tablist" aria-label="学び方"></nav>
+    <nav class="steps" id="steps" role="tablist" aria-label="手順"></nav>
+    <div class="panel" id="panel"></div>
+  </section>
+</div>
+
+<div id="modal" class="modal" hidden></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

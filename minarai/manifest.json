@@ -1,0 +1,17 @@
+{
+  "name": "見習いアーム — 32×32の目で仕事をおぼえる",
+  "short_name": "見習いアーム",
+  "description": "32×32ピクセルの目しか持たないロボットアームに仕事を教えるゲーム。模倣学習・強化学習・その合わせ技の3通りで育てて、検定の合格率をくらべる。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#05070f",
+  "theme_color": "#05070f",
+  "lang": "ja",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
