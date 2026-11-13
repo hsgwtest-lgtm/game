@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="512" height="512" shape-rendering="crispEdges">
+  <title>はこにわ進化島</title>
+  <!-- 空（夕暮れの帯） -->
+  <rect x="0" y="0" width="16" height="3" fill="#13234a"/>
+  <rect x="0" y="3" width="16" height="2" fill="#1f3a73"/>
+  <rect x="0" y="5" width="16" height="2" fill="#35569a"/>
+  <rect x="0" y="7" width="16" height="3" fill="#5674b4"/>
+  <!-- 星と月 -->
+  <rect x="2" y="1" width="1" height="1" fill="#cfd8ff"/>
+  <rect x="8" y="0.5" width="0.5" height="0.5" fill="#cfd8ff"/>
+  <rect x="14" y="3" width="0.5" height="0.5" fill="#cfd8ff"/>
+  <rect x="11" y="1" width="2" height="2" fill="#f6ebb6"/>
+  <!-- 海 -->
+  <rect x="0" y="10" width="16" height="6" fill="#2c6db0"/>
+  <rect x="0" y="13" width="16" height="3" fill="#245c99"/>
+  <rect x="1" y="12" width="1" height="0.5" fill="#7fbdf2"/>
+  <rect x="13" y="14" width="1" height="0.5" fill="#7fbdf2"/>
+  <rect x="6" y="15" width="1" height="0.5" fill="#7fbdf2"/>
+  <!-- 島（ボクセル） -->
+  <rect x="1" y="8" width="14" height="1" fill="#5db143"/>
+  <rect x="1" y="9" width="14" height="1" fill="#4b8f35"/>
+  <rect x="2" y="10" width="12" height="1" fill="#7a5230"/>
+  <rect x="3" y="11" width="10" height="1" fill="#6a4628"/>
+  <rect x="4" y="12" width="8" height="1" fill="#e6d39a" opacity="0.55"/>
+  <!-- 木と実 -->
+  <rect x="3" y="3" width="1" height="1" fill="#3f9842"/>
+  <rect x="2" y="4" width="3" height="2" fill="#2f7d32"/>
+  <rect x="3" y="6" width="1" height="2" fill="#6b4426"/>
+  <rect x="2" y="5" width="1" height="1" fill="#e0443a"/>
+  <rect x="4" y="4" width="1" height="1" fill="#f2a03a"/>
+  <!-- うさぎ（左へ逃げる） -->
+  <rect x="7" y="4" width="1" height="2" fill="#efe8da"/>
+  <rect x="6" y="6" width="2" height="1" fill="#f6f1e6"/>
+  <rect x="6" y="7" width="3" height="1" fill="#f6f1e6"/>
+  <rect x="9" y="7" width="1" height="0.6" fill="#ffffff"/>
+  <rect x="6.2" y="6.2" width="0.4" height="0.4" fill="#1a1a1a"/>
+  <!-- きつね（追いかける） -->
+  <rect x="11" y="5" width="1" height="1" fill="#c75a22"/>
+  <rect x="10" y="6" width="2" height="1" fill="#e8742f"/>
+  <rect x="11" y="7" width="3" height="1" fill="#e8742f"/>
+  <rect x="14" y="6" width="1" height="1" fill="#e8742f"/>
+  <rect x="14" y="5.4" width="1" height="0.6" fill="#fff4e6"/>
+  <rect x="10.2" y="6.2" width="0.4" height="0.4" fill="#1a1a1a"/>
+</svg>

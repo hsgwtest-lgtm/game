@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="はこにわ">
+<meta name="theme-color" content="#0f1724">
+<meta name="description" content="ドットの小さな島で、自分の脳（ニューラルネット）で考える生き物たちが食べ、逃げ、子を残す。世代を重ねると島に合った形質が残っていく、生態系と進化の観察ゲーム。">
+<title>はこにわ進化島 — ドットの生態系</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="view" aria-label="島の3D表示。1本指で回転、2本指でズームと移動、タップで道具を使う"></canvas>
+
+<header id="hud" class="hud" hidden>
+  <div class="hud-bar">
+    <div class="clock">
+      <b id="h-day">1日目</b>
+      <span id="h-time">07:12</span>
+      <span id="h-weather" aria-label="天気">☀️</span>
+      <span id="h-temp">18℃</span>
+    </div>
+    <div class="speed" role="group" aria-label="時間の速さ">
+      <button type="button" data-speed="0" aria-label="一時停止">停止</button>
+      <button type="button" data-speed="1">1x</button>
+      <button type="button" data-speed="2">2x</button>
+      <button type="button" data-speed="4">4x</button>
+    </div>
+  </div>
+  <div class="chips">
+    <span class="chip herb" title="草食動物"><i aria-hidden="true">🐇</i><b id="h-herb">0</b></span>
+    <span class="chip carn" title="肉食動物"><i aria-hidden="true">🦊</i><b id="h-carn">0</b></span>
+    <span class="chip" title="生きている種の数"><i aria-hidden="true">🧬</i><b id="h-sp">0</b>種</span>
+    <span class="chip" title="いちばん新しい世代">世代<b id="h-gen">0</b></span>
+    <span class="chip" title="草の量"><i aria-hidden="true">🌿</i><b id="h-grass">0</b>%</span>
+    <span class="chip god" id="h-godchip" title="神の力（道具を使うと減り、時間で回復）"><i aria-hidden="true">✨</i><b id="h-god">∞</b></span>
+  </div>
+  <button type="button" id="mission-bar" class="mission-bar" hidden>
+    <span class="mb-title" id="mb-title"></span>
+    <span class="mb-text" id="mb-text"></span>
+    <span class="meter" aria-hidden="true"><i id="mb-fill"></i></span>
+  </button>
+  <div id="legend" class="legend" hidden></div>
+</header>
+
+<footer id="dock" class="dock" hidden>
+  <div id="tool-opt" class="tool-opt" hidden></div>
+  <div class="tools" id="tools" role="toolbar" aria-label="神さまの道具">
+    <button type="button" data-tool="look"><i aria-hidden="true">👆</i><span>観察</span></button>
+    <button type="button" data-tool="grass"><i aria-hidden="true">🌱</i><span>草</span><em data-cost="grass"></em></button>
+    <button type="button" data-tool="fruit"><i aria-hidden="true">🍎</i><span>木の実</span><em data-cost="fruit"></em></button>
+    <button type="button" data-tool="tree"><i aria-hidden="true">🌳</i><span>木</span><em data-cost="tree"></em></button>
+    <button type="button" data-tool="herb"><i aria-hidden="true">🐇</i><span>草食</span><em data-cost="herb"></em></button>
+    <button type="button" data-tool="carn"><i aria-hidden="true">🦊</i><span>肉食</span><em data-cost="carn"></em></button>
+    <span class="tools-sep" aria-hidden="true"></span>
+    <button type="button" data-event="rain"><i aria-hidden="true">🌧️</i><span>雨</span><em data-cost="rain"></em></button>
+    <button type="button" data-event="heat"><i aria-hidden="true">🔥</i><span>熱波</span><em data-cost="heat"></em></button>
+    <button type="button" data-event="cold"><i aria-hidden="true">❄️</i><span>寒波</span><em data-cost="cold"></em></button>
+  </div>
+  <nav class="tabs" aria-label="パネル">
+    <button type="button" data-sheet="graph"><i aria-hidden="true">📈</i><span>グラフ</span></button>
+    <button type="button" data-sheet="species"><i aria-hidden="true">🧬</i><span>種</span></button>
+    <button type="button" data-sheet="goal"><i aria-hidden="true">🏆</i><span>ミッション</span></button>
+    <button type="button" data-sheet="menu"><i aria-hidden="true">☰</i><span>メニュー</span></button>
+  </nav>
+</footer>
+
+<section id="sheet" class="sheet" hidden aria-labelledby="sheet-title">
+  <div class="sheet-head">
+    <h2 id="sheet-title"></h2>
+    <button type="button" id="sheet-close" class="btn-icon" aria-label="閉じる">✕</button>
+  </div>
+  <div id="sheet-body" class="sheet-body"></div>
+</section>
+
+<div id="title" class="title">
+  <div class="title-card">
+    <p class="title-kicker">ドットの生態系シミュレーション</p>
+    <h1>はこにわ<br>進化島</h1>
+    <p class="lead">小さな島で、草を食べる動物と、それを狩る動物が暮らしています。みんな自分の小さな脳で考えて動き、子に形質と脳を受け継ぎます。世代を重ねると、島に合った体と行動が残っていきます。</p>
+    <div class="title-actions">
+      <button type="button" id="t-continue" class="btn btn-solid" hidden>つづきから<small id="t-continue-info"></small></button>
+      <button type="button" id="t-sandbox" class="btn btn-solid">新しい島で観察する</button>
+      <button type="button" id="t-missions" class="btn btn-outline">ミッションに挑戦</button>
+      <button type="button" id="t-help" class="btn btn-text">あそびかた</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-card" id="modal-card" role="dialog" aria-modal="true"></div>
+</div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<noscript><p class="noscript">このゲームを遊ぶには JavaScript を有効にしてください。</p></noscript>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

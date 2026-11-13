@@ -1,0 +1,17 @@
+{
+  "name": "はこにわ進化島 — ドットの生態系",
+  "short_name": "はこにわ",
+  "description": "ドットの小さな島で、自分の脳（ニューラルネット）で考える生き物たちが食べ、逃げ、子を残す。世代を重ねると島に合った形質が残っていく、生態系と進化の観察ゲーム。",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1724",
+  "theme_color": "#0f1724",
+  "categories": ["games", "education"],
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
