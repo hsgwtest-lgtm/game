@@ -1,0 +1,10 @@
+{
+  "name": "manabi-lab",
+  "private": true,
+  "version": "1.0.0",
+  "description": "学習くらべラボ — 4つの学習方法を同じ島でくらべるピクセル×Three.jsの箱庭PWA",
+  "type": "module",
+  "scripts": {
+    "test": "node tests/run.js"
+  }
+}
