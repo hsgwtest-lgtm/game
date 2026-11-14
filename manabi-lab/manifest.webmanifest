@@ -1,0 +1,17 @@
+{
+  "name": "学習くらべラボ — 4つの学び方をくらべるドットの島",
+  "short_name": "学習くらべ",
+  "description": "ボクセルの島で、ルール・進化ニューラルネット・Q学習・ランダム＋選択の4つの学び方で生き物が育つ。学習曲線・系図・ベスト個体のリプレイで、学び方のちがいを観察するドット絵の実験ラボ。",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1020",
+  "theme_color": "#0b1020",
+  "categories": ["education", "games"],
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

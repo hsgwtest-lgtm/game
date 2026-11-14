@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="学習くらべ">
+<meta name="theme-color" content="#0b1020">
+<meta name="description" content="ボクセルの島で、ルール・進化ニューラルネット・Q学習・ランダム＋選択の4つの学び方で生き物が育つ。学習曲線・系図・ベスト個体のリプレイで、学び方のちがいを観察するドット絵の実験ラボ。">
+<title>学習くらべラボ — 4つの学び方をくらべるドットの島</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="view" aria-label="島の3D表示。1本指で回転、2本指でズームと移動、タップで生き物を選ぶ"></canvas>
+
+<!-- 最大速（ヘッドレス高速学習）のあいだの表示 -->
+<div id="fast" class="fast px-panel" hidden role="status" aria-live="polite">
+  <div class="fast-head"><i data-icon="bolt"></i><b>高速学習中</b><span class="fast-sub">島の描画を止めて、学習だけを全力で回しています</span></div>
+  <div class="fast-nums">
+    <span>世代 <canvas id="f-gen" class="pnum"></canvas></span>
+    <span><canvas id="f-rate" class="pnum"></canvas> 世代/秒</span>
+    <span id="f-target"></span>
+  </div>
+  <canvas id="f-chart" class="pix"></canvas>
+  <div id="f-legend" class="legend"></div>
+</div>
+
+<header id="hud" class="hud" hidden>
+  <div class="hud-bar">
+    <div class="clock px-panel">
+      <i id="h-sky" data-icon="sun"></i>
+      <span class="lbl">世代</span><canvas id="h-gen" class="pnum"></canvas>
+      <span id="h-day" class="day">1日目</span>
+      <span id="h-time" class="time">06:00</span>
+    </div>
+    <div class="speed" role="group" aria-label="時間の速さ">
+      <button type="button" class="pbtn" data-speed="0" aria-label="一時停止"><i data-icon="pause"></i><span>停止</span></button>
+      <button type="button" class="pbtn" data-speed="1"><i data-icon="play"></i><span>1x</span></button>
+      <button type="button" class="pbtn" data-speed="2"><i data-icon="ff"></i><span>2x</span></button>
+      <button type="button" class="pbtn" data-speed="4"><i data-icon="fff"></i><span>4x</span></button>
+      <button type="button" class="pbtn" data-speed="max" aria-label="最大速（ヘッドレス高速学習）"><i data-icon="bolt"></i><span>最大</span></button>
+    </div>
+  </div>
+  <div id="season" class="season" aria-hidden="true"></div>
+  <div id="chips" class="chips" role="group" aria-label="方式（タップで見る島を切り替え）"></div>
+  <div id="info" class="info px-panel" hidden></div>
+</header>
+
+<!-- ベスト個体のリプレイ操作 -->
+<div id="repbar" class="repbar px-panel" hidden>
+  <div class="rep-head">
+    <i id="rep-icon" data-icon="replay"></i>
+    <div class="rep-title"><b id="rep-title"></b><small id="rep-sub"></small></div>
+    <button type="button" id="rep-exit" class="pbtn small"><i data-icon="close"></i><span>もどる</span></button>
+  </div>
+  <canvas id="rep-chart" class="pix"></canvas>
+  <div class="rep-ctl">
+    <button type="button" id="rep-start" class="pbtn icon-only" aria-label="はじめから"><i data-icon="rewind"></i></button>
+    <button type="button" id="rep-play" class="pbtn icon-only" aria-label="再生・一時停止"><i data-icon="pause"></i></button>
+    <button type="button" id="rep-speed" class="pbtn small">1x</button>
+    <input id="rep-seek" class="prange" type="range" min="0" max="144" step="1" value="0" aria-label="リプレイの時刻">
+  </div>
+</div>
+
+<footer id="dock" class="dock" hidden>
+  <nav class="tabs" aria-label="パネル">
+    <button type="button" class="pbtn tab" data-sheet="graph"><i data-icon="chart"></i><span>グラフ</span></button>
+    <button type="button" class="pbtn tab" data-sheet="tree"><i data-icon="tree"></i><span>系図</span></button>
+    <button type="button" class="pbtn tab" data-sheet="replay"><i data-icon="replay"></i><span>リプレイ</span></button>
+    <button type="button" class="pbtn tab" data-sheet="mind"><i data-icon="book"></i><span>方式</span></button>
+    <button type="button" class="pbtn tab" data-sheet="lab"><i data-icon="flask"></i><span>実験</span></button>
+  </nav>
+</footer>
+
+<section id="sheet" class="sheet px-panel" hidden aria-labelledby="sheet-title">
+  <div class="sheet-head">
+    <h2 id="sheet-title"></h2>
+    <button type="button" id="sheet-close" class="pbtn icon-only" aria-label="閉じる"><i data-icon="close"></i></button>
+  </div>
+  <div id="sheet-body" class="sheet-body"></div>
+</section>
+
+<div id="title" class="title">
+  <div class="title-card px-panel">
+    <p class="kicker">4つの学び方をくらべる、ドットの実験島</p>
+    <h1 class="logo"><span>学習</span><span>くらべ</span><span>ラボ</span></h1>
+    <div id="t-methods" class="t-methods"></div>
+    <p class="lead">草を食べて暮らす小さな生き物たち。同じ島・同じ条件で、<b>ルール</b>・<b>進化NN</b>・<b>Q学習</b>・<b>ランダム＋選択</b>の4つの方法で「上手な暮らし方」を身につけていきます。学び方によって、何が・いつ・どう変わるのかを観察しよう。</p>
+    <div class="title-actions">
+      <button type="button" id="t-continue" class="pbtn big gold" hidden><i data-icon="play"></i><span>つづきから<small id="t-continue-info"></small></span></button>
+      <button type="button" id="t-separate" class="pbtn big"><i data-icon="island"></i><span>4つの島でくらべる<small>方式ごとに別の島（同じ地形・同じ出発点）</small></span></button>
+      <button type="button" id="t-arena" class="pbtn big"><i data-icon="sword"></i><span>1つの島で競争させる<small>集めた草の割合で、次の世代のなわばりが決まる</small></span></button>
+      <button type="button" id="t-help" class="pbtn"><i data-icon="help"></i><span>あそびかた</span></button>
+    </div>
+  </div>
+</div>
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-card px-panel" id="modal-card" role="dialog" aria-modal="true"></div>
+</div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<noscript><p class="noscript">このアプリを使うには JavaScript を有効にしてください。</p></noscript>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
