@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>無人島プロジェクト</title>
+    <meta name="description" content="フォロワーが住む無人島。動画がない日も、島はここで動いています。" />
+    <meta name="theme-color" content="#2a9fd0" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icon.svg" />
+    <link rel="stylesheet" href="./css/style.css" />
+  </head>
+  <body data-sheet="closed">
+    <div id="app">
+      <main id="stage">
+        <canvas id="scene" aria-label="島のライブ表示。ドラッグで回転、ピンチで拡大、タップで島民や建物を選べます。"></canvas>
+        <div id="labels" aria-hidden="true"></div>
+
+        <header id="hud">
+          <div class="hud-title">
+            <span class="hud-icon" data-icon="island"></span>
+            <h1 id="island-name">無人島プロジェクト</h1>
+          </div>
+          <div class="hud-stats">
+            <span class="chip chip-day" id="day-chip">–日目</span>
+            <span class="chip" id="pop-chip">島民 –人</span>
+          </div>
+        </header>
+
+        <button id="vote-chip" type="button" hidden>
+          <span class="vote-chip-badge">投票受付中</span>
+          <span id="vote-chip-text"></span>
+          <span class="vote-chip-arrow" aria-hidden="true">›</span>
+        </button>
+
+        <div id="loading">
+          <span class="loading-icon" data-icon="island"></span>
+          <span class="loading-text">島を読み込み中…</span>
+        </div>
+        <div id="toast" role="status" aria-live="polite"></div>
+      </main>
+
+      <section id="panel" data-view="islanders" aria-label="島の情報">
+        <button id="recenter" type="button" aria-label="島全体を見る">
+          <span data-icon="island"></span><span>全体</span>
+        </button>
+
+        <div id="sheet">
+          <div id="view-islanders" class="view">
+            <h2 class="view-title"><span data-icon="people"></span>島民</h2>
+            <p id="sample-note" class="note" hidden>いまはデモ用のサンプル（島民・出来事）を表示しています。</p>
+            <form id="search-form" role="search">
+              <label for="search" class="visually-hidden">島民を名前やIDで探す</label>
+              <span class="search-icon" data-icon="search"></span>
+              <input id="search" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="名前やIDで探す" />
+            </form>
+            <p id="list-meta" class="list-meta"></p>
+            <ol id="islander-list" class="islander-list"></ol>
+          </div>
+
+          <div id="view-chronicle" class="view" hidden>
+            <h2 class="view-title"><span data-icon="scroll"></span>島の年表</h2>
+            <section id="island-now" class="island-now" aria-label="島のいま"></section>
+            <ol id="chronicle-list" class="chronicle"></ol>
+          </div>
+
+          <div id="view-vote" class="view" hidden>
+            <h2 class="view-title"><span data-icon="vote"></span>投票</h2>
+            <div id="vote-card" class="vote-card"></div>
+          </div>
+
+          <div id="view-detail" class="view" hidden></div>
+
+          <p id="updated" class="updated"></p>
+        </div>
+
+        <nav id="tabs" aria-label="表示の切り替え">
+          <button type="button" data-tab="island" aria-selected="true"><span data-icon="island"></span><span>島</span></button>
+          <button type="button" data-tab="islanders" aria-selected="false"><span data-icon="people"></span><span>島民</span></button>
+          <button type="button" data-tab="chronicle" aria-selected="false"><span data-icon="scroll"></span><span>年表</span></button>
+          <button type="button" data-tab="vote" aria-selected="false"><span data-icon="vote"></span><span>投票</span><i class="tab-dot" hidden></i></button>
+        </nav>
+      </section>
+    </div>
+
+    <noscript><p class="noscript">この島を見るには JavaScript を有効にしてください。</p></noscript>
+    <script type="module" src="./js/main.js"></script>
+  </body>
+</html>

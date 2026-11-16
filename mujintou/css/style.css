@@ -1,0 +1,1323 @@
+/* 無人島プロジェクト PWA — ドット絵ゲームのUIを意識した、角ばった枠と段影のスタイル */
+
+:root {
+  --ink: #231d36;
+  --ink-soft: #5d5674;
+  --paper: #fbf2d8;
+  --paper-2: #f2e3ba;
+  --card: #fff9e6;
+  --accent: #e8643c;
+  --accent-dark: #b8431f;
+  --sea: #2a9fd0;
+  --leaf: #3f9a45;
+  --gold: #f2c230;
+  --pink: #e2607e;
+  --sky: #8fd6f5;
+  --tabs-h: 58px;
+  --sheet-h: 50vh;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: var(--sky);
+}
+
+body {
+  font-family: 'Hiragino Maru Gothic ProN', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', 'Meiryo', 'Noto Sans JP', 'Noto Sans CJK JP', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+ol,
+ul,
+dl,
+dd {
+  margin: 0;
+}
+
+ol,
+ul {
+  padding: 0;
+  list-style: none;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.px-icon,
+.portrait {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  flex: none;
+  display: block;
+}
+
+/* ---- 全体の配置（スマホ：島が全画面、情報は下からのシート） ---- */
+
+#app {
+  position: fixed;
+  inset: 0;
+}
+
+#stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--sky);
+}
+
+#scene {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+}
+
+#scene:active {
+  cursor: grabbing;
+}
+
+#labels {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* 島民の名前ラベル。字の大きさと濃さはカメラの距離に応じて JS（zoom.js）が決める */
+.label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 0.27em 0.45em;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  color: #fff;
+  background: rgba(35, 29, 54, 0.86);
+  will-change: transform;
+}
+
+.label.is-talking {
+  z-index: 1;
+}
+
+.label.is-selected {
+  z-index: 2;
+  color: var(--ink);
+  background: var(--gold);
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
+/* セリフの吹き出し（行動範囲の縁で、たまにつぶやく）。名前ラベルの上に出る */
+.speech {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  padding: 0.4em 0.6em;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: var(--ink);
+  background: #fff;
+  border: 2px solid var(--ink);
+  box-shadow: 2px 2px 0 rgba(35, 29, 54, 0.35);
+  transform: translateX(-50%);
+}
+
+/* しっぽ（ドット絵ふうの段々） */
+.speech::before,
+.speech::after {
+  position: absolute;
+  left: 50%;
+  content: '';
+  background: var(--ink);
+}
+
+.speech::before {
+  top: calc(100% + 2px);
+  width: 8px;
+  height: 3px;
+  margin-left: -4px;
+}
+
+.speech::after {
+  top: calc(100% + 5px);
+  width: 4px;
+  height: 3px;
+  margin-left: -2px;
+}
+
+.dlabel {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.78);
+  border: 2px solid var(--ink);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.dlabel.is-on {
+  opacity: 0.95;
+}
+
+/* ---- ヘッダー ---- */
+
+#hud {
+  position: absolute;
+  inset: 0 0 auto 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: calc(var(--safe-top) + 8px) 10px 14px;
+  pointer-events: none;
+  background: linear-gradient(rgba(35, 29, 54, 0.5), rgba(35, 29, 54, 0));
+}
+
+.hud-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.hud-icon {
+  padding: 3px;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+}
+
+#island-name {
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #fff;
+  text-shadow:
+    2px 0 0 var(--ink),
+    -2px 0 0 var(--ink),
+    0 2px 0 var(--ink),
+    0 -2px 0 var(--ink),
+    2px 2px 0 var(--ink),
+    -2px 2px 0 var(--ink),
+    2px -2px 0 var(--ink),
+    -2px -2px 0 var(--ink);
+}
+
+.hud-stats {
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-block;
+  padding: 3px 7px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.3;
+  white-space: nowrap;
+  color: var(--ink);
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.chip-day {
+  background: var(--gold);
+}
+
+.chip-open {
+  color: #fff;
+  background: var(--leaf);
+}
+
+.chip-counting {
+  background: var(--gold);
+}
+
+.chip-closed {
+  color: #fff;
+  background: var(--ink-soft);
+}
+
+#vote-chip {
+  position: absolute;
+  top: calc(var(--safe-top) + 52px);
+  left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: calc(100% - 20px);
+  min-height: 36px;
+  padding: 4px 9px 4px 4px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.vote-chip-badge {
+  flex: none;
+  padding: 3px 6px;
+  font-size: 11px;
+  color: #fff;
+  background: var(--accent-dark);
+}
+
+#vote-chip-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.vote-chip-arrow {
+  flex: none;
+  font-size: 16px;
+  line-height: 1;
+}
+
+#loading {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100% - 40px);
+  padding: 12px 16px;
+  font-weight: 700;
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--ink);
+  transform: translate(-50%, -50%);
+}
+
+#loading .loading-icon {
+  animation: bob 0.8s steps(2) infinite;
+}
+
+#loading.is-error .loading-icon {
+  animation: none;
+}
+
+@keyframes bob {
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+#toast {
+  position: absolute;
+  bottom: calc(var(--tabs-h) + var(--safe-bottom) + 14px);
+  left: 50%;
+  max-width: calc(100% - 24px);
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(35, 29, 54, 0.92);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: opacity 0.2s;
+}
+
+#toast.is-on {
+  opacity: 1;
+}
+
+/* ---- 下のパネル（シート＋タブ） ---- */
+
+#panel {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#recenter {
+  position: absolute;
+  top: -50px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 40px;
+  padding: 4px 9px 4px 6px;
+  font-size: 12px;
+  font-weight: 800;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+#recenter:active,
+#vote-chip:active {
+  box-shadow: none;
+  transform: translate(2px, 2px);
+}
+
+#sheet {
+  height: 0;
+  padding: 0 14px;
+  overflow: hidden auto;
+  visibility: hidden;
+  background: var(--paper);
+  border-top: 0 solid var(--ink);
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  transition:
+    height 0.26s ease,
+    visibility 0s 0.26s;
+}
+
+body[data-sheet='open'] #sheet {
+  height: var(--sheet-h);
+  padding: 14px 14px 22px;
+  visibility: visible;
+  border-top-width: 3px;
+  transition: height 0.26s ease;
+}
+
+#tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  flex: none;
+  height: calc(var(--tabs-h) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  background: var(--ink);
+  border-top: 3px solid var(--ink);
+}
+
+#tabs button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--paper);
+  background: #3a3352;
+  border: 0;
+  border-right: 2px solid var(--ink);
+}
+
+#tabs button:last-child {
+  border-right: 0;
+}
+
+#tabs button[aria-selected='true'] {
+  color: var(--ink);
+  background: var(--paper);
+}
+
+#tabs button:focus-visible {
+  outline-offset: -4px;
+}
+
+.tab-dot {
+  position: absolute;
+  top: 7px;
+  right: calc(50% - 22px);
+  width: 9px;
+  height: 9px;
+  background: var(--accent);
+  border: 2px solid var(--ink);
+}
+
+/* ---- シートの中身 ---- */
+
+.view-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.note {
+  margin-bottom: 10px;
+  padding: 5px 8px;
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--paper-2);
+  border-left: 4px solid var(--gold);
+}
+
+.muted {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.updated {
+  margin-top: 16px;
+  font-size: 11px;
+  text-align: right;
+  color: var(--ink-soft);
+}
+
+.tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+  vertical-align: 2px;
+  color: var(--ink-soft);
+  background: #fff;
+  border: 1px solid var(--ink-soft);
+}
+
+.tag-adopted {
+  margin: 0;
+  color: #fff;
+  background: var(--accent-dark);
+  border-color: var(--ink);
+}
+
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 8px 14px;
+  font-weight: 800;
+  text-decoration: none;
+  color: var(--ink);
+  background: var(--card);
+  border: 3px solid var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
+}
+
+.btn:active {
+  box-shadow: none;
+  transform: translateY(3px);
+}
+
+.btn-primary {
+  color: #fff;
+  background: var(--accent-dark);
+}
+
+.btn-small {
+  min-height: 36px;
+  padding: 4px 10px;
+  font-size: 12px;
+  border-width: 2px;
+  box-shadow: 0 2px 0 var(--ink);
+}
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: var(--card);
+  border: 2px solid var(--ink);
+  box-shadow: 0 2px 0 var(--ink);
+}
+
+.empty {
+  padding: 16px 12px;
+  font-size: 13px;
+  text-align: center;
+  color: var(--ink-soft);
+  background: var(--card);
+  border: 2px dashed var(--ink-soft);
+}
+
+.empty-title {
+  margin-bottom: 4px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+/* 島民検索とランキング */
+
+#search-form {
+  position: relative;
+}
+
+.search-icon {
+  position: absolute;
+  top: 50%;
+  left: 11px;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+#search {
+  width: 100%;
+  height: 46px;
+  padding: 0 10px 0 44px;
+  font-size: 16px;
+  font-weight: 700;
+  background: #fff;
+  border: 3px solid var(--ink);
+  border-radius: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+#search::placeholder {
+  font-weight: 400;
+  color: #8d86a1;
+}
+
+.list-meta {
+  margin: 10px 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.islander-list li + li {
+  margin-top: 7px;
+}
+
+.islander-row {
+  display: grid;
+  grid-template-columns: 38px 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 60px;
+  padding: 5px 12px 5px 6px;
+  text-align: left;
+  background: var(--card);
+  border: 2px solid var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
+}
+
+.islander-row:active,
+.rel-row:active {
+  box-shadow: none;
+  transform: translateY(3px);
+}
+
+.rank {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.rank-4 {
+  color: var(--ink-soft);
+}
+
+.portrait-wrap {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 48px;
+  overflow: hidden;
+  background: #c6ecf8;
+  border: 2px solid var(--ink);
+}
+
+.portrait-wrap .portrait {
+  width: 36px;
+  height: 48px;
+  margin-top: 2px;
+}
+
+.portrait-big {
+  width: 60px;
+  height: 78px;
+}
+
+.portrait-big .portrait {
+  width: 54px;
+  height: 72px;
+}
+
+.portrait-building {
+  background: var(--paper-2);
+}
+
+.portrait-building .px-icon {
+  width: 40px !important;
+  height: 32px !important;
+}
+
+.who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.who-name {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 800;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.who-sub {
+  overflow: hidden;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ink-soft);
+}
+
+.days {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.days::before {
+  margin-right: 3px;
+  content: '在住';
+  color: var(--ink-soft);
+}
+
+.days b {
+  font-size: 21px;
+  line-height: 1;
+}
+
+/* 年表 */
+
+.chronicle {
+  margin-left: 6px;
+}
+
+.chron {
+  position: relative;
+  padding: 0 0 18px 18px;
+  border-left: 3px solid var(--ink);
+}
+
+.chron:last-child {
+  padding-bottom: 2px;
+}
+
+.chron::before {
+  position: absolute;
+  top: 4px;
+  left: -8px;
+  width: 13px;
+  height: 13px;
+  content: '';
+  background: var(--accent);
+  border: 2px solid var(--ink);
+}
+
+.chron-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chron-head time {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.chron h3 {
+  margin: 7px 0 2px;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.chron-vote {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: var(--card);
+  border: 2px solid var(--ink);
+}
+
+.chron-vote-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--ink-soft);
+}
+
+.chron-vote-label .px-icon {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+.chron-vote-q {
+  font-size: 13px;
+}
+
+.chron-vote strong {
+  font-size: 15px;
+}
+
+.chron-vote-note {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+/* 行動範囲が広がった日（住民の投票で決まった拡大） */
+.chron-expand::before {
+  background: var(--leaf);
+}
+
+.chron-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.chron-range-label {
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--leaf);
+}
+
+/* 島のいま（拠点と行動範囲） */
+
+.island-now {
+  margin-bottom: 18px;
+  padding: 10px 12px;
+  background: var(--card);
+  border: 2px solid var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
+}
+
+.now-title {
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.now-list > div {
+  display: grid;
+  grid-template-columns: 4.6em minmax(0, 1fr);
+  gap: 8px;
+  padding: 5px 0;
+  border-top: 2px dotted var(--paper-2);
+}
+
+.now-list dt {
+  padding-top: 1px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--ink-soft);
+}
+
+.now-list dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 6px;
+  font-size: 13px;
+}
+
+.now-list dd b {
+  font-size: 14px;
+}
+
+.now-list dd span {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.now-barriers li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
+}
+
+.now-barriers li + li {
+  margin-top: 2px;
+}
+
+.now-note {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+/* 投票カード */
+
+.vote-card {
+  padding: 14px;
+  background: var(--card);
+  border: 3px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.vote-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vote-kicker {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.vote-q {
+  margin: 8px 0 2px;
+  font-size: 21px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.vote-desc {
+  font-size: 13px;
+}
+
+.vote-options {
+  display: grid;
+  gap: 7px;
+  margin: 12px 0;
+}
+
+.vote-options li {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px 7px 7px;
+  background: #fff;
+  border: 2px solid var(--ink);
+}
+
+.vote-options li.is-adopted {
+  background: #ffe9a8;
+}
+
+.opt-key {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.opt-body {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.35;
+}
+
+.opt-body b {
+  font-size: 15px;
+}
+
+.opt-body span {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.vote-deadline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 13px;
+}
+
+.vote-deadline-label {
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.vote-remaining {
+  color: var(--accent-dark);
+}
+
+.vote-result-note {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.vote-how {
+  margin-top: 14px;
+  padding: 12px;
+  font-size: 13px;
+  background: var(--paper-2);
+  border: 2px solid var(--ink);
+}
+
+.vote-how-title {
+  margin-bottom: 2px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.vote-how ol {
+  margin: 8px 0 12px;
+  padding-left: 1.5em;
+  list-style: decimal;
+}
+
+.vote-how ol li + li {
+  margin-top: 2px;
+}
+
+/* 詳細パネル */
+
+.detail-head {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.detail-head > :first-child {
+  justify-self: start;
+}
+
+.detail-head > :last-child {
+  justify-self: end;
+}
+
+.detail-kicker {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  color: var(--ink-soft);
+}
+
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.profile-main {
+  min-width: 0;
+}
+
+.profile h3 {
+  font-size: 21px;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.profile-id {
+  font-size: 12px;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.now-line {
+  min-height: 1.6em;
+  margin-top: 5px;
+  padding: 2px 8px;
+  font-size: 13px;
+  font-weight: 700;
+  background: #e1f2d0;
+  border-left: 4px solid var(--leaf);
+}
+
+.now-line:empty {
+  visibility: hidden;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  grid-auto-flow: column;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.facts > div {
+  padding: 6px 8px;
+  background: var(--card);
+  border: 2px solid var(--ink);
+}
+
+.facts dt {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.facts dd {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.facts dd b {
+  font-size: 22px;
+}
+
+.since {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.section-title {
+  margin: 16px 0 7px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.rel-list li + li {
+  margin-top: 7px;
+}
+
+.rel-row {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 60px;
+  padding: 5px 10px 5px 6px;
+  text-align: left;
+  background: var(--card);
+  border: 2px solid var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
+}
+
+.rel-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rel-name {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 800;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.rel-type {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.meter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.meter-bar {
+  display: block;
+  width: 62px;
+  height: 12px;
+  background: #fff;
+  border: 2px solid var(--ink);
+}
+
+.meter-fill {
+  display: block;
+  height: 100%;
+  background: var(--pink);
+}
+
+.meter-num {
+  width: 1.9em;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.noscript {
+  position: fixed;
+  inset: auto 0 0 0;
+  padding: 16px;
+  text-align: center;
+  background: var(--paper);
+}
+
+@supports (height: 1dvh) {
+  :root {
+    --sheet-h: 50dvh;
+  }
+}
+
+/* ---- PC・横長：右に常設のパネル ---- */
+
+@media (min-width: 900px) {
+  #app {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 400px;
+  }
+
+  #stage {
+    position: relative;
+    inset: auto;
+  }
+
+  #panel {
+    position: relative;
+    inset: auto;
+    min-height: 0;
+    background: var(--paper);
+    border-left: 3px solid var(--ink);
+  }
+
+  #tabs {
+    order: -1;
+    grid-template-columns: repeat(3, 1fr);
+    height: 60px;
+    padding: 0;
+    border-top: 0;
+    border-bottom: 3px solid var(--ink);
+  }
+
+  #tabs button {
+    flex-direction: row;
+    gap: 8px;
+    font-size: 13px;
+  }
+
+  #tabs button[data-tab='island'] {
+    display: none;
+  }
+
+  .tab-dot {
+    top: 10px;
+    right: 12px;
+  }
+
+  #sheet,
+  body[data-sheet='open'] #sheet {
+    flex: 1;
+    height: auto;
+    min-height: 0;
+    padding: 18px 18px 24px;
+    visibility: visible;
+    border-top: 0;
+    transition: none;
+  }
+
+  #recenter {
+    top: auto;
+    right: calc(100% + 14px);
+    bottom: 14px;
+  }
+
+  #toast {
+    bottom: 20px;
+  }
+
+  #island-name {
+    font-size: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

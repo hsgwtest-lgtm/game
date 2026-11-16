@@ -1,0 +1,36 @@
+{
+  "sample": false,
+  "islandName": "無人島プロジェクト",
+  "day": 1,
+  "updatedAt": "2026-11-16",
+  "base": null,
+  "districts": [
+    { "id": "beach", "inRange": true },
+    { "id": "cove", "inRange": true },
+    { "id": "plain", "inRange": true },
+    { "id": "forest", "inRange": false },
+    { "id": "highland", "inRange": false }
+  ],
+  "buildings": [],
+  "chronicle": [
+    {
+      "day": 1,
+      "title": "島の記録がはじまる",
+      "text": "まだ誰もいない、手つかずの無人島。フォローした人は、この島の東の砂浜に漂着する。最初の問いは「拠点はどこにする？」。"
+    }
+  ],
+  "currentVote": {
+    "id": "vote-001-base",
+    "status": "open",
+    "question": "拠点はどこにする？",
+    "description": "これからこの島に漂着する人たちが、暮らしの拠点をつくる場所を選ぼう。選ばれた場所に広場ができて、島の開拓がはじまる。",
+    "options": [
+      { "key": "A", "label": "島の真ん中の平原", "note": "平らで広い。森にも高原にも近い" },
+      { "key": "B", "label": "入り江のほとり", "note": "波がおだやか。釣りや舟出に向いている" },
+      { "key": "C", "label": "漂着した砂浜", "note": "見晴らしがよく、漂流者をすぐ迎えられる" }
+    ],
+    "deadline": null,
+    "postUrl": "",
+    "result": null
+  }
+}

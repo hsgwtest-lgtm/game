@@ -1,0 +1,87 @@
+{
+  "updatedAt": "2026-11-16",
+  "islanders": [
+    {
+      "id": "sample_nagisa",
+      "name": "なぎさ",
+      "joinedDay": 1,
+      "since": "2026-11-12",
+      "home": "cove",
+      "job": "漁師",
+      "color": "#3f8fd6",
+      "relationships": [
+        { "id": "sample_riku", "type": "rival", "affinity": 35 },
+        { "id": "sample_sora", "type": "friend", "affinity": 70 }
+      ],
+      "sample": true
+    },
+    {
+      "id": "sample_genta",
+      "name": "げんた",
+      "joinedDay": 1,
+      "since": "2026-11-12",
+      "home": "plain",
+      "job": "大工",
+      "color": "#e0862f",
+      "relationships": [
+        { "id": "sample_koharu", "type": "crush", "affinity": 80 },
+        { "id": "sample_minori", "type": "friend", "affinity": 55 }
+      ],
+      "sample": true
+    },
+    {
+      "id": "sample_minori",
+      "name": "みのり",
+      "joinedDay": 1,
+      "since": "2026-11-12",
+      "home": "plain",
+      "job": "農家",
+      "color": "#58b04a",
+      "relationships": [
+        { "id": "sample_koharu", "type": "friend", "affinity": 85 },
+        { "id": "sample_genta", "type": "friend", "affinity": 55 }
+      ],
+      "sample": true
+    },
+    {
+      "id": "sample_sora",
+      "name": "そら",
+      "joinedDay": 2,
+      "since": "2026-11-13",
+      "home": "beach",
+      "job": "探検家",
+      "color": "#8a63d2",
+      "relationships": [
+        { "id": "sample_nagisa", "type": "friend", "affinity": 70 }
+      ],
+      "sample": true
+    },
+    {
+      "id": "sample_koharu",
+      "name": "こはる",
+      "joinedDay": 3,
+      "since": "2026-11-14",
+      "home": "plain",
+      "job": "料理人",
+      "color": "#e2607e",
+      "relationships": [
+        { "id": "sample_minori", "type": "friend", "affinity": 85 },
+        { "id": "sample_genta", "type": "friend", "affinity": 45 }
+      ],
+      "sample": true
+    },
+    {
+      "id": "sample_riku",
+      "name": "りく",
+      "joinedDay": 4,
+      "since": "2026-11-15",
+      "home": "cove",
+      "job": "漁師",
+      "color": "#2fa39a",
+      "relationships": [
+        { "id": "sample_nagisa", "type": "rival", "affinity": 35 }
+      ],
+      "sample": true
+    }
+  ]
+}

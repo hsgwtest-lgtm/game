@@ -1,0 +1,62 @@
+{
+  "sample": true,
+  "islandName": "無人島プロジェクト",
+  "day": 5,
+  "updatedAt": "2026-11-16",
+  "base": { "name": "中央の広場", "x": 0, "z": 5, "decidedDay": 2 },
+  "districts": [
+    { "id": "beach", "inRange": true },
+    { "id": "cove", "inRange": true },
+    { "id": "plain", "inRange": true },
+    { "id": "forest", "inRange": false },
+    { "id": "highland", "inRange": false }
+  ],
+  "buildings": [
+    { "id": "hut-1", "type": "hut", "name": "はじまりの小屋", "x": -2, "z": -7, "rot": 0, "builtDay": 3 },
+    { "id": "field-1", "type": "field", "name": "みんなの畑", "x": 5, "z": 27, "rot": 180, "builtDay": 5 },
+    { "id": "pier-1", "type": "pier", "name": "入り江の桟橋", "x": -14, "z": 54, "rot": 0, "builtDay": 5 }
+  ],
+  "chronicle": [
+    {
+      "day": 1,
+      "date": "2026-11-12",
+      "title": "最初の漂着",
+      "text": "最初の島民たちが東の砂浜に流れ着いた。最初の問いは「拠点はどこにする？」。"
+    },
+    {
+      "day": 2,
+      "date": "2026-11-13",
+      "title": "拠点が決まった",
+      "text": "島の真ん中の平原に広場をつくり、たき火を囲むことに。ここから開拓がはじまる。",
+      "vote": { "question": "拠点はどこにする？", "adopted": "島の真ん中の平原", "note": "いいね最多のコメントを採用" }
+    },
+    {
+      "day": 3,
+      "date": "2026-11-14",
+      "title": "はじまりの小屋が完成",
+      "text": "広場の北に小屋が建った。たき火を囲んで、はじめての夜ごはん。",
+      "vote": { "question": "最初に建てるものは？", "adopted": "小屋", "note": "いいね最多のコメントを採用" }
+    },
+    {
+      "day": 5,
+      "date": "2026-11-16",
+      "title": "桟橋と畑ができた",
+      "text": "入り江に桟橋がのび、広場の南に畑ができた。魚と野菜で食卓がにぎやかに。",
+      "vote": { "question": "食料はどうやって手に入れる？", "adopted": "釣りと畑の両方", "note": "いいね最多のコメントを採用" }
+    }
+  ],
+  "currentVote": {
+    "id": "vote-sample-4",
+    "status": "open",
+    "question": "次に建てるものは？",
+    "description": "島の暮らしを広げる建物を1つ選ぼう。",
+    "options": [
+      { "key": "A", "label": "見張り台", "note": "遠くの高原まで見渡せる" },
+      { "key": "B", "label": "かまど", "note": "料理のレパートリーが増える" },
+      { "key": "C", "label": "2軒目の小屋", "note": "新しい島民を迎えやすくなる" }
+    ],
+    "deadline": "2026-11-19T21:00:00+09:00",
+    "postUrl": "",
+    "result": null
+  }
+}
